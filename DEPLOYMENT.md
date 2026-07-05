@@ -27,10 +27,12 @@ You only need to do this once on any machine you plan to deploy from:
    git commit -m "..."
    git push origin main
    ```
-2. **Deploy:**
+2. **Deploy — always with `APP_URL` overridden for the build:**
    ```
-   vapor deploy production
+   APP_URL=https://farmtask.be vapor deploy production
    ```
+   **Do not run plain `vapor deploy production` from a local dev machine.** See "Critical: APP_URL during builds" below for why.
+
    This single command:
    - Runs the `build` steps from `vapor.yml` (composer install, `npm run build`, route/view/event caching)
    - Builds a Docker image and pushes it to AWS ECR
@@ -46,6 +48,25 @@ You only need to do this once on any machine you plan to deploy from:
 If a deploy fails, **check where it failed** before assuming anything went live:
 - If it failed during the build/image-push stage (before "Updating Function Code"), production is untouched — the previous version is still serving traffic, and migrations have not run.
 - Only once you see `Ensuring Storage Exists` / `Updating Function Code` onward has anything about the live environment started changing.
+
+## Critical: APP_URL during builds
+
+For a Docker-runtime project like this one, Vapor's `build:` commands (`composer install`, `php artisan ziggy:generate`, `npm run build`, etc.) run **locally on the machine invoking `vapor deploy`**, before the Docker image is assembled — they are not run inside the production environment. That means they read your **local** `.env` file, not the production one.
+
+This matters specifically for `php artisan ziggy:generate`: it bakes the app's base URL into `resources/js/ziggy.js`, which then gets bundled into the shipped frontend JS and used as the base for every `route()`-generated link in the app (invitation-accept links, export downloads, any `route()` call in a React page). If your local `.env` has `APP_URL=http://localhost:8000` (the normal local dev setting), that's what ends up live in production — every generated link points at `localhost:8000` instead of `farmtask.be`, silently broken for anyone but whoever's running the local dev server.
+
+**Fix:** always prefix the deploy command with the correct URL as a real shell environment variable (not by editing `.env`, which risks being left in place and breaking local dev):
+```
+APP_URL=https://farmtask.be vapor deploy production
+```
+A real environment variable takes precedence over the value in `.env`, so this overrides it just for that one command without touching any files.
+
+**How to tell if this has happened:** fetch the live app's JS bundle and search for `localhost`:
+```
+curl -s https://farmtask.be/login | grep -o 'src="[^"]*app-[^"]*\.js"'
+curl -s "<that asset URL>" | grep -o "localhost[^\"']*"
+```
+If that prints anything, the bundle has the wrong base URL baked in — redeploy with the `APP_URL=` prefix above to fix it.
 
 ## Environment variables
 
