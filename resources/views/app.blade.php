@@ -10,7 +10,7 @@
         <link rel="icon" href="/favicon.ico" sizes="any">
 
         <!-- PWA -->
-        <link rel="manifest" href="/manifest.json">
+        <link rel="manifest" href="/manifest.webmanifest">
         <meta name="theme-color" content="#1A5C38">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
         <meta name="apple-mobile-web-app-capable" content="yes">
