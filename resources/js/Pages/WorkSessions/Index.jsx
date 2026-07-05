@@ -1,5 +1,18 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import HelpTip from '@/Components/HelpTip';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+
+const STATUS_LABELS = {
+    draft: 'Draft',
+    finalised: 'Finalised',
+    approved: 'Approved',
+};
+
+const STATUS_COLORS = {
+    draft: 'bg-gray-100 text-gray-600',
+    finalised: 'bg-blue-100 text-blue-700',
+    approved: 'bg-green-100 text-green-700',
+};
 
 export default function Index({ sessions, activeSession }) {
     const { currentProperty } = usePage().props;
@@ -63,6 +76,25 @@ export default function Index({ sessions, activeSession }) {
                     </Link>
                 )}
 
+                {/* Finalise & share / export */}
+                <div className="flex items-center justify-end gap-3 mb-3">
+                    <div className="flex items-center gap-1 px-3 py-2 bg-white rounded-lg shadow">
+                        <Link
+                            href={route('work-sessions.finalise-and-share')}
+                            className="text-sm font-medium text-green-600"
+                        >
+                            Finalise & Share →
+                        </Link>
+                        <HelpTip messageKey="work-sessions.finalise-and-share" />
+                    </div>
+                    <Link
+                        href={route('work-sessions.export')}
+                        className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600"
+                    >
+                        Export →
+                    </Link>
+                </div>
+
                 {/* Sessions list */}
                 {sessions.length === 0 ? (
                     <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
@@ -101,9 +133,13 @@ export default function Index({ sessions, activeSession }) {
                                                 ${session.billing_amount}
                                             </p>
                                         )}
-                                        {!session.ended_at && (
+                                        {!session.ended_at ? (
                                             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
                                                 Active
+                                            </span>
+                                        ) : (
+                                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[session.status]}`}>
+                                                {STATUS_LABELS[session.status]}
                                             </span>
                                         )}
                                     </div>

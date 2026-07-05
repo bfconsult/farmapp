@@ -1,5 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 
 const STATUS_COLORS = {
     'Pending': 'bg-yellow-100 text-yellow-800',
@@ -14,31 +16,62 @@ const PRIORITY_COLORS = {
     'High': 'bg-orange-100 text-orange-700',
     'Critical': 'bg-red-100 text-red-700',
 };
-export default function Index({ jobs, counts, currentStatus, currentOrder, currentView, jobStatuses }) {
+
+function currentMonthRange() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const from = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const to = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(lastDay)}`;
+    return { from, to };
+}
+
+export default function Index({ jobs, counts, currentStatusIds, currentOrder, currentDateFrom, currentDateTo, jobStatuses }) {
     const { currentProperty } = usePage().props;
+    const [showFilters, setShowFilters] = useState(false);
+    const [showCalendar, setShowCalendar] = useState(false);
 
-    const filterByStatus = (status) => {
+    const goTo = (overrides = {}) => {
         router.get(route('jobs.index'), {
-            status: currentStatus === status ? null : status,
-            order: currentOrder,
-            view: currentView,
-        }, { preserveState: true });
+            statuses: overrides.statuses ?? currentStatusIds,
+            date_from: overrides.dateFrom ?? currentDateFrom,
+            date_to: overrides.dateTo ?? currentDateTo,
+            order: overrides.order ?? currentOrder,
+        }, { preserveState: true, preserveScroll: true });
     };
 
-    const changeOrder = (e) => {
-        router.get(route('jobs.index'), {
-            status: currentStatus,
-            order: e.target.value,
-            view: currentView,
-        }, { preserveState: true });
+    const toggleStatus = (statusId) => {
+        const next = currentStatusIds.includes(statusId)
+            ? currentStatusIds.filter((id) => id !== statusId)
+            : [...currentStatusIds, statusId];
+        goTo({ statuses: next });
     };
 
-    const changeView = (view) => {
-        router.get(route('jobs.index'), {
-            view,
-            order: currentOrder,
-        }, { preserveState: true });
+    const selectAllStatuses = () => goTo({ statuses: jobStatuses.map((s) => s.id) });
+    const selectNoStatuses = () => goTo({ statuses: [] });
+
+    const changeOrder = (e) => goTo({ order: e.target.value });
+    const changeRange = (dateFrom, dateTo) => goTo({ dateFrom, dateTo });
+
+    const formatDate = (iso) =>
+        new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+
+    const resetToThisMonth = () => {
+        const { from, to } = currentMonthRange();
+        goTo({ dateFrom: from, dateTo: to });
     };
+
+    const isThisMonth = (() => {
+        const { from, to } = currentMonthRange();
+        return currentDateFrom === from && currentDateTo === to;
+    })();
+
+    const filterSummary = [
+        isThisMonth ? 'This month' : `${currentDateFrom} → ${currentDateTo}`,
+        currentStatusIds.length === jobStatuses.length
+            ? 'All statuses'
+            : `${currentStatusIds.length} status${currentStatusIds.length === 1 ? '' : 'es'}`,
+    ].join(' · ');
 
     return (
         <AuthenticatedLayout title="Jobs">
@@ -46,59 +79,17 @@ export default function Index({ jobs, counts, currentStatus, currentOrder, curre
 
             <div className="max-w-lg mx-auto mt-2">
 
-
-                {/* View toggle */}
-                <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-4">
-                    {['active', 'completed', 'all'].map((view) => (
-                        <button
-                            key={view}
-                            onClick={() => changeView(view)}
-                            className={`flex-1 py-2 rounded-md text-sm font-medium capitalize transition-all ${
-                                currentView === view
-                                    ? 'bg-white text-gray-900 shadow'
-                                    : 'text-gray-500'
-                            }`}
-                        >
-                            {view}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Status counts */}
-                <div className="grid gap-1 mb-3" style={{ gridTemplateColumns: `repeat(${jobStatuses.length}, 1fr)` }}>
-                {jobStatuses.map((status) => (
+                {/* Filters toggle */}
+                <div className="flex items-center justify-between mb-3">
                     <button
-                        key={status.id}
-                        onClick={() => filterByStatus(status.name)}
-                        className={`rounded-lg p-1.5 text-center border-2 transition-all ${
-                            currentStatus === status.name
-                                ? 'border-green-500 bg-green-50'
-                                : 'border-transparent bg-white'
-                        }`}
+                        onClick={() => setShowFilters((v) => !v)}
+                        className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
                     >
-                        <div className="text-base font-bold text-gray-900">
-                            {counts[status.name] ?? 0}
-                        </div>
-                        <div className="text-xs text-gray-500 leading-tight">
-                            {status.name}
-                        </div>
+                        <span>Filters</span>
+                        <span className="text-xs text-gray-500 font-normal">{filterSummary}</span>
+                        <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
                     </button>
-                ))}
-            </div>
 
-                {/* Order selector */}
-                <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm text-gray-500">
-                        {currentStatus ? `Filtered: ${currentStatus}` : 'All jobs'}
-                        {currentStatus && (
-                            <button
-                                onClick={() => filterByStatus(currentStatus)}
-                                className="ml-2 text-green-600"
-                            >
-                                ✕ Clear
-                            </button>
-                        )}
-                    </span>
                     <select
                         value={currentOrder}
                         onChange={changeOrder}
@@ -110,20 +101,76 @@ export default function Index({ jobs, counts, currentStatus, currentOrder, curre
                     </select>
                 </div>
 
+                {showFilters && (
+                    <div className="bg-white rounded-lg shadow p-4 mb-4 space-y-4">
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-gray-700">Date range</span>
+                                {!isThisMonth && (
+                                    <button onClick={resetToThisMonth} className="text-xs text-green-600">
+                                        Reset to this month
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setShowCalendar((v) => !v)}
+                                className="w-full flex items-center justify-between text-sm border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
+                            >
+                                <span>{formatDate(currentDateFrom)} → {formatDate(currentDateTo)}</span>
+                                <span className="text-gray-400">{showCalendar ? '▲' : '▼'}</span>
+                            </button>
+                            {showCalendar && (
+                                <div className="mt-2 border border-gray-200 rounded-lg p-3">
+                                    <DateRangeCalendar
+                                        from={currentDateFrom}
+                                        to={currentDateTo}
+                                        onChange={changeRange}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-gray-700">Status</span>
+                                <div className="flex gap-2 text-xs">
+                                    <button onClick={selectAllStatuses} className="text-green-600">All</button>
+                                    <button onClick={selectNoStatuses} className="text-green-600">None</button>
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                {jobStatuses.map((status) => (
+                                    <label
+                                        key={status.id}
+                                        className="flex items-center justify-between gap-2 py-1 cursor-pointer"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={currentStatusIds.includes(status.id)}
+                                                onChange={() => toggleStatus(status.id)}
+                                                className="rounded text-green-600 focus:ring-green-500"
+                                            />
+                                            <span className="text-sm text-gray-700">{status.name}</span>
+                                        </span>
+                                        <span className="text-xs text-gray-400">{counts[status.id] ?? 0}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Jobs list */}
                 {jobs.length === 0 ? (
                     <div className="bg-white rounded-lg shadow p-8 text-center">
-                        <p className="text-gray-500 mb-4">
-                            {currentStatus ? `No ${currentStatus} jobs.` : `No ${currentView} jobs.`}
-                        </p>
-                        {currentView === 'active' && !currentStatus && (
-                            <Link
-                                href={route('jobs.create')}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm"
-                            >
-                                Add your first job
-                            </Link>
-                        )}
+                        <p className="text-gray-500 mb-4">No jobs match the current filters.</p>
+                        <Link
+                            href={route('jobs.create')}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm"
+                        >
+                            Add your first job
+                        </Link>
                     </div>
                 ) : (
                     <div className="space-y-3">

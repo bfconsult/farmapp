@@ -52,32 +52,41 @@ function LookupRow({ item, onSave, onDelete, extraFields }) {
                         {item.can_book_time ? 'bookable' : 'not bookable'}
                     </span>
                 )}
+                {item.is_in_progress_default && (
+                    <span className="text-xs ml-2 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                        in-progress default
+                    </span>
+                )}
             </div>
-            <div className="flex gap-3">
-                <button
-                    onClick={() => setEditing(true)}
-                    className="text-sm text-green-600"
-                >
-                    Edit
-                </button>
-                <button
-                    onClick={() => onDelete(item.id)}
-                    className="text-sm text-red-500"
-                >
-                    Delete
-                </button>
-            </div>
+            {item.is_protected ? (
+                <span className="text-xs text-gray-400">Default</span>
+            ) : (
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setEditing(true)}
+                        className="text-sm text-green-600"
+                    >
+                        Edit
+                    </button>
+                    <button
+                        onClick={() => onDelete(item.id)}
+                        className="text-sm text-red-500"
+                    >
+                        Delete
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
 
 function AddRow({ onAdd, extraFields }) {
     const [adding, setAdding] = useState(false);
-    const [values, setValues] = useState({ name: '', order: 0, can_book_time: true });
+    const [values, setValues] = useState({ name: '', order: 0, can_book_time: true, is_in_progress_default: false });
 
     const save = () => {
         onAdd(values);
-        setValues({ name: '', order: 0, can_book_time: true });
+        setValues({ name: '', order: 0, can_book_time: true, is_in_progress_default: false });
         setAdding(false);
     };
 
@@ -121,13 +130,21 @@ function AddRow({ onAdd, extraFields }) {
     );
 }
 
-export default function Index({ priorities, jobTypes, jobStatuses }) {
+const BILLING_BLOCK_LABELS = {
+    1: '1 minute',
+    15: '15 minutes',
+    30: '30 minutes',
+    60: '1 hour',
+};
+
+export default function Index({ priorities, jobTypes, jobStatuses, billingBlockMinutes, billingBlockOptions }) {
     const [activeTab, setActiveTab] = useState('priorities');
 
     const tabs = [
         { key: 'priorities', label: 'Priorities' },
         { key: 'jobTypes', label: 'Types' },
         { key: 'jobStatuses', label: 'Statuses' },
+        { key: 'billing', label: 'Billing' },
     ];
 
     // Priorities
@@ -149,6 +166,11 @@ export default function Index({ priorities, jobTypes, jobStatuses }) {
     const saveJobStatus = (id, values) => router.patch(route('settings.job-statuses.update', id), values);
     const deleteJobStatus = (id) => {
         if (confirm('Delete this status?')) router.delete(route('settings.job-statuses.destroy', id));
+    };
+
+    // Billing block
+    const setBillingBlock = (minutes) => {
+        router.patch(route('settings.billing-block.update'), { billing_block_minutes: minutes });
     };
 
     const orderField = (values, setValues) => (
@@ -178,6 +200,15 @@ export default function Index({ priorities, jobTypes, jobStatuses }) {
                     className="rounded"
                 />
                 Can book time against this status
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                    type="checkbox"
+                    checked={values.is_in_progress_default ?? false}
+                    onChange={(e) => setValues({ ...values, is_in_progress_default: e.target.checked })}
+                    className="rounded"
+                />
+                Switch a job to this status when time is first booked against it
             </label>
         </>
     );
@@ -247,6 +278,36 @@ export default function Index({ priorities, jobTypes, jobStatuses }) {
                             ))}
                             <AddRow onAdd={addJobStatus} extraFields={statusFields} />
                         </>
+                    )}
+
+                    {activeTab === 'billing' && (
+                        <div>
+                            <p className="text-sm text-gray-500 mb-3">
+                                Round work session durations up to the nearest:
+                            </p>
+                            <div className="space-y-1">
+                                <label className="flex items-center gap-2 py-2 px-1 text-sm text-gray-900">
+                                    <input
+                                        type="radio"
+                                        name="billing_block"
+                                        checked={!billingBlockMinutes}
+                                        onChange={() => setBillingBlock(null)}
+                                    />
+                                    No rounding (exact time)
+                                </label>
+                                {billingBlockOptions.map((minutes) => (
+                                    <label key={minutes} className="flex items-center gap-2 py-2 px-1 text-sm text-gray-900">
+                                        <input
+                                            type="radio"
+                                            name="billing_block"
+                                            checked={billingBlockMinutes === minutes}
+                                            onChange={() => setBillingBlock(minutes)}
+                                        />
+                                        {BILLING_BLOCK_LABELS[minutes] ?? `${minutes} minutes`}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>

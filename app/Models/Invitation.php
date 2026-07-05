@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 class Invitation extends Model
 {
-    protected $fillable = ['property_id', 'invited_by', 'email', 'role', 'token'];
+    protected $fillable = ['property_id', 'invited_by', 'email', 'role', 'message', 'token', 'accepted_at'];
 
     protected $casts = [
         'accepted_at' => 'datetime',

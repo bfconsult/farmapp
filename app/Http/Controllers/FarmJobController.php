@@ -7,6 +7,7 @@ use App\Models\Priority;
 use App\Models\JobType;
 use App\Models\JobStatus;
 use App\Models\Property;
+use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -15,46 +16,51 @@ class FarmJobController extends Controller
 {
     public function index(Request $request)
     {
+        if (Auth::user()->properties()->doesntExist()) {
+            return redirect()->route('properties.create');
+        }
+
         $currentPropertyId = session('current_property_id');
-        $view = $request->view ?? 'active';
-    
-        $query = Auth::user()->farmJobs()
+
+        $dateFrom = $request->date_from
+            ? \Carbon\Carbon::parse($request->date_from)->startOfDay()
+            : now()->startOfMonth();
+        $dateTo = $request->date_to
+            ? \Carbon\Carbon::parse($request->date_to)->endOfDay()
+            : now()->endOfMonth();
+
+        // Status ids: explicit selection from the Filters panel, or (on first
+        // load, when nothing has been chosen yet) the statuses flagged as active.
+        // Note: an empty `statuses` array is dropped entirely by query-string
+        // serialization, so it can't be distinguished from "absent" on its own —
+        // `date_from` is always sent by the Filters panel and never empty, so we
+        // use its presence as the "the user has touched the filters" signal.
+        if ($request->has('date_from')) {
+            $statusIds = collect($request->input('statuses', []))->map(fn ($id) => (int) $id)->all();
+        } else {
+            $statusIds = JobStatus::where('can_book_time', true)->pluck('id')->all();
+        }
+
+        $query = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
-            ->with(['priority', 'jobType', 'jobStatus', 'property']);
-    
-        // Apply view filter
-        match($view) {
-            'active' => $query->whereHas('jobStatus', function ($q) {
-                $q->where('can_book_time', true);
-            })->orWhere(function ($q) use ($currentPropertyId) {
-                $q->whereNull('job_status_id')
-                  ->when($currentPropertyId, fn($q) => $q->where('property_id', $currentPropertyId));
-            }),
-            'completed' => $query->whereHas('jobStatus', function ($q) {
-                $q->where('name', 'Completed');
-            }),
-            default => null,
-        };
-    
-        // Status counts (always based on full unfiltered set)
-        $allJobs = Auth::user()->farmJobs()
+            ->whereBetween('created_at', [$dateFrom, $dateTo])
+            ->with(['priority', 'jobType', 'jobStatus', 'property'])
+            ->whereIn('job_status_id', $statusIds);
+
+        // Status counts, scoped to the date range so they reflect what the
+        // checkboxes would currently show, but not to the status selection itself.
+        $countableJobs = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
+            ->whereBetween('created_at', [$dateFrom, $dateTo])
             ->with('jobStatus')
             ->get();
-    
-        $counts = $allJobs->groupBy('job_status.name')->map->count();
-    
-        // Apply status filter on top of view
-        if ($request->status) {
-            $query->whereHas('jobStatus', function ($q) use ($request) {
-                $q->where('name', $request->status);
-            });
-        }
-    
+
+        $counts = $countableJobs->groupBy('job_status_id')->map->count();
+
         // Ordering
         $order = $request->order ?? 'latest';
         match($order) {
@@ -66,16 +72,17 @@ class FarmJobController extends Controller
                              ->select('farm_jobs.*'),
             default => $query->latest(),
         };
-    
+
         $jobs = $query->get();
-    
+
         return Inertia::render('Jobs/Index', [
             'jobs' => $jobs,
             'counts' => $counts,
-            'currentStatus' => $request->status,
+            'currentStatusIds' => $statusIds,
             'currentOrder' => $order,
-            'currentView' => $view,
-            'jobStatuses' => \App\Models\JobStatus::orderBy('order')->get(),
+            'currentDateFrom' => $dateFrom->toDateString(),
+            'currentDateTo' => $dateTo->toDateString(),
+            'jobStatuses' => JobStatus::orderBy('order')->get(),
         ]);
     }
 
@@ -105,18 +112,31 @@ class FarmJobController extends Controller
             'description' => 'nullable|string',
             'estimated_hours' => 'nullable|numeric|min:0',
             'budget' => 'nullable|numeric|min:0',
+            'hourly_rate' => 'nullable|numeric|min:0',
             'priority_id' => 'nullable|exists:priorities,id',
             'job_type_id' => 'nullable|exists:job_types,id',
             'job_status_id' => 'nullable|exists:job_statuses,id',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'intent' => 'nullable|in:camera,plan',
         ]);
-    
+
+        $intent = $validated['intent'] ?? 'camera';
+        unset($validated['intent']);
+
         $validated['user_id'] = Auth::id();
         $validated['property_id'] = session('current_property_id');
-    
+        $validated['job_status_id'] = $validated['job_status_id'] ?? JobStatus::where('is_default', true)->value('id');
+
         $farmJob = FarmJob::create($validated);
-    
+
+        $teamUserIds = Role::where('property_id', $farmJob->property_id)->pluck('user_id');
+        $farmJob->assignees()->attach($teamUserIds);
+
+        if ($intent === 'plan') {
+            return redirect()->route('jobs.edit', $farmJob);
+        }
+
         return redirect()->route('jobs.show', $farmJob)->with('addPhoto', true);
     }
 
@@ -131,12 +151,15 @@ class FarmJobController extends Controller
 
     public function edit(FarmJob $farmJob)
     {
+        $farmJob->load('assignees');
+
         return Inertia::render('Jobs/Edit', [
             'job' => $farmJob,
             'priorities' => Priority::orderBy('order')->get(),
             'jobStatuses' => JobStatus::orderBy('order')->get(),
             'jobTypes' => JobType::orderBy('name')->get(),
             'properties' => Auth::user()->properties()->get(),
+            'teamRoles' => Property::find($farmJob->property_id)->roles()->with('user')->get(),
         ]);
     }
 
@@ -147,13 +170,22 @@ class FarmJobController extends Controller
             'description' => 'nullable|string',
             'estimated_hours' => 'nullable|numeric|min:0',
             'budget' => 'nullable|numeric|min:0',
+            'hourly_rate' => 'nullable|numeric|min:0',
             'priority_id' => 'nullable|exists:priorities,id',
             'job_type_id' => 'nullable|exists:job_types,id',
             'job_status_id' => 'nullable|exists:job_statuses,id',
             'property_id' => 'required|exists:properties,id',
+            'assignee_ids' => 'nullable|array',
+            'assignee_ids.*' => 'exists:users,id',
         ]);
 
+        $assigneeIds = $validated['assignee_ids'] ?? [];
+        unset($validated['assignee_ids']);
+
+        $validated['job_status_id'] = $validated['job_status_id'] ?? JobStatus::where('is_default', true)->value('id');
+
         $farmJob->update($validated);
+        $farmJob->assignees()->sync($assigneeIds);
 
         return redirect()->route('jobs.show', $farmJob);
     }

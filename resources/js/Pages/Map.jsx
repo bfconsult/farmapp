@@ -1,18 +1,18 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useEffect, useRef } from 'react';
 
-export default function Map({ jobs }) {
+export default function Map({ jobs, shape, currentRole }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const { currentProperty } = usePage().props;
+    const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
 
     useEffect(() => {
         if (mapInstance.current) return;
 
-        import('leaflet').then((L) => {
-            import('leaflet/dist/leaflet.css');
-
+        import('leaflet').then(async (L) => {
+            await import('leaflet/dist/leaflet.css');
             // Fix default marker icons
             delete L.Icon.Default.prototype._getIconUrl;
             L.Icon.Default.mergeOptions({
@@ -51,16 +51,27 @@ export default function Map({ jobs }) {
                 `);
             });
 
-            // Fit map to markers if we have multiple
-            if (jobsWithLocation.length > 1) {
-                const bounds = L.latLngBounds(
-                    jobsWithLocation.map(j => [j.latitude, j.longitude])
-                );
-                map.fitBounds(bounds, { padding: [40, 40] });
-            }
+            // Draw property boundary and fit to it if it exists
+            if (shape?.coordinates) {
+                const boundary = L.polygon(shape.coordinates, {
+                    color: '#ca8a04',
+                    weight: 2,
+                    dashArray: '6, 6',
+                    fillColor: '#fef08a',
+                    fillOpacity: 0.15,
+                }).addTo(map);
 
-            // Try to get user's current location
-            map.locate({ setView: jobsWithLocation.length === 0, maxZoom: 16 });
+                map.fitBounds(boundary.getBounds(), { padding: [40, 40] });
+            } else if (jobsWithLocation.length > 1) {
+                // No boundary — fit to job markers
+                map.fitBounds(
+                    L.latLngBounds(jobsWithLocation.map(j => [j.latitude, j.longitude])),
+                    { padding: [40, 40] }
+                );
+            } else {
+                // No boundary, no multiple jobs — try geolocation
+                map.locate({ setView: true, maxZoom: 16 });
+            }
         });
 
         return () => {
@@ -75,7 +86,18 @@ export default function Map({ jobs }) {
         <AuthenticatedLayout>
             <Head title="Map" />
 
-            <div className="-mx-4 -mt-4">
+            <div className="-mx-4">
+                {currentProperty && !shape && isAdminOrManager && (
+                    <div className="bg-green-50 border-b border-green-200 px-4 py-2 text-sm text-green-800 flex items-center justify-between">
+                        <span>No boundary set for this property.</span>
+                        <Link
+                            href={route('shape.edit', currentProperty.id)}
+                            className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
+                        >
+                            Create boundary
+                        </Link>
+                    </div>
+                )}
                 {jobs.filter(j => j.latitude && j.longitude).length === 0 && (
                     <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800">
                         No jobs with location data yet. Add jobs in the field to see them on the map.
@@ -83,7 +105,7 @@ export default function Map({ jobs }) {
                 )}
                 <div
                     ref={mapRef}
-                    style={{ height: 'calc(100vh - 8rem)' }}
+                    style={{ height: 'calc(100dvh - 8.5rem)' }}
                 />
             </div>
         </AuthenticatedLayout>

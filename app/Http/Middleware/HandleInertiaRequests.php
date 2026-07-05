@@ -61,8 +61,11 @@ class HandleInertiaRequests extends Middleware
         ],
         'properties' => $properties,
         'currentProperty' => $currentProperty,
+        'currentUserRole' => $user && $currentProperty ? $user->roleOn($currentProperty) : null,
         'flash' => [
             'addPhoto' => session('addPhoto'),
+            'error' => session('error'),
+            'success' => session('success'),
         ],
     ];
 }

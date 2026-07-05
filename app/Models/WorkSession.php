@@ -6,6 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class WorkSession extends Model
 {
+    const DRAFT = 'draft';
+    const FINALISED = 'finalised';
+    const APPROVED = 'approved';
+
+    const STATUSES = [self::DRAFT, self::FINALISED, self::APPROVED];
+
     protected $fillable = [
         'property_id',
         'farm_job_id',
@@ -15,6 +21,7 @@ class WorkSession extends Model
         'ended_at',
         'latitude',
         'longitude',
+        'status',
     ];
 
     protected $casts = [
@@ -45,12 +52,27 @@ class WorkSession extends Model
     public function getDurationInHoursAttribute()
     {
         if (!$this->ended_at) return null;
-        return round($this->started_at->diffInMinutes($this->ended_at) / 60, 2);
+
+        $minutes = $this->started_at->diffInMinutes($this->ended_at);
+
+        if ($blockMinutes = $this->user?->billing_block_minutes) {
+            $minutes = ceil($minutes / $blockMinutes) * $blockMinutes;
+        }
+
+        return round($minutes / 60, 2);
+    }
+
+    /**
+     * A job's own hourly_rate overrides the worker's default rate when set.
+     */
+    public function getHourlyRateAttribute()
+    {
+        return $this->farmJob?->hourly_rate ?? $this->user?->hourly_rate;
     }
 
     public function getBillingAmountAttribute()
     {
-        if (!$this->duration_in_hours || !$this->farmJob?->hourly_rate) return null;
-        return round($this->duration_in_hours * $this->farmJob->hourly_rate, 2);
+        if (!$this->duration_in_hours || !$this->hourly_rate) return null;
+        return round($this->duration_in_hours * $this->hourly_rate, 2);
     }
 }

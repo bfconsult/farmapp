@@ -3,11 +3,19 @@ import { Head, Link, router } from '@inertiajs/react';
 
 
 
-export default function Show({ property }) {
+export default function Show({ property, currentRole }) {
+    const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
+    const isAdmin = currentRole === 'admin';
 
     const destroy = () => {
         if (confirm('Are you sure you want to delete this property?')) {
             router.delete(route('properties.destroy', property.id));
+        }
+    };
+
+    const destroyShape = () => {
+        if (confirm('Remove the boundary for this property?')) {
+            router.delete(route('shape.destroy', property.id));
         }
     };
     return (
@@ -58,6 +66,35 @@ export default function Show({ property }) {
                             </div>
                         </div>
                     </div>
+
+                    {isAdminOrManager && (
+                        <div className="bg-white rounded-lg shadow p-6 mb-6">
+                            <div className="flex justify-between items-center mb-2">
+                                <h2 className="text-lg font-medium text-gray-900">Boundary</h2>
+                                <div className="flex gap-3">
+                                    <Link
+                                        href={route('shape.edit', property.id)}
+                                        className="text-sm text-green-600 hover:text-green-800"
+                                    >
+                                        {property.shape ? 'Edit' : 'Create'}
+                                    </Link>
+                                    {property.shape && (
+                                        <button
+                                            onClick={destroyShape}
+                                            className="text-sm text-red-600 hover:text-red-800"
+                                        >
+                                            Delete
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            <p className="text-sm text-gray-500">
+                                {property.shape
+                                    ? `Boundary set — ${property.shape.coordinates.length} points`
+                                    : 'No boundary defined yet.'}
+                            </p>
+                        </div>
+                    )}
 
                     <div className="bg-white rounded-lg shadow p-6">
                         <div className="flex justify-between items-center mb-4">

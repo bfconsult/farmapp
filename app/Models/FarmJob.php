@@ -63,4 +63,9 @@ class FarmJob extends Model
     {
         return $this->hasMany(WorkSession::class);
     }
+
+    public function assignees()
+    {
+        return $this->belongsToMany(User::class, 'farm_job_user', 'farm_job_id', 'user_id')->withTimestamps();
+    }
 }

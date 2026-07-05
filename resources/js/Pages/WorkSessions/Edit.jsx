@@ -1,16 +1,22 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
+import { toLocalInputValue, fromLocalInputValue } from '@/dateInput';
 
 export default function Edit({ session, plannedJobs }) {
-    const { data, setData, patch, processing, errors } = useForm({
+    const { data, setData, patch, processing, errors, transform } = useForm({
         description: session.description ?? '',
         farm_job_id: session.farm_job_id ?? '',
-        started_at: session.started_at ? new Date(session.started_at).toISOString().slice(0, 16) : '',
-        ended_at: session.ended_at ? new Date(session.ended_at).toISOString().slice(0, 16) : '',
+        started_at: toLocalInputValue(session.started_at),
+        ended_at: toLocalInputValue(session.ended_at),
     });
 
     const submit = (e) => {
         e.preventDefault();
+        transform((data) => ({
+            ...data,
+            started_at: fromLocalInputValue(data.started_at),
+            ended_at: fromLocalInputValue(data.ended_at),
+        }));
         patch(route('work-sessions.update', session.id));
     };
 

@@ -45,8 +45,11 @@ class PropertyController extends Controller
     {
         $property->load('shape', 'farmJobs');
 
+        $currentRole = Auth::user()->roleOn($property);
+
         return Inertia::render('Properties/Show', [
             'property' => $property,
+            'currentRole' => $currentRole,
         ]);
     }
 

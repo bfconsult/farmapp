@@ -1,0 +1,75 @@
+id: 75823
+name: farmapp
+
+environments:
+    production:
+        runtime: 'docker'
+        region: ap-southeast-2
+        memory: 1024
+        cli-memory: 512
+        scheduler: true
+        domain: farmtask.be
+        database: FarmApp
+        storage: farmtask-production
+        queues:
+            - default
+        build:
+            - 'composer install --no-dev --optimize-autoloader'
+            - 'php artisan ziggy:generate'
+            - 'npm ci'
+            - 'npm run build'
+            - 'rm -rf node_modules'
+            - 'php artisan route:cache'
+            - 'php artisan view:cache'
+            - 'php artisan event:cache'
+        deploy:
+            - 'php artisan migrate --force'
+        environment:
+            APP_NAME: FarmTask
+            APP_ENV: production
+            APP_DEBUG: false
+            APP_URL: https://farmtask.be
+            LOG_CHANNEL: stderr
+            LOG_LEVEL: error
+            DB_CONNECTION: mysql
+            SESSION_DRIVER: cookie
+            SESSION_LIFETIME: 120
+            QUEUE_CONNECTION: sync
+            CACHE_STORE: array
+            FILESYSTEM_DISK: s3
+            BROADCAST_CONNECTION: log
+
+    staging:
+        runtime: 'docker'
+        region: ap-southeast-2
+        memory: 1024
+        cli-memory: 512
+        storage: 1024
+        build:
+            - 'composer install --no-dev --optimize-autoloader'
+            - 'php artisan ziggy:generate'
+            - 'npm ci'
+            - 'npm run build'
+            - 'rm -rf node_modules'
+            - 'php artisan config:cache'
+            - 'php artisan route:cache'
+            - 'php artisan view:cache'
+        deploy:
+            - 'php artisan migrate --force'
+        environment:
+            APP_NAME: 'FarmTask (Staging)'
+            APP_ENV: staging
+            APP_DEBUG: true
+            LOG_CHANNEL: stderr
+            LOG_LEVEL: debug
+            DB_CONNECTION: mysql
+            DB_HOST: reseau.proxy.rlwy.net
+            DB_PORT: 26486
+            DB_DATABASE: railway
+            DB_USERNAME: root
+            SESSION_DRIVER: cookie
+            SESSION_LIFETIME: 120
+            QUEUE_CONNECTION: sync
+            CACHE_STORE: array
+            FILESYSTEM_DISK: local
+            BROADCAST_CONNECTION: log

@@ -1,10 +1,24 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { compressImageFiles } from '@/imageCompression';
+
+const STATUS_LABELS = {
+    draft: 'Draft',
+    finalised: 'Finalised',
+    approved: 'Approved',
+};
+
+const STATUS_COLORS = {
+    draft: 'bg-gray-100 text-gray-600',
+    finalised: 'bg-blue-100 text-blue-700',
+    approved: 'bg-green-100 text-green-700',
+};
 
 export default function Show({ session, durationInHours, billingAmount }) {
     const fileInput = useRef(null);
     const { flash } = usePage().props;
+    const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         if (flash?.addPhoto && fileInput.current) {
@@ -14,6 +28,18 @@ export default function Show({ session, durationInHours, billingAmount }) {
 
     const stop = () => {
         router.post(route('work-sessions.stop', session.id));
+    };
+
+    const finalise = () => {
+        if (confirm('Finalise this work session?')) {
+            router.post(route('work-sessions.finalise', session.id));
+        }
+    };
+
+    const revertToDraft = () => {
+        if (confirm('Revert this session back to draft? It will become editable again.')) {
+            router.post(route('work-sessions.revert-to-draft', session.id));
+        }
     };
 
     const destroy = () => {
@@ -28,16 +54,21 @@ export default function Show({ session, durationInHours, billingAmount }) {
         }
     };
 
-    const uploadPhotos = (e) => {
+    const uploadPhotos = async (e) => {
         const files = e.target.files;
         if (!files.length) return;
 
+        setUploading(true);
+        const compressed = await compressImageFiles(files);
+
         const formData = new FormData();
-        Array.from(files).forEach(file => formData.append('photos[]', file));
+        compressed.forEach(file => formData.append('photos[]', file));
         formData.append('work_session_id', session.id);
 
         router.post(route('photos.store-session', session.id), formData, {
             forceFormData: true,
+            onFinish: () => setUploading(false),
+            onError: () => alert('Photo upload failed. Please try again with a smaller photo.'),
         });
     };
 
@@ -61,12 +92,14 @@ export default function Show({ session, durationInHours, billingAmount }) {
                     <Link href={route('work-sessions.index')} className="text-green-600 text-sm">
                         ← Work
                     </Link>
-                    <Link
-                        href={route('work-sessions.edit', session.id)}
-                        className="text-sm px-3 py-1 border border-green-600 text-green-600 rounded-lg"
-                    >
-                        Edit
-                    </Link>
+                    {session.status === 'draft' && (
+                        <Link
+                            href={route('work-sessions.edit', session.id)}
+                            className="text-sm px-3 py-1 border border-green-600 text-green-600 rounded-lg"
+                        >
+                            Edit
+                        </Link>
+                    )}
                 </div>
 
                 {/* Active session banner */}
@@ -88,6 +121,12 @@ export default function Show({ session, durationInHours, billingAmount }) {
                         Session Details
                     </h2>
                     <div className="space-y-3">
+                        <div className="flex justify-between">
+                            <span className="text-sm text-gray-500">Status</span>
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[session.status]}`}>
+                                {STATUS_LABELS[session.status]}
+                            </span>
+                        </div>
                         <div className="flex justify-between">
                             <span className="text-sm text-gray-500">Date</span>
                             <span className="text-sm text-gray-900">{formatDate(session.started_at)}</span>
@@ -132,15 +171,36 @@ export default function Show({ session, durationInHours, billingAmount }) {
                     </div>
                 </div>
 
+                {/* Finalise */}
+                {session.status === 'draft' && session.ended_at && (
+                    <button
+                        onClick={finalise}
+                        className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                    >
+                        Finalise Session
+                    </button>
+                )}
+
+                {/* Revert to draft */}
+                {session.status === 'finalised' && (
+                    <button
+                        onClick={revertToDraft}
+                        className="w-full py-3 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+                    >
+                        Revert to Draft
+                    </button>
+                )}
+
                 {/* Photos */}
                 <div className="bg-white rounded-lg shadow p-4">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Photos</h2>
                         <button
                             onClick={() => fileInput.current.click()}
-                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
+                            disabled={uploading}
+                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg disabled:opacity-50"
                         >
-                            + Add Photo
+                            {uploading ? 'Uploading…' : '+ Add Photo'}
                         </button>
                         <input
                             ref={fileInput}
@@ -158,7 +218,10 @@ export default function Show({ session, durationInHours, billingAmount }) {
                             onClick={() => fileInput.current.click()}
                             className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400"
                         >
-                            <p className="text-2xl mb-2">📷</p>
+                            <svg className="w-8 h-8 mx-auto mb-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
                             <p className="text-sm">Tap to add a photo</p>
                         </button>
                     ) : (
@@ -166,7 +229,7 @@ export default function Show({ session, durationInHours, billingAmount }) {
                             {session.photos.map((photo) => (
                                 <div key={photo.id} className="relative">
                                     <img
-                                        src={`/storage/${photo.file}`}
+                                        src={photo.url}
                                         className="w-full h-24 object-cover rounded-lg"
                                     />
                                     <button

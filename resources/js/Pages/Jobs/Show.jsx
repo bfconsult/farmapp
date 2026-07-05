@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { compressImageFiles } from '@/imageCompression';
 
 const STATUS_COLORS = {
     'Pending': 'bg-yellow-100 text-yellow-800',
@@ -16,9 +17,19 @@ const PRIORITY_COLORS = {
     'Critical': 'bg-red-100 text-red-700',
 };
 
+function Spinner({ className = 'h-4 w-4' }) {
+    return (
+        <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+    );
+}
+
 export default function Show({ job }) {
     const fileInput = useRef(null);
     const { flash } = usePage().props;
+    const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
         if (flash?.addPhoto && fileInput.current) {
@@ -38,21 +49,35 @@ export default function Show({ job }) {
         }
     };
 
-    const uploadPhotos = (e) => {
+    const uploadPhotos = async (e) => {
         const files = e.target.files;
         if (!files.length) return;
 
+        setUploading(true);
+        const compressed = await compressImageFiles(files);
+
         const formData = new FormData();
-        Array.from(files).forEach(file => formData.append('photos[]', file));
+        compressed.forEach(file => formData.append('photos[]', file));
 
         router.post(route('photos.store', job.id), formData, {
             forceFormData: true,
+            onFinish: () => setUploading(false),
+            onError: () => alert('Photo upload failed. Please try again with a smaller photo.'),
         });
     };
 
     return (
         <AuthenticatedLayout>
             <Head title={job.name} />
+
+            {uploading && (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+                    <div className="bg-white rounded-lg shadow-lg px-6 py-5 flex flex-col items-center gap-3">
+                        <Spinner className="h-10 w-10 text-green-600" />
+                        <p className="text-sm text-gray-700">Uploading photo…</p>
+                    </div>
+                </div>
+            )}
 
             <div className="max-w-lg mx-auto space-y-4">
                 {/* Header */}
@@ -133,7 +158,8 @@ export default function Show({ job }) {
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Photos</h2>
                         <button
                             onClick={() => fileInput.current.click()}
-                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
+                            disabled={uploading}
+                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg disabled:opacity-50"
                         >
                             + Add Photo
                         </button>
@@ -152,9 +178,13 @@ export default function Show({ job }) {
                     {job.photos && job.photos.length === 0 ? (
                         <button
                             onClick={() => fileInput.current.click()}
-                            className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400"
+                            disabled={uploading}
+                            className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400 disabled:opacity-50"
                         >
-                            <p className="text-2xl mb-2">📷</p>
+                            <svg className="w-8 h-8 mx-auto mb-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
                             <p className="text-sm">Tap to add a photo</p>
                         </button>
                     ) : (
@@ -162,7 +192,7 @@ export default function Show({ job }) {
                             {job.photos.map((photo) => (
                                 <div key={photo.id} className="relative">
                                     <img
-                                        src={`/storage/${photo.file}`}
+                                        src={photo.url}
                                         className="w-full h-24 object-cover rounded-lg"
                                     />
                                     <button

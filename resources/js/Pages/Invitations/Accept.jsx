@@ -1,4 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
+import ApplicationLogo from '@/Components/ApplicationLogo';
 
 export default function Accept({ invitation }) {
     const { post, processing } = useForm();
@@ -13,7 +14,7 @@ export default function Accept({ invitation }) {
             <Head title="Join Property" />
 
             <div className="max-w-sm w-full bg-white rounded-lg shadow p-6 text-center">
-                <p className="text-2xl mb-2">🌱</p>
+                <ApplicationLogo className="h-10 w-10 mx-auto mb-2" />
                 <h1 className="text-lg font-semibold text-gray-900 mb-2">
                     You've been invited!
                 </h1>

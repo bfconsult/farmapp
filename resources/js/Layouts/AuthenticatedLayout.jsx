@@ -1,7 +1,9 @@
 import { Link, router, usePage } from '@inertiajs/react';
+import ApplicationLogo from '@/Components/ApplicationLogo';
 
 export default function AuthenticatedLayout({ title, children }) {
-    const { auth, properties, currentProperty } = usePage().props;
+    const { auth, properties, currentProperty, currentUserRole, flash } = usePage().props;
+    const canViewReports = currentUserRole === 'admin' || currentUserRole === 'manager';
 
     const selectProperty = (e) => {
         router.post(route('property.select'), { property_id: e.target.value });
@@ -14,7 +16,7 @@ export default function AuthenticatedLayout({ title, children }) {
                 <div className="flex items-center justify-between px-4 h-14">
                     {/* Left: logo + page title */}
                     <div className="flex items-center gap-2">
-                        <span className="text-green-700 font-bold text-lg">🌱</span>
+                        <ApplicationLogo className="h-6 w-6" />
                         {title && (
                             <span className="text-gray-900 font-semibold text-base">{title}</span>
                         )}
@@ -92,11 +94,21 @@ export default function AuthenticatedLayout({ title, children }) {
 
             {/* Main content */}
             <main className="pt-14 px-4 py-4">
+                {flash?.error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                        {flash.error}
+                    </div>
+                )}
+                {flash?.success && (
+                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+                        {flash.success}
+                    </div>
+                )}
                 {children}
             </main>
 
             {/* Floating Add Job button */}
-            {currentProperty && (
+            {currentProperty && !route().current('work-sessions.*') && !route().current('profile.*') && !route().current('properties.*') && !route().current('reports.*') && (
                 <Link
                     href={route('jobs.create')}
                     className="fixed bottom-20 right-4 z-20 bg-green-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg text-2xl hover:bg-green-700"
@@ -137,6 +149,18 @@ export default function AuthenticatedLayout({ title, children }) {
                         </svg>
                         Map
                     </Link>
+
+                    {canViewReports && (
+                        <Link
+                            href={route('reports.index')}
+                            className={`flex flex-col items-center text-xs gap-1 px-4 py-2 ${route().current('reports.*') ? 'text-green-600' : 'text-gray-500'}`}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14m0 0h2a2 2 0 002-2" />
+                            </svg>
+                            Reports
+                        </Link>
+                    )}
 
                     <Link
                         href={route('profile.edit')}

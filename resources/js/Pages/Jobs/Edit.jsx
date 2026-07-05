@@ -1,21 +1,45 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 
-export default function Edit({ job, priorities, jobTypes, jobStatuses, properties }) {
+const ROLE_LABELS = {
+    admin: 'Admin',
+    manager: 'Manager',
+    worker: 'Worker',
+    approver: 'Approver',
+};
+
+const ROLE_COLORS = {
+    admin: 'bg-purple-100 text-purple-700',
+    manager: 'bg-blue-100 text-blue-700',
+    worker: 'bg-green-100 text-green-700',
+    approver: 'bg-yellow-100 text-yellow-700',
+};
+
+export default function Edit({ job, priorities, jobTypes, jobStatuses, properties, teamRoles }) {
     const { data, setData, patch, processing, errors } = useForm({
         name: job.name,
         description: job.description ?? '',
         estimated_hours: job.estimated_hours ?? '',
         budget: job.budget ?? '',
+        hourly_rate: job.hourly_rate ?? '',
         priority_id: job.priority_id ?? '',
         job_type_id: job.job_type_id ?? '',
         job_status_id: job.job_status_id ?? '',
         property_id: job.property_id,
+        assignee_ids: job.assignees.map((user) => user.id),
     });
 
     const submit = (e) => {
         e.preventDefault();
         patch(route('jobs.update', job.id));
+    };
+
+    const toggleAssignee = (userId) => {
+        setData('assignee_ids',
+            data.assignee_ids.includes(userId)
+                ? data.assignee_ids.filter((id) => id !== userId)
+                : [...data.assignee_ids, userId]
+        );
     };
 
     return (
@@ -52,7 +76,7 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                                 {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="grid grid-cols-3 gap-4 mb-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours</label>
                                     <input
@@ -74,6 +98,20 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                                         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
                                     />
                                     {errors.budget && <p className="mt-1 text-sm text-red-600">{errors.budget}</p>}
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Hourly Rate ($)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="Worker's rate"
+                                        value={data.hourly_rate}
+                                        onChange={(e) => setData('hourly_rate', e.target.value)}
+                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                    />
+                                    {errors.hourly_rate && <p className="mt-1 text-sm text-red-600">{errors.hourly_rate}</p>}
                                 </div>
                             </div>
 
@@ -132,6 +170,35 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                                         ))}
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Assigned to</label>
+                                <p className="text-xs text-gray-500 mb-2">
+                                    This job is visible to whoever is checked below.
+                                </p>
+                                <div className="space-y-1 border border-gray-200 rounded-md divide-y divide-gray-100">
+                                    {teamRoles.map((role) => (
+                                        <label
+                                            key={role.user.id}
+                                            className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer"
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={data.assignee_ids.includes(role.user.id)}
+                                                    onChange={() => toggleAssignee(role.user.id)}
+                                                    className="rounded text-green-600 focus:ring-green-500"
+                                                />
+                                                <span className="text-sm text-gray-900">{role.user.name}</span>
+                                            </span>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ROLE_COLORS[role.type]}`}>
+                                                {ROLE_LABELS[role.type]}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {errors.assignee_ids && <p className="mt-1 text-sm text-red-600">{errors.assignee_ids}</p>}
                             </div>
 
                             <div className="flex justify-end gap-4">

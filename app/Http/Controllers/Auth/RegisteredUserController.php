@@ -52,7 +52,7 @@ class RegisteredUserController extends Controller
         // Complete any pending invitation
         if ($token = session('pending_invitation_token')) {
             $invitation = \App\Models\Invitation::where('token', $token)->whereNull('accepted_at')->first();
-            if ($invitation && $invitation->email === $user->email) {
+            if ($invitation && strtolower($invitation->email) === strtolower($user->email)) {
                 \App\Models\Role::create([
                     'user_id' => $user->id,
                     'property_id' => $invitation->property_id,
@@ -63,8 +63,6 @@ class RegisteredUserController extends Controller
             }
         }
 
-return redirect(route('dashboard', absolute: false));
-
-        return redirect(route('dashboard', absolute: false));
+        return redirect(route('jobs.index', absolute: false));
     }
 }
