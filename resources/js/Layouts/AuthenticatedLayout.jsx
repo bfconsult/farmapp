@@ -107,8 +107,8 @@ export default function AuthenticatedLayout({ title, children }) {
                 {children}
             </main>
 
-            {/* Floating Add Job button */}
-            {currentProperty && !route().current('work-sessions.*') && !route().current('profile.*') && !route().current('properties.*') && !route().current('reports.*') && (
+            {/* Floating Add Job button — only where adding a job actually makes sense */}
+            {currentProperty && (route().current('jobs.*') || route().current('map')) && (
                 <Link
                     href={route('jobs.create')}
                     className="fixed bottom-20 right-4 z-20 bg-green-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg text-2xl hover:bg-green-700"
