@@ -20,6 +20,27 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 });
 
+// Served via a route (not a static public/ file) so the icon URLs below can
+// resolve through asset(), which points at the CDN on Vapor — a plain public/
+// file would 404 there, since Vapor only auto-redirects favicon.ico/robots.txt.
+Route::get('manifest.webmanifest', function () {
+    return response()->json([
+        'name' => 'FarmTask',
+        'short_name' => 'FarmTask',
+        'description' => 'Farm job and work session tracking',
+        'start_url' => '/work-sessions',
+        'scope' => '/',
+        'display' => 'standalone',
+        'orientation' => 'portrait',
+        'background_color' => '#1A5C38',
+        'theme_color' => '#1A5C38',
+        'icons' => [
+            ['src' => asset('icon-192.png'), 'sizes' => '192x192', 'type' => 'image/png'],
+            ['src' => asset('icon-512.png'), 'sizes' => '512x512', 'type' => 'image/png'],
+        ],
+    ])->header('Content-Type', 'application/manifest+json');
+})->name('manifest');
+
 Route::resource('jobs', FarmJobController::class)->parameters([
     'jobs' => 'farmJob'
 ]);
