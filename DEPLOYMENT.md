@@ -39,7 +39,7 @@ You only need to do this once on any machine you plan to deploy from:
    - Uploads compiled frontend assets to S3
    - Updates the Lambda function and switches traffic over
    - **Runs `php artisan migrate --force` automatically** (see `deploy:` in `vapor.yml`) — any pending migration goes live at this point, against the real production database
-   - Takes roughly 10–15 minutes end to end
+   - Takes roughly 10–15 minutes end to end. A `.vaporignore` file (gitignore-style syntax) excludes `vendor/`, `node_modules/`, `.git/`, and a few other directories from the build/Docker context — those get reinstalled fresh by `composer install`/`npm ci` regardless, so copying the local versions first was just wasted time (`vendor/` alone is 15,000+ files). If deploys start feeling slow again, check `.vaporignore` still exists and covers anything new and large.
 
 3. **Verify it worked:**
    - `curl -s -o /dev/null -w "%{http_code}\n" https://farmtask.be/login` should return `200`
