@@ -27,7 +27,8 @@ function currentMonthRange() {
 }
 
 export default function Index({ jobs, counts, currentStatusIds, currentOrder, currentDateFrom, currentDateTo, jobStatuses }) {
-    const { currentProperty } = usePage().props;
+    const { currentProperty, currentUserRole } = usePage().props;
+    const canManageRecurring = currentUserRole === 'admin' || currentUserRole === 'manager';
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
 
@@ -78,6 +79,17 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
             <Head title="Jobs" />
 
             <div className="max-w-lg mx-auto mt-2">
+
+                {canManageRecurring && (
+                    <div className="flex justify-end mb-3">
+                        <Link
+                            href={route('recurring-jobs.index')}
+                            className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600"
+                        >
+                            Recurring Jobs →
+                        </Link>
+                    </div>
+                )}
 
                 {/* Filters toggle */}
                 <div className="flex items-center justify-between mb-3">

@@ -12,6 +12,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\ShapeController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\HelpMessageController;
+use App\Http\Controllers\RecurringJobController;
 
 
 
@@ -110,6 +111,10 @@ Route::middleware(['auth', 'property.role:admin'])->group(function () {
 // Admin and Manager routes
 Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('recurring-jobs', [RecurringJobController::class, 'index'])->name('recurring-jobs.index');
+    Route::post('recurring-jobs', [RecurringJobController::class, 'store'])->name('recurring-jobs.store');
+    Route::patch('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'update'])->name('recurring-jobs.update');
+    Route::delete('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'destroy'])->name('recurring-jobs.destroy');
     Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('settings/priorities', [SettingsController::class, 'storePriority'])->name('settings.priorities.store');
     Route::patch('settings/priorities/{priority}', [SettingsController::class, 'updatePriority'])->name('settings.priorities.update');

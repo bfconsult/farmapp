@@ -21,12 +21,24 @@ class FarmJob extends Model
         'job_status_id',
         'user_id',
         'property_id',
+        'recurring_job_id',
+        'period_start',
+        'period_end',
     ];
-    
+
+    protected $casts = [
+        'period_start' => 'date',
+        'period_end' => 'date',
+    ];
 
     public function getRouteKeyName()
     {
         return 'id';
+    }
+
+    public function recurringJob()
+    {
+        return $this->belongsTo(RecurringJob::class);
     }
 
     public function priority()

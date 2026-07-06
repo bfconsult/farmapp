@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FarmJob;
 use App\Models\JobStatus;
+use App\Models\RecurringJob;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -45,17 +46,8 @@ class WorkSessionController extends Controller
         // (enforced in store()).
         $currentPropertyId = session('current_property_id');
 
-        $plannedJobs = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
-        ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
-            $query->where('property_id', $currentPropertyId);
-        })
-        ->where(function ($query) {
-            $query->whereHas('jobStatus', function ($q) {
-                $q->where('can_book_time', true);
-            })->orWhereNull('job_status_id');
-        })
-        ->get();
-    
+        $plannedJobs = $this->bookableJobs($currentPropertyId);
+
         return Inertia::render('WorkSessions/Create', [
             'plannedJobs' => $plannedJobs,
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
@@ -341,6 +333,42 @@ class WorkSessionController extends Controller
     private function activeSession(): ?WorkSession
     {
         return Auth::user()->workSessions()->whereNull('ended_at')->first();
+    }
+
+    /**
+     * Jobs the current user can book time against: normally any assigned job
+     * whose status allows it, plus — as a grace window for late entries — a
+     * recurring job's most recently closed instance, until the end of the
+     * following period (e.g. July's instance stays bookable through August).
+     */
+    private function bookableJobs($currentPropertyId)
+    {
+        $normal = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
+            ->when($currentPropertyId, fn ($query) => $query->where('property_id', $currentPropertyId))
+            ->where(function ($query) {
+                $query->whereHas('jobStatus', fn ($q) => $q->where('can_book_time', true))
+                    ->orWhereNull('job_status_id');
+            })
+            ->get();
+
+        $recurringInGrace = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
+            ->when($currentPropertyId, fn ($query) => $query->where('property_id', $currentPropertyId))
+            ->whereNotNull('recurring_job_id')
+            ->whereNotNull('period_end')
+            ->with('recurringJob')
+            ->get()
+            ->filter(function (FarmJob $job) {
+                $graceEnd = match ($job->recurringJob->interval) {
+                    RecurringJob::DAILY => $job->period_end->copy()->addDay(),
+                    RecurringJob::WEEKLY => $job->period_end->copy()->addWeek(),
+                    RecurringJob::MONTHLY => $job->period_end->copy()->addMonthNoOverflow(),
+                    RecurringJob::YEARLY => $job->period_end->copy()->addYear(),
+                };
+
+                return now()->lte($graceEnd);
+            });
+
+        return $normal->merge($recurringInGrace)->unique('id')->values();
     }
 
     /**

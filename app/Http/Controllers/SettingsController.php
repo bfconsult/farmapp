@@ -94,10 +94,15 @@ class SettingsController extends Controller
             'order' => 'required|integer',
             'can_book_time' => 'boolean',
             'is_in_progress_default' => 'boolean',
+            'is_recurring_closed_default' => 'boolean',
         ]);
 
         if ($validated['is_in_progress_default'] ?? false) {
             JobStatus::where('is_in_progress_default', true)->update(['is_in_progress_default' => false]);
+        }
+
+        if ($validated['is_recurring_closed_default'] ?? false) {
+            JobStatus::where('is_recurring_closed_default', true)->update(['is_recurring_closed_default' => false]);
         }
 
         JobStatus::create($validated);
@@ -115,6 +120,7 @@ class SettingsController extends Controller
             'order' => 'required|integer',
             'can_book_time' => 'boolean',
             'is_in_progress_default' => 'boolean',
+            'is_recurring_closed_default' => 'boolean',
         ]);
 
         // Only one status can be the in-progress default at a time.
@@ -122,6 +128,13 @@ class SettingsController extends Controller
             JobStatus::where('id', '!=', $jobStatus->id)
                 ->where('is_in_progress_default', true)
                 ->update(['is_in_progress_default' => false]);
+        }
+
+        // Only one status can be the recurring-closed default at a time.
+        if ($validated['is_recurring_closed_default'] ?? false) {
+            JobStatus::where('id', '!=', $jobStatus->id)
+                ->where('is_recurring_closed_default', true)
+                ->update(['is_recurring_closed_default' => false]);
         }
 
         $jobStatus->update($validated);
