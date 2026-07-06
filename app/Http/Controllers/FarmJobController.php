@@ -205,12 +205,42 @@ class FarmJobController extends Controller
             'property_id' => 'required|exists:properties,id',
             'assignee_ids' => 'nullable|array',
             'assignee_ids.*' => 'exists:users,id',
+            'repeats' => 'boolean',
+            'interval' => 'required_if:repeats,true|in:' . implode(',', RecurringJob::INTERVALS),
+            'starts_on' => 'required_if:repeats,true|date',
         ]);
 
         $assigneeIds = $validated['assignee_ids'] ?? [];
-        unset($validated['assignee_ids']);
+        $repeats = $validated['repeats'] ?? false;
+        $interval = $validated['interval'] ?? null;
+        $startsOn = $validated['starts_on'] ?? null;
+        unset($validated['assignee_ids'], $validated['repeats'], $validated['interval'], $validated['starts_on']);
 
         $validated['job_status_id'] = $validated['job_status_id'] ?? JobStatus::where('is_default', true)->value('id');
+
+        // Turn this existing job into the first instance of a new recurring
+        // template — only possible if it isn't already part of one.
+        if ($repeats && !$farmJob->recurring_job_id) {
+            $recurringJob = RecurringJob::create([
+                'property_id' => $validated['property_id'],
+                'created_by' => Auth::id(),
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'job_type_id' => $validated['job_type_id'] ?? null,
+                'priority_id' => $validated['priority_id'] ?? null,
+                'estimated_hours' => $validated['estimated_hours'] ?? null,
+                'budget' => $validated['budget'] ?? null,
+                'hourly_rate' => $validated['hourly_rate'] ?? null,
+                'interval' => $interval,
+                'starts_on' => $startsOn,
+                'is_active' => true,
+            ]);
+
+            $periodStart = \Carbon\Carbon::parse($startsOn);
+            $validated['recurring_job_id'] = $recurringJob->id;
+            $validated['period_start'] = $periodStart;
+            $validated['period_end'] = $recurringJob->periodEndFor($periodStart);
+        }
 
         $farmJob->update($validated);
         $farmJob->assignees()->sync($assigneeIds);

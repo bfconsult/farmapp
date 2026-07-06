@@ -27,6 +27,9 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
         job_status_id: job.job_status_id ?? '',
         property_id: job.property_id,
         assignee_ids: job.assignees.map((user) => user.id),
+        repeats: false,
+        interval: 'monthly',
+        starts_on: job.created_at ? job.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
     });
 
     const submit = (e) => {
@@ -200,6 +203,47 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                                 </div>
                                 {errors.assignee_ids && <p className="mt-1 text-sm text-red-600">{errors.assignee_ids}</p>}
                             </div>
+
+                            {!job.recurring_job_id && (
+                                <div className="mb-6 border-t border-gray-200 pt-4">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.repeats}
+                                            onChange={(e) => setData('repeats', e.target.checked)}
+                                            className="rounded text-green-600 focus:ring-green-500"
+                                        />
+                                        Make this job repeat
+                                    </label>
+
+                                    {data.repeats && (
+                                        <div className="grid grid-cols-2 gap-4 mt-3">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Repeats</label>
+                                                <select
+                                                    value={data.interval}
+                                                    onChange={(e) => setData('interval', e.target.value)}
+                                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                                >
+                                                    <option value="daily">Daily</option>
+                                                    <option value="weekly">Weekly</option>
+                                                    <option value="monthly">Monthly</option>
+                                                    <option value="yearly">Yearly</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Starting</label>
+                                                <input
+                                                    type="date"
+                                                    value={data.starts_on}
+                                                    onChange={(e) => setData('starts_on', e.target.value)}
+                                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="flex justify-end gap-4">
                                 <Link
