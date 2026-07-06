@@ -87,7 +87,7 @@ function RecurringJobFields({ values, setValues, jobTypes, priorities }) {
     );
 }
 
-function RecurringJobCard({ recurringJob, jobTypes, priorities }) {
+function RecurringJobRow({ recurringJob, jobTypes, priorities }) {
     const [editing, setEditing] = useState(false);
     const [values, setValues] = useState({
         name: recurringJob.name,
@@ -122,7 +122,7 @@ function RecurringJobCard({ recurringJob, jobTypes, priorities }) {
 
     if (editing) {
         return (
-            <div className="bg-green-50 rounded-lg shadow p-4 space-y-3">
+            <div className="p-4 bg-green-50 space-y-3">
                 <RecurringJobFields values={values} setValues={setValues} jobTypes={jobTypes} priorities={priorities} />
                 <div className="flex gap-2">
                     <button onClick={save} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Save</button>
@@ -133,23 +133,18 @@ function RecurringJobCard({ recurringJob, jobTypes, priorities }) {
     }
 
     return (
-        <div className="bg-white rounded-lg shadow p-4">
-            <div className="flex items-start justify-between gap-2">
-                <div>
-                    <p className="font-medium text-gray-900">{recurringJob.name}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                        {INTERVAL_LABELS[recurringJob.interval]} · {recurringJob.instances_count} instance{recurringJob.instances_count === 1 ? '' : 's'} created
-                    </p>
+        <div className="flex items-center justify-between gap-2 px-4 py-3">
+            <div>
+                <p className="text-sm text-gray-900">{recurringJob.name}</p>
+                <div className="flex gap-3 mt-1 text-xs">
+                    <button onClick={() => setEditing(true)} className="text-green-600">Edit</button>
+                    <button onClick={toggleActive} className="text-blue-600">{recurringJob.is_active ? 'Pause' : 'Resume'}</button>
+                    <button onClick={destroy} className="text-red-500">Delete</button>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${recurringJob.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {recurringJob.is_active ? 'Active' : 'Paused'}
-                </span>
             </div>
-            <div className="flex gap-3 mt-3 text-sm">
-                <button onClick={() => setEditing(true)} className="text-green-600">Edit</button>
-                <button onClick={toggleActive} className="text-blue-600">{recurringJob.is_active ? 'Pause' : 'Resume'}</button>
-                <button onClick={destroy} className="text-red-500">Delete</button>
-            </div>
+            <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${recurringJob.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                {recurringJob.is_active ? 'Active' : 'Paused'}
+            </span>
         </div>
     );
 }
@@ -169,9 +164,9 @@ export default function Index({ recurringJobs, jobTypes, priorities }) {
                         No recurring jobs set up yet.
                     </div>
                 ) : (
-                    <div className="space-y-3">
+                    <div className="bg-white rounded-lg shadow divide-y divide-gray-100">
                         {recurringJobs.map((recurringJob) => (
-                            <RecurringJobCard
+                            <RecurringJobRow
                                 key={recurringJob.id}
                                 recurringJob={recurringJob}
                                 jobTypes={jobTypes}

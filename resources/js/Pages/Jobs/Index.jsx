@@ -80,17 +80,6 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
 
             <div className="max-w-lg mx-auto mt-2">
 
-                {canManageRecurring && (
-                    <div className="flex justify-end mb-3">
-                        <Link
-                            href={route('recurring-jobs.index')}
-                            className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600"
-                        >
-                            Recurring Jobs →
-                        </Link>
-                    </div>
-                )}
-
                 {/* Filters toggle */}
                 <div className="flex items-center justify-between mb-3">
                     <button
@@ -170,6 +159,17 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
                                 ))}
                             </div>
                         </div>
+
+                        {canManageRecurring && (
+                            <div className="border-t border-gray-100 pt-3">
+                                <Link
+                                    href={route('recurring-jobs.index')}
+                                    className="text-sm text-green-600"
+                                >
+                                    Recurring Jobs →
+                                </Link>
+                            </div>
+                        )}
                     </div>
                 )}
 
