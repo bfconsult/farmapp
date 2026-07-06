@@ -30,17 +30,29 @@ export default function Show({ job }) {
     const fileInput = useRef(null);
     const { flash } = usePage().props;
     const [uploading, setUploading] = useState(false);
+    const [showDeleteOptions, setShowDeleteOptions] = useState(false);
 
     useEffect(() => {
         if (flash?.addPhoto && fileInput.current) {
             fileInput.current.click();
         }
     }, [flash]);
-    
+
     const destroy = () => {
+        if (job.recurring_job_id) {
+            setShowDeleteOptions(true);
+            return;
+        }
+
         if (confirm('Are you sure you want to delete this job?')) {
             router.delete(route('jobs.destroy', job.id));
         }
+    };
+
+    const destroyWithChoice = (deleteRecurring) => {
+        router.delete(route('jobs.destroy', job.id), {
+            data: { delete_recurring: deleteRecurring },
+        });
     };
 
     const destroyPhoto = (photoId) => {
@@ -215,6 +227,43 @@ export default function Show({ job }) {
                     Delete Job
                 </button>
             </div>
+
+            {showDeleteOptions && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                    onClick={() => setShowDeleteOptions(false)}
+                >
+                    <div
+                        className="bg-white rounded-lg shadow-lg max-w-sm w-full p-5"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h3 className="text-base font-semibold text-gray-900 mb-2">This job repeats</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Do you want to delete just this instance, or stop it repeating altogether?
+                        </p>
+                        <div className="space-y-2">
+                            <button
+                                onClick={() => destroyWithChoice(false)}
+                                className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg text-sm"
+                            >
+                                Just delete this job
+                            </button>
+                            <button
+                                onClick={() => destroyWithChoice(true)}
+                                className="w-full py-2 bg-red-600 text-white rounded-lg text-sm"
+                            >
+                                Delete this and stop repeating
+                            </button>
+                            <button
+                                onClick={() => setShowDeleteOptions(false)}
+                                className="w-full py-2 text-gray-500 text-sm"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </AuthenticatedLayout>
     );
 }

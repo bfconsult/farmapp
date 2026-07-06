@@ -248,8 +248,15 @@ class FarmJobController extends Controller
         return redirect()->route('jobs.show', $farmJob);
     }
 
-    public function destroy(FarmJob $farmJob)
+    public function destroy(Request $request, FarmJob $farmJob)
     {
+        // Deleting the template stops future instances being generated, but
+        // (via nullOnDelete) leaves any other instances it already created
+        // intact - same as RecurringJobController::destroy().
+        if ($farmJob->recurring_job_id && $request->boolean('delete_recurring')) {
+            $farmJob->recurringJob?->delete();
+        }
+
         $farmJob->delete();
 
         return redirect()->route('jobs.index');
