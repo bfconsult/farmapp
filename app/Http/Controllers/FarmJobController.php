@@ -311,8 +311,12 @@ class FarmJobController extends Controller
         $ics = implode("\r\n", $lines) . "\r\n";
 
         return response($ics, 200, [
+            // Deliberately not "attachment" - forcing a download makes mobile
+            // browsers treat this as a generic file instead of handing it off
+            // to the calendar app directly, which is the whole point of
+            // serving text/calendar.
             'Content-Type' => 'text/calendar; charset=utf-8',
-            'Content-Disposition' => 'attachment; filename="' . Str::slug($farmJob->name) . '.ics"',
+            'Content-Disposition' => 'inline; filename="' . Str::slug($farmJob->name) . '.ics"',
         ]);
     }
 
