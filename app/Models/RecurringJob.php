@@ -71,4 +71,33 @@ class RecurringJob extends Model
             self::YEARLY => $periodStart->copy()->endOfYear(),
         };
     }
+
+    /**
+     * Create this template's job instance for the period starting on the
+     * given date — used both by the daily scheduler and to create the first
+     * instance immediately when a recurring job is created.
+     */
+    public function createInstance(\Carbon\Carbon $periodStart): FarmJob
+    {
+        $job = FarmJob::create([
+            'name' => $this->name,
+            'description' => $this->description,
+            'estimated_hours' => $this->estimated_hours,
+            'budget' => $this->budget,
+            'hourly_rate' => $this->hourly_rate,
+            'priority_id' => $this->priority_id,
+            'job_type_id' => $this->job_type_id,
+            'job_status_id' => JobStatus::where('is_default', true)->value('id'),
+            'user_id' => $this->created_by,
+            'property_id' => $this->property_id,
+            'recurring_job_id' => $this->id,
+            'period_start' => $periodStart,
+            'period_end' => $this->periodEndFor($periodStart),
+        ]);
+
+        $teamUserIds = Role::where('property_id', $job->property_id)->pluck('user_id');
+        $job->assignees()->attach($teamUserIds);
+
+        return $job;
+    }
 }

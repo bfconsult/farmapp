@@ -7,6 +7,7 @@ use App\Models\Priority;
 use App\Models\JobType;
 use App\Models\JobStatus;
 use App\Models\Property;
+use App\Models\RecurringJob;
 use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -119,10 +120,37 @@ class FarmJobController extends Controller
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'intent' => 'nullable|in:camera,plan',
+            'repeats' => 'boolean',
+            'interval' => 'required_if:repeats,true|in:' . implode(',', RecurringJob::INTERVALS),
+            'starts_on' => 'required_if:repeats,true|date',
         ]);
 
         $intent = $validated['intent'] ?? 'camera';
-        unset($validated['intent']);
+        $repeats = $validated['repeats'] ?? false;
+        unset($validated['intent'], $validated['repeats']);
+
+        // A repeating job's first instance is created immediately, in the
+        // same action, rather than waiting for the scheduler to pick it up.
+        if ($repeats) {
+            $recurringJob = RecurringJob::create([
+                'property_id' => session('current_property_id'),
+                'created_by' => Auth::id(),
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'job_type_id' => $validated['job_type_id'] ?? null,
+                'priority_id' => $validated['priority_id'] ?? null,
+                'estimated_hours' => $validated['estimated_hours'] ?? null,
+                'budget' => $validated['budget'] ?? null,
+                'hourly_rate' => $validated['hourly_rate'] ?? null,
+                'interval' => $validated['interval'],
+                'starts_on' => $validated['starts_on'],
+                'is_active' => true,
+            ]);
+
+            $farmJob = $recurringJob->createInstance($recurringJob->starts_on);
+
+            return redirect()->route('jobs.edit', $farmJob);
+        }
 
         $validated['user_id'] = Auth::id();
         $validated['property_id'] = session('current_property_id');

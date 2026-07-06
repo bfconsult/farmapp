@@ -2,11 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\FarmJob;
 use App\Models\JobStatus;
 use App\Models\RecurringJob;
-use App\Models\Role;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 
 class GenerateRecurringJobs extends Command
@@ -36,8 +33,12 @@ class GenerateRecurringJobs extends Command
             $latest = $template->instances()->latest('period_start')->first();
 
             if (!$latest) {
+                // Normally the first instance is created immediately alongside
+                // the template (see FarmJobController::store()) — this only
+                // fires as a fallback if a template ever exists without one.
                 if (now()->toDateString() >= $template->starts_on->toDateString()) {
-                    $this->createInstance($template, $template->starts_on);
+                    $job = $template->createInstance($template->starts_on);
+                    $this->info("Created \"{$job->name}\" for {$job->period_start->toDateString()} to {$job->period_end->toDateString()} (recurring job #{$template->id}).");
                 }
 
                 return;
@@ -48,34 +49,9 @@ class GenerateRecurringJobs extends Command
                     $latest->update(['job_status_id' => $closedStatusId]);
                 }
 
-                $this->createInstance($template, $latest->period_end->copy()->addDay());
+                $job = $template->createInstance($latest->period_end->copy()->addDay());
+                $this->info("Created \"{$job->name}\" for {$job->period_start->toDateString()} to {$job->period_end->toDateString()} (recurring job #{$template->id}).");
             }
         });
-    }
-
-    private function createInstance(RecurringJob $template, Carbon $periodStart): void
-    {
-        $periodEnd = $template->periodEndFor($periodStart);
-
-        $job = FarmJob::create([
-            'name' => $template->name,
-            'description' => $template->description,
-            'estimated_hours' => $template->estimated_hours,
-            'budget' => $template->budget,
-            'hourly_rate' => $template->hourly_rate,
-            'priority_id' => $template->priority_id,
-            'job_type_id' => $template->job_type_id,
-            'job_status_id' => JobStatus::where('is_default', true)->value('id'),
-            'user_id' => $template->created_by,
-            'property_id' => $template->property_id,
-            'recurring_job_id' => $template->id,
-            'period_start' => $periodStart,
-            'period_end' => $periodEnd,
-        ]);
-
-        $teamUserIds = Role::where('property_id', $job->property_id)->pluck('user_id');
-        $job->assignees()->attach($teamUserIds);
-
-        $this->info("Created \"{$job->name}\" for {$periodStart->toDateString()} to {$periodEnd->toDateString()} (recurring job #{$template->id}).");
     }
 }

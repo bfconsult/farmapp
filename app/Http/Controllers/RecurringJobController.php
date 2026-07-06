@@ -6,7 +6,6 @@ use App\Models\JobType;
 use App\Models\Priority;
 use App\Models\RecurringJob;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class RecurringJobController extends Controller
@@ -27,18 +26,11 @@ class RecurringJobController extends Controller
         ]);
     }
 
-    public function store(Request $request)
-    {
-        $validated = $this->validated($request);
-        $validated['property_id'] = session('current_property_id');
-        $validated['created_by'] = Auth::id();
-        $validated['is_active'] = true;
-
-        RecurringJob::create($validated);
-
-        return back()->with('success', 'Recurring job created.');
-    }
-
+    /**
+     * Creating a recurring job happens on the normal job-creation screen (see
+     * FarmJobController::store()) so the first instance is created in the
+     * same action — this controller only manages templates after that.
+     */
     public function update(Request $request, RecurringJob $recurringJob)
     {
         $validated = $this->validated($request);
@@ -57,12 +49,12 @@ class RecurringJobController extends Controller
     }
 
     /**
-     * starts_on is deliberately excluded from update() — changing it once
-     * instances already exist would make it ambiguous which period is current.
+     * starts_on is deliberately excluded — changing it once instances already
+     * exist would make it ambiguous which period is current.
      */
     private function validated(Request $request): array
     {
-        $rules = [
+        return $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'job_type_id' => 'nullable|exists:job_types,id',
@@ -71,12 +63,6 @@ class RecurringJobController extends Controller
             'budget' => 'nullable|numeric|min:0',
             'hourly_rate' => 'nullable|numeric|min:0',
             'interval' => 'required|in:' . implode(',', RecurringJob::INTERVALS),
-        ];
-
-        if ($request->routeIs('recurring-jobs.store')) {
-            $rules['starts_on'] = 'required|date';
-        }
-
-        return $request->validate($rules);
+        ]);
     }
 }

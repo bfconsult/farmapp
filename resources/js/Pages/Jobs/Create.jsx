@@ -2,6 +2,8 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
 export default function Create({ priorities, jobTypes, jobStatuses, currentProperty }) {
     const defaultStatus = jobStatuses.find((status) => status.is_default);
 
@@ -16,6 +18,9 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
         job_status_id: defaultStatus ? String(defaultStatus.id) : '',
         latitude: '',
         longitude: '',
+        repeats: false,
+        interval: 'monthly',
+        starts_on: todayIso(),
     });
 
     const [locationStatus, setLocationStatus] = useState('getting');
@@ -49,7 +54,7 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
 
     const submit = (e) => {
         e.preventDefault();
-        submitWithIntent('camera');
+        submitWithIntent(data.repeats ? 'plan' : 'camera');
     };
 
     return (
@@ -187,6 +192,45 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                         </div>
                     )}
 
+                    <div className="border-t border-gray-200 pt-4">
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={data.repeats}
+                                onChange={(e) => setData('repeats', e.target.checked)}
+                                className="rounded"
+                            />
+                            Make this job repeat
+                        </label>
+
+                        {data.repeats && (
+                            <div className="grid grid-cols-2 gap-3 mt-3">
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">Repeats</label>
+                                    <select
+                                        value={data.interval}
+                                        onChange={(e) => setData('interval', e.target.value)}
+                                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
+                                    >
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                        <option value="yearly">Yearly</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">Starting</label>
+                                    <input
+                                        type="date"
+                                        value={data.starts_on}
+                                        onChange={(e) => setData('starts_on', e.target.value)}
+                                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="flex gap-2 pt-2">
                         <button
                             type="button"
@@ -195,28 +239,40 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                         >
                             Cancel
                         </button>
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-                        >
-                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            Report
-                        </button>
-                        <button
-                            type="button"
-                            disabled={processing}
-                            onClick={() => submitWithIntent('plan')}
-                            className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-                        >
-                            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Plan
-                        </button>
+                        {data.repeats ? (
+                            <button
+                                type="submit"
+                                disabled={processing}
+                                className="flex-1 flex items-center justify-center py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                            >
+                                Create Repeating Job
+                            </button>
+                        ) : (
+                            <>
+                                <button
+                                    type="submit"
+                                    disabled={processing}
+                                    className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                                >
+                                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    Report
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={processing}
+                                    onClick={() => submitWithIntent('plan')}
+                                    className="flex-1 flex flex-col items-center justify-center gap-1 py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                                >
+                                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Plan
+                                </button>
+                            </>
+                        )}
                     </div>
                 </form>
             </div>

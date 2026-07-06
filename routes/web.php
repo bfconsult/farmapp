@@ -112,7 +112,6 @@ Route::middleware(['auth', 'property.role:admin'])->group(function () {
 Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('recurring-jobs', [RecurringJobController::class, 'index'])->name('recurring-jobs.index');
-    Route::post('recurring-jobs', [RecurringJobController::class, 'store'])->name('recurring-jobs.store');
     Route::patch('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'update'])->name('recurring-jobs.update');
     Route::delete('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'destroy'])->name('recurring-jobs.destroy');
     Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');

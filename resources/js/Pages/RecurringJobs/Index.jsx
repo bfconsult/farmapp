@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 
 const INTERVAL_LABELS = {
@@ -9,21 +9,7 @@ const INTERVAL_LABELS = {
     yearly: 'Yearly',
 };
 
-function emptyValues() {
-    return {
-        name: '',
-        description: '',
-        job_type_id: '',
-        priority_id: '',
-        estimated_hours: '',
-        budget: '',
-        hourly_rate: '',
-        interval: 'monthly',
-        starts_on: new Date().toISOString().slice(0, 10),
-    };
-}
-
-function RecurringJobFields({ values, setValues, jobTypes, priorities, showStartsOn }) {
+function RecurringJobFields({ values, setValues, jobTypes, priorities }) {
     return (
         <div className="space-y-3">
             <input
@@ -88,29 +74,15 @@ function RecurringJobFields({ values, setValues, jobTypes, priorities, showStart
                     placeholder="Rate ($/hr)"
                 />
             </div>
-            <div className="grid grid-cols-2 gap-2">
-                <select
-                    value={values.interval}
-                    onChange={(e) => setValues({ ...values, interval: e.target.value })}
-                    className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                >
-                    {Object.entries(INTERVAL_LABELS).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                    ))}
-                </select>
-                {showStartsOn ? (
-                    <input
-                        type="date"
-                        value={values.starts_on}
-                        onChange={(e) => setValues({ ...values, starts_on: e.target.value })}
-                        className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                    />
-                ) : (
-                    <div className="flex items-center text-xs text-gray-400 px-1">
-                        Start date can't be changed after creation
-                    </div>
-                )}
-            </div>
+            <select
+                value={values.interval}
+                onChange={(e) => setValues({ ...values, interval: e.target.value })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+            >
+                {Object.entries(INTERVAL_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                ))}
+            </select>
         </div>
     );
 }
@@ -151,7 +123,7 @@ function RecurringJobCard({ recurringJob, jobTypes, priorities }) {
     if (editing) {
         return (
             <div className="bg-green-50 rounded-lg shadow p-4 space-y-3">
-                <RecurringJobFields values={values} setValues={setValues} jobTypes={jobTypes} priorities={priorities} showStartsOn={false} />
+                <RecurringJobFields values={values} setValues={setValues} jobTypes={jobTypes} priorities={priorities} />
                 <div className="flex gap-2">
                     <button onClick={save} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Save</button>
                     <button onClick={() => setEditing(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
@@ -183,29 +155,16 @@ function RecurringJobCard({ recurringJob, jobTypes, priorities }) {
 }
 
 export default function Index({ recurringJobs, jobTypes, priorities }) {
-    const [adding, setAdding] = useState(false);
-    const [values, setValues] = useState(emptyValues());
-
-    const add = () => {
-        router.post(route('recurring-jobs.store'), values, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setValues(emptyValues());
-                setAdding(false);
-            },
-        });
-    };
-
     return (
         <AuthenticatedLayout title="Recurring Jobs">
             <Head title="Recurring Jobs" />
 
             <div className="max-w-lg mx-auto mt-2 space-y-4 pb-24">
                 <p className="text-sm text-gray-500">
-                    Recurring jobs automatically create a new job instance each period (e.g. a monthly management-hours bucket), closing out the previous one once its period ends.
+                    Recurring jobs automatically create a new job instance each period (e.g. a monthly management-hours bucket), closing out the previous one once its period ends. To set up a new one, check "Make this job repeat" on the job creation screen.
                 </p>
 
-                {recurringJobs.length === 0 && !adding ? (
+                {recurringJobs.length === 0 ? (
                     <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
                         No recurring jobs set up yet.
                     </div>
@@ -222,22 +181,12 @@ export default function Index({ recurringJobs, jobTypes, priorities }) {
                     </div>
                 )}
 
-                {adding ? (
-                    <div className="bg-green-50 rounded-lg shadow p-4 space-y-3">
-                        <RecurringJobFields values={values} setValues={setValues} jobTypes={jobTypes} priorities={priorities} showStartsOn />
-                        <div className="flex gap-2">
-                            <button onClick={add} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add</button>
-                            <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
-                        </div>
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => setAdding(true)}
-                        className="w-full py-2 text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
-                    >
-                        + Add Recurring Job
-                    </button>
-                )}
+                <Link
+                    href={route('jobs.create')}
+                    className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
+                >
+                    + Add Recurring Job
+                </Link>
             </div>
         </AuthenticatedLayout>
     );
