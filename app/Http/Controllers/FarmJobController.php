@@ -11,6 +11,7 @@ use App\Models\RecurringJob;
 use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class FarmJobController extends Controller
@@ -123,6 +124,7 @@ class FarmJobController extends Controller
             'repeats' => 'boolean',
             'interval' => 'required_if:repeats,true|in:' . implode(',', RecurringJob::INTERVALS),
             'starts_on' => 'required_if:repeats,true|date',
+            'scheduled_date' => 'nullable|date',
         ]);
 
         $intent = $validated['intent'] ?? 'camera';
@@ -208,6 +210,7 @@ class FarmJobController extends Controller
             'repeats' => 'boolean',
             'interval' => 'required_if:repeats,true|in:' . implode(',', RecurringJob::INTERVALS),
             'starts_on' => 'required_if:repeats,true|date',
+            'scheduled_date' => 'nullable|date',
         ]);
 
         $assigneeIds = $validated['assignee_ids'] ?? [];
@@ -260,5 +263,61 @@ class FarmJobController extends Controller
         $farmJob->delete();
 
         return redirect()->route('jobs.index');
+    }
+
+    /**
+     * Downloadable .ics calendar event for a job's scheduled date — works
+     * with Apple Calendar, Outlook and Google Calendar without needing any
+     * account integration, since it's just a standard file the OS/browser
+     * hands off to whatever calendar app is installed.
+     */
+    public function calendar(FarmJob $farmJob)
+    {
+        if (!$farmJob->scheduled_date) {
+            abort(404);
+        }
+
+        $start = $farmJob->scheduled_date->format('Ymd');
+        $end = $farmJob->scheduled_date->copy()->addDay()->format('Ymd');
+        $stamp = now()->utc()->format('Ymd\THis\Z');
+
+        $lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//FarmTask//EN',
+            'CALSCALE:GREGORIAN',
+            'BEGIN:VEVENT',
+            "UID:farm-job-{$farmJob->id}@farmtask.be",
+            "DTSTAMP:{$stamp}",
+            "DTSTART;VALUE=DATE:{$start}",
+            "DTEND;VALUE=DATE:{$end}",
+            'SUMMARY:' . $this->icsEscape($farmJob->name),
+        ];
+
+        if ($farmJob->description) {
+            $lines[] = 'DESCRIPTION:' . $this->icsEscape($farmJob->description);
+        }
+
+        $lines = array_merge($lines, [
+            'BEGIN:VALARM',
+            'ACTION:DISPLAY',
+            'DESCRIPTION:Reminder',
+            'TRIGGER:-P1D',
+            'END:VALARM',
+            'END:VEVENT',
+            'END:VCALENDAR',
+        ]);
+
+        $ics = implode("\r\n", $lines) . "\r\n";
+
+        return response($ics, 200, [
+            'Content-Type' => 'text/calendar; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="' . Str::slug($farmJob->name) . '.ics"',
+        ]);
+    }
+
+    private function icsEscape(string $text): string
+    {
+        return str_replace(["\\", ',', ';', "\n"], ['\\\\', '\\,', '\\;', '\\n'], $text);
     }
 }

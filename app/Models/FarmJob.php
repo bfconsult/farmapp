@@ -24,11 +24,13 @@ class FarmJob extends Model
         'recurring_job_id',
         'period_start',
         'period_end',
+        'scheduled_date',
     ];
 
     protected $casts = [
         'period_start' => 'date',
         'period_end' => 'date',
+        'scheduled_date' => 'date',
     ];
 
     public function getRouteKeyName()

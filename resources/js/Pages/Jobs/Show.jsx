@@ -135,6 +135,22 @@ export default function Show({ job }) {
                             <span className="text-sm text-gray-500">Property</span>
                             <span className="text-sm text-gray-900">{job.property?.name}</span>
                         </div>
+                        {job.scheduled_date && (
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm text-gray-500">Scheduled</span>
+                                <span className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-900">
+                                        {new Date(`${job.scheduled_date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+                                    </span>
+                                    <a
+                                        href={route('jobs.calendar', job.id)}
+                                        className="text-xs text-green-600 border border-green-600 rounded-full px-2 py-0.5"
+                                    >
+                                        Add to Calendar
+                                    </a>
+                                </span>
+                            </div>
+                        )}
                         {job.estimated_hours && (
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Estimated Hours</span>
