@@ -114,9 +114,16 @@ export default function Show({ job }) {
                         <button
                             type="button"
                             onClick={() => setShowShare((v) => !v)}
-                            className="text-sm px-3 py-1 border border-gray-300 text-gray-700 rounded-lg"
+                            aria-label="Share"
+                            className="p-2 border border-gray-300 text-gray-700 rounded-lg"
                         >
-                            Share
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <circle cx="18" cy="5" r="3" />
+                                <circle cx="6" cy="12" r="3" />
+                                <circle cx="18" cy="19" r="3" />
+                                <line x1="8.59" y1="10.51" x2="15.42" y2="6.49" />
+                                <line x1="8.59" y1="13.49" x2="15.42" y2="17.51" />
+                            </svg>
                         </button>
                         <Link
                             href={route('jobs.edit', job.id)}
