@@ -179,6 +179,41 @@ class FarmJobController extends Controller
         ]);
     }
 
+    /**
+     * A job's share link. If the viewer is logged in and normally allowed to
+     * see this job (assigned to it), send them to the real page instead -
+     * this route is only meant to stand in for people who can't see it.
+     */
+    public function share(string $token)
+    {
+        $farmJob = FarmJob::where('share_token', $token)->firstOrFail();
+
+        if ($farmJob->isVisibleTo(Auth::user())) {
+            return redirect()->route('jobs.show', $farmJob);
+        }
+
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos']);
+
+        // Curated on purpose - this is a public, unauthenticated route, so
+        // internal figures like budget/hourly_rate/location never leave the
+        // server, not just hidden in the UI.
+        return Inertia::render('Jobs/SharedView', [
+            'job' => [
+                'name' => $farmJob->name,
+                'description' => $farmJob->description,
+                'scheduled_date' => $farmJob->scheduled_date,
+                'priority' => $farmJob->priority?->only(['name']),
+                'job_type' => $farmJob->jobType?->only(['name']),
+                'job_status' => $farmJob->jobStatus?->only(['name']),
+                'property' => $farmJob->property?->only(['name']),
+                'photos' => $farmJob->photos->map(fn ($photo) => [
+                    'id' => $photo->id,
+                    'url' => $photo->url,
+                ]),
+            ],
+        ]);
+    }
+
     public function edit(FarmJob $farmJob)
     {
         $farmJob->load('assignees');

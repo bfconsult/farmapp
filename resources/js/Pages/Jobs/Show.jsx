@@ -31,6 +31,8 @@ export default function Show({ job }) {
     const { flash } = usePage().props;
     const [uploading, setUploading] = useState(false);
     const [showDeleteOptions, setShowDeleteOptions] = useState(false);
+    const [showShare, setShowShare] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         if (flash?.addPhoto && fileInput.current) {
@@ -53,6 +55,17 @@ export default function Show({ job }) {
         router.delete(route('jobs.destroy', job.id), {
             data: { delete_recurring: deleteRecurring },
         });
+    };
+
+    const copyShareLink = async () => {
+        const link = route('jobs.share', job.share_token);
+        try {
+            await navigator.clipboard.writeText(link);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            // Clipboard API unavailable; the link is still visible to copy manually.
+        }
     };
 
     const destroyPhoto = (photoId) => {
@@ -97,13 +110,42 @@ export default function Show({ job }) {
                     <Link href={route('jobs.index')} className="text-green-600 text-sm">
                         ← Jobs
                     </Link>
-                    <Link
-                        href={route('jobs.edit', job.id)}
-                        className="text-sm px-3 py-1 border border-green-600 text-green-600 rounded-lg"
-                    >
-                        Edit
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowShare((v) => !v)}
+                            className="text-sm px-3 py-1 border border-gray-300 text-gray-700 rounded-lg"
+                        >
+                            Share
+                        </button>
+                        <Link
+                            href={route('jobs.edit', job.id)}
+                            className="text-sm px-3 py-1 border border-green-600 text-green-600 rounded-lg"
+                        >
+                            Edit
+                        </Link>
+                    </div>
                 </div>
+
+                {showShare && (
+                    <div className="bg-white rounded-lg shadow p-4">
+                        <p className="text-xs text-gray-500 mb-2">
+                            Anyone with this link can view this job, even without an account.
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <p className="flex-1 min-w-0 text-xs text-gray-500 bg-gray-50 rounded-lg px-2 py-1.5 truncate">
+                                {route('jobs.share', job.share_token)}
+                            </p>
+                            <button
+                                type="button"
+                                onClick={copyShareLink}
+                                className="text-xs text-green-600 whitespace-nowrap flex-shrink-0"
+                            >
+                                {copied ? 'Copied!' : 'Copy link'}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Job name & badges */}
                 <div className="bg-white rounded-lg shadow p-4">

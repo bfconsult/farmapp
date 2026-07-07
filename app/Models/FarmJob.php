@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class FarmJob extends Model
 {
@@ -25,6 +26,7 @@ class FarmJob extends Model
         'period_start',
         'period_end',
         'scheduled_date',
+        'share_token',
     ];
 
     protected $casts = [
@@ -33,9 +35,25 @@ class FarmJob extends Model
         'scheduled_date' => 'date',
     ];
 
+    protected static function booted()
+    {
+        static::creating(function (FarmJob $job) {
+            $job->share_token = $job->share_token ?? Str::random(40);
+        });
+    }
+
     public function getRouteKeyName()
     {
         return 'id';
+    }
+
+    /**
+     * Whether this user sees the job normally (assigned to it) rather than
+     * only via its share link.
+     */
+    public function isVisibleTo(?User $user): bool
+    {
+        return $user !== null && $this->assignees()->where('users.id', $user->id)->exists();
     }
 
     public function recurringJob()

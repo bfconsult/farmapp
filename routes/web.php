@@ -178,6 +178,10 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
 Route::get('invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');
 Route::post('invitations/{token}', [InvitationController::class, 'process'])->name('invitations.process');
 
+// Job share link (no auth required - the controller decides whether the
+// viewer sees the normal job page or a read-only share view)
+Route::get('share/jobs/{token}', [FarmJobController::class, 'share'])->name('jobs.share');
+
 // Admin and Manager can manage the property boundary
 Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::get('properties/{property}/shape/edit', [ShapeController::class, 'edit'])->name('shape.edit');
