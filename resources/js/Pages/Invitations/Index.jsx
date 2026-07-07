@@ -100,8 +100,6 @@ export default function Index({ property, roles, pendingInvitations, currentUser
             <Head title="Team" />
 
             <div className="max-w-lg mx-auto mt-2 space-y-4">
-                <p className="text-sm text-gray-500">{property.name}</p>
-
                 {/* Current team */}
                 <div className="bg-white rounded-lg shadow">
                     <div className="px-4 py-3 border-b border-gray-100">
