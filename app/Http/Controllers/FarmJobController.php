@@ -77,6 +77,27 @@ class FarmJobController extends Controller
 
         $jobs = $query->get();
 
+        // Calendar view - independent of the list's filters/date range, since
+        // it's a month-by-month browse rather than a filtered list. A job
+        // shows on its scheduled_date, or created_at if it has none.
+        $calendarMonth = $request->input('calendar_month') ?? now()->format('Y-m');
+        $calendarMonthStart = \Carbon\Carbon::parse($calendarMonth . '-01')->startOfMonth();
+        $calendarMonthEnd = $calendarMonthStart->copy()->endOfMonth();
+
+        $calendarJobs = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
+            ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
+                $query->where('property_id', $currentPropertyId);
+            })
+            ->where(function ($query) use ($calendarMonthStart, $calendarMonthEnd) {
+                $query->whereBetween('scheduled_date', [$calendarMonthStart, $calendarMonthEnd])
+                    ->orWhere(function ($query) use ($calendarMonthStart, $calendarMonthEnd) {
+                        $query->whereNull('scheduled_date')
+                            ->whereBetween('created_at', [$calendarMonthStart, $calendarMonthEnd]);
+                    });
+            })
+            ->with(['priority', 'jobType', 'jobStatus'])
+            ->get();
+
         return Inertia::render('Jobs/Index', [
             'jobs' => $jobs,
             'counts' => $counts,
@@ -85,6 +106,8 @@ class FarmJobController extends Controller
             'currentDateFrom' => $dateFrom->toDateString(),
             'currentDateTo' => $dateTo->toDateString(),
             'jobStatuses' => JobStatus::orderBy('order')->get(),
+            'calendarJobs' => $calendarJobs,
+            'calendarMonth' => $calendarMonth,
         ]);
     }
 

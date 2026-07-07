@@ -35,6 +35,17 @@ class FarmJob extends Model
         'scheduled_date' => 'date',
     ];
 
+    protected $appends = ['effective_date'];
+
+    /**
+     * The date this job shows on in the calendar view - its scheduled date
+     * if it has one, otherwise the date it was created.
+     */
+    public function getEffectiveDateAttribute(): string
+    {
+        return ($this->scheduled_date ?? $this->created_at)->toDateString();
+    }
+
     protected static function booted()
     {
         static::creating(function (FarmJob $job) {

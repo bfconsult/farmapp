@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 const STATUS_COLORS = {
     'Pending': 'bg-yellow-100 text-yellow-800',
@@ -17,6 +17,8 @@ const PRIORITY_COLORS = {
     'Critical': 'bg-red-100 text-red-700',
 };
 
+const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
 function currentMonthRange() {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
@@ -26,11 +28,175 @@ function currentMonthRange() {
     return { from, to };
 }
 
-export default function Index({ jobs, counts, currentStatusIds, currentOrder, currentDateFrom, currentDateTo, jobStatuses }) {
-    const { currentProperty, currentUserRole } = usePage().props;
+function JobCard({ job }) {
+    return (
+        <Link
+            href={route('jobs.show', job.id)}
+            className="block bg-white rounded-lg shadow p-4 hover:bg-gray-50 active:bg-gray-100"
+        >
+            <div className="flex items-start justify-between gap-2">
+                <h2 className="text-base font-medium text-gray-900 flex items-center gap-1.5">
+                    {job.recurring_job_id && (
+                        <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Repeating job">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                    )}
+                    {job.name}
+                </h2>
+                <span className="text-gray-400 text-lg flex-shrink-0">›</span>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-2">
+                {job.job_status && (
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[job.job_status.name] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {job.job_status.name}
+                    </span>
+                )}
+                {job.priority && (
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${PRIORITY_COLORS[job.priority.name] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {job.priority.name}
+                    </span>
+                )}
+                {job.job_type && (
+                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                        {job.job_type.name}
+                    </span>
+                )}
+            </div>
+
+            {job.description && (
+                <p className="text-sm text-gray-500 mt-2 line-clamp-1">
+                    {job.description}
+                </p>
+            )}
+        </Link>
+    );
+}
+
+function JobsCalendar({ month, jobs, onMonthChange }) {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const [selectedDate, setSelectedDate] = useState(() => (todayIso.slice(0, 7) === month ? todayIso : null));
+
+    const [year, monthNum] = month.split('-').map(Number);
+    const pad = (n) => String(n).padStart(2, '0');
+    const toISO = (day) => `${year}-${pad(monthNum)}-${pad(day)}`;
+
+    const firstWeekday = (new Date(year, monthNum - 1, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+    const monthLabel = new Date(year, monthNum - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const cells = [...Array(firstWeekday).fill(null), ...[...Array(daysInMonth).keys()].map((d) => d + 1)];
+
+    const jobsByDate = useMemo(() => {
+        const map = {};
+        jobs.forEach((job) => {
+            (map[job.effective_date] ??= []).push(job);
+        });
+        return map;
+    }, [jobs]);
+
+    const changeMonth = (delta) => {
+        const d = new Date(year, monthNum - 1 + delta, 1);
+        setSelectedDate(null);
+        onMonthChange(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
+    };
+
+    const selectedJobs = selectedDate ? (jobsByDate[selectedDate] ?? []) : [];
+
+    return (
+        <div>
+            <div className="bg-white rounded-lg shadow p-3 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                    <button
+                        type="button"
+                        onClick={() => changeMonth(-1)}
+                        className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded-full"
+                        aria-label="Previous month"
+                    >
+                        ‹
+                    </button>
+                    <span className="text-sm font-semibold text-gray-900">{monthLabel}</span>
+                    <button
+                        type="button"
+                        onClick={() => changeMonth(1)}
+                        className="w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100 rounded-full"
+                        aria-label="Next month"
+                    >
+                        ›
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-7 gap-y-1 text-center">
+                    {WEEKDAYS.map((wd) => (
+                        <div key={wd} className="text-xs text-gray-400 font-medium py-1">
+                            {wd}
+                        </div>
+                    ))}
+
+                    {cells.map((day, i) => {
+                        if (day === null) return <div key={`empty-${i}`} />;
+                        const iso = toISO(day);
+                        const dayJobs = jobsByDate[iso] ?? [];
+                        const isToday = iso === todayIso;
+                        const isSelected = iso === selectedDate;
+                        return (
+                            <button
+                                type="button"
+                                key={iso}
+                                onClick={() => setSelectedDate(iso)}
+                                className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm mx-auto w-full transition-colors ${
+                                    isSelected
+                                        ? 'bg-green-600 text-white font-semibold'
+                                        : isToday
+                                        ? 'bg-green-50 text-green-700 font-semibold'
+                                        : 'text-gray-700 hover:bg-gray-100'
+                                }`}
+                            >
+                                <span>{day}</span>
+                                {dayJobs.length > 0 && (
+                                    <span className="flex gap-0.5 mt-0.5">
+                                        {Array.from({ length: Math.min(dayJobs.length, 3) }).map((_, dotIndex) => (
+                                            <span
+                                                key={dotIndex}
+                                                className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-green-500'}`}
+                                            />
+                                        ))}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {selectedDate && (
+                <div>
+                    <p className="text-xs text-gray-500 mb-2">
+                        {selectedJobs.length} job{selectedJobs.length === 1 ? '' : 's'} on{' '}
+                        {new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </p>
+                    {selectedJobs.length === 0 ? (
+                        <p className="text-sm text-gray-400 bg-white rounded-lg shadow p-4 text-center">
+                            No jobs this day.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {selectedJobs.map((job) => (
+                                <JobCard key={job.id} job={job} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default function Index({ jobs, counts, currentStatusIds, currentOrder, currentDateFrom, currentDateTo, jobStatuses, calendarJobs, calendarMonth }) {
+    const { currentUserRole } = usePage().props;
     const canManageRecurring = currentUserRole === 'admin' || currentUserRole === 'manager';
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
+    const [view, setView] = useState('list');
 
     const goTo = (overrides = {}) => {
         router.get(route('jobs.index'), {
@@ -38,6 +204,7 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
             date_from: overrides.dateFrom ?? currentDateFrom,
             date_to: overrides.dateTo ?? currentDateTo,
             order: overrides.order ?? currentOrder,
+            calendar_month: overrides.calendarMonth ?? calendarMonth,
         }, { preserveState: true, preserveScroll: true });
     };
 
@@ -53,6 +220,7 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
 
     const changeOrder = (e) => goTo({ order: e.target.value });
     const changeRange = (dateFrom, dateTo) => goTo({ dateFrom, dateTo });
+    const changeCalendarMonth = (newMonth) => goTo({ calendarMonth: newMonth });
 
     const formatDate = (iso) =>
         new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
@@ -80,6 +248,30 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
 
             <div className="max-w-lg mx-auto mt-2">
 
+                {/* View toggle */}
+                <div className="flex bg-white rounded-lg shadow p-1 mb-3">
+                    <button
+                        type="button"
+                        onClick={() => setView('list')}
+                        className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${
+                            view === 'list' ? 'bg-green-600 text-white' : 'text-gray-600'
+                        }`}
+                    >
+                        List
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setView('calendar')}
+                        className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${
+                            view === 'calendar' ? 'bg-green-600 text-white' : 'text-gray-600'
+                        }`}
+                    >
+                        Calendar
+                    </button>
+                </div>
+
+                {view === 'list' && (
+                <>
                 {/* Filters toggle */}
                 <div className="flex items-center justify-between mb-3">
                     <button
@@ -187,49 +379,19 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
                 ) : (
                     <div className="space-y-3">
                         {jobs.map((job) => (
-                            <Link
-                                key={job.id}
-                                href={route('jobs.show', job.id)}
-                                className="block bg-white rounded-lg shadow p-4 hover:bg-gray-50 active:bg-gray-100"
-                            >
-                                <div className="flex items-start justify-between gap-2">
-                                    <h2 className="text-base font-medium text-gray-900 flex items-center gap-1.5">
-                                        {job.recurring_job_id && (
-                                            <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Repeating job">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                                            </svg>
-                                        )}
-                                        {job.name}
-                                    </h2>
-                                    <span className="text-gray-400 text-lg flex-shrink-0">›</span>
-                                </div>
-
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {job.job_status && (
-                                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[job.job_status.name] ?? 'bg-gray-100 text-gray-600'}`}>
-                                            {job.job_status.name}
-                                        </span>
-                                    )}
-                                    {job.priority && (
-                                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${PRIORITY_COLORS[job.priority.name] ?? 'bg-gray-100 text-gray-600'}`}>
-                                            {job.priority.name}
-                                        </span>
-                                    )}
-                                    {job.job_type && (
-                                        <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
-                                            {job.job_type.name}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {job.description && (
-                                    <p className="text-sm text-gray-500 mt-2 line-clamp-1">
-                                        {job.description}
-                                    </p>
-                                )}
-                            </Link>
+                            <JobCard key={job.id} job={job} />
                         ))}
                     </div>
+                )}
+                </>
+                )}
+
+                {view === 'calendar' && (
+                    <JobsCalendar
+                        month={calendarMonth}
+                        jobs={calendarJobs}
+                        onMonthChange={changeCalendarMonth}
+                    />
                 )}
             </div>
         </AuthenticatedLayout>
