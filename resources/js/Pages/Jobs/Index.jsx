@@ -248,51 +248,71 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
 
             <div className="max-w-lg mx-auto mt-2">
 
-                {/* View toggle */}
-                <div className="flex bg-white rounded-lg shadow p-1 mb-3">
-                    <button
-                        type="button"
-                        onClick={() => setView('list')}
-                        className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${
-                            view === 'list' ? 'bg-green-600 text-white' : 'text-gray-600'
-                        }`}
-                    >
-                        List
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setView('calendar')}
-                        className={`flex-1 text-sm font-medium py-1.5 rounded-md transition-colors ${
-                            view === 'calendar' ? 'bg-green-600 text-white' : 'text-gray-600'
-                        }`}
-                    >
-                        Calendar
-                    </button>
+                {/* Filters + view toggle + order */}
+                <div className="flex items-center justify-between mb-3 gap-2">
+                    {view === 'list' ? (
+                        <button
+                            onClick={() => setShowFilters((v) => !v)}
+                            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
+                        >
+                            <span>Filters</span>
+                            <span className="text-xs text-gray-500 font-normal">{filterSummary}</span>
+                            <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
+                        </button>
+                    ) : <span />}
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setView('list')}
+                            aria-label="Card view"
+                            className={`p-2 rounded-lg border ${
+                                view === 'list'
+                                    ? 'bg-green-600 border-green-600 text-white'
+                                    : 'bg-white border-gray-300 text-gray-500'
+                            }`}
+                        >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <rect x="3" y="3" width="7" height="7" rx="1" />
+                                <rect x="14" y="3" width="7" height="7" rx="1" />
+                                <rect x="3" y="14" width="7" height="7" rx="1" />
+                                <rect x="14" y="14" width="7" height="7" rx="1" />
+                            </svg>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setView('calendar')}
+                            aria-label="Calendar view"
+                            className={`p-2 rounded-lg border ${
+                                view === 'calendar'
+                                    ? 'bg-green-600 border-green-600 text-white'
+                                    : 'bg-white border-gray-300 text-gray-500'
+                            }`}
+                        >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <rect x="3" y="4" width="18" height="18" rx="2" />
+                                <line x1="16" y1="2" x2="16" y2="6" />
+                                <line x1="8" y1="2" x2="8" y2="6" />
+                                <line x1="3" y1="10" x2="21" y2="10" />
+                            </svg>
+                        </button>
+
+                        {view === 'list' && (
+                            <select
+                                value={currentOrder}
+                                onChange={changeOrder}
+                                className="text-sm border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                            >
+                                <option value="latest">Latest first</option>
+                                <option value="priority">By priority</option>
+                                <option value="status">By status</option>
+                            </select>
+                        )}
+                    </div>
                 </div>
 
                 {view === 'list' && (
                 <>
-                {/* Filters toggle */}
-                <div className="flex items-center justify-between mb-3">
-                    <button
-                        onClick={() => setShowFilters((v) => !v)}
-                        className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
-                    >
-                        <span>Filters</span>
-                        <span className="text-xs text-gray-500 font-normal">{filterSummary}</span>
-                        <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
-                    </button>
-
-                    <select
-                        value={currentOrder}
-                        onChange={changeOrder}
-                        className="text-sm border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                    >
-                        <option value="latest">Latest first</option>
-                        <option value="priority">By priority</option>
-                        <option value="status">By status</option>
-                    </select>
-                </div>
 
                 {showFilters && (
                     <div className="bg-white rounded-lg shadow p-4 mb-4 space-y-4">
