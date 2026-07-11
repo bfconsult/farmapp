@@ -22,6 +22,8 @@ class WorkSession extends Model
         'latitude',
         'longitude',
         'status',
+        'source',
+        'external_uuid',
     ];
 
     protected $casts = [
