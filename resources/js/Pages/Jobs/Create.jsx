@@ -108,17 +108,19 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                                 className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
                             />
 
-                            <div>
-                                <label className="block text-xs text-gray-500 mb-1">
-                                    Scheduled Date <span className="text-gray-400">optional</span>
-                                </label>
-                                <input
-                                    type="date"
-                                    value={data.scheduled_date}
-                                    onChange={(e) => setData('scheduled_date', e.target.value)}
-                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
-                                />
-                            </div>
+                            {!data.repeats && (
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">
+                                        Scheduled Date <span className="text-gray-400">optional</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={data.scheduled_date}
+                                        onChange={(e) => setData('scheduled_date', e.target.value)}
+                                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
+                                    />
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -210,7 +212,11 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                             <input
                                 type="checkbox"
                                 checked={data.repeats}
-                                onChange={(e) => setData('repeats', e.target.checked)}
+                                onChange={(e) => setData((current) => ({
+                                    ...current,
+                                    repeats: e.target.checked,
+                                    scheduled_date: e.target.checked ? '' : current.scheduled_date,
+                                }))}
                                 className="rounded"
                             />
                             Make this job repeat

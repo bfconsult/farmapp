@@ -80,16 +80,18 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                                 {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
                             </div>
 
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Scheduled Date</label>
-                                <input
-                                    type="date"
-                                    value={data.scheduled_date}
-                                    onChange={(e) => setData('scheduled_date', e.target.value)}
-                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
-                                />
-                                {errors.scheduled_date && <p className="mt-1 text-sm text-red-600">{errors.scheduled_date}</p>}
-                            </div>
+                            {!job.recurring_job_id && !data.repeats && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Scheduled Date</label>
+                                    <input
+                                        type="date"
+                                        value={data.scheduled_date}
+                                        onChange={(e) => setData('scheduled_date', e.target.value)}
+                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                    />
+                                    {errors.scheduled_date && <p className="mt-1 text-sm text-red-600">{errors.scheduled_date}</p>}
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-3 gap-4 mb-4">
                                 <div>
@@ -222,7 +224,11 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                                         <input
                                             type="checkbox"
                                             checked={data.repeats}
-                                            onChange={(e) => setData('repeats', e.target.checked)}
+                                            onChange={(e) => setData((current) => ({
+                                                ...current,
+                                                repeats: e.target.checked,
+                                                scheduled_date: e.target.checked ? '' : current.scheduled_date,
+                                            }))}
                                             className="rounded text-green-600 focus:ring-green-500"
                                         />
                                         Make this job repeat
