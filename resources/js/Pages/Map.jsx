@@ -51,7 +51,10 @@ export default function Map({ jobs, shape, currentRole }) {
                 `);
             });
 
-            // Draw property boundary and fit to it if it exists
+            // Draw property boundary and non-working zone, and fit to
+            // whichever of them exist.
+            const boundsTargets = [];
+
             if (shape?.coordinates) {
                 const boundary = L.polygon(shape.coordinates, {
                     color: '#ca8a04',
@@ -60,8 +63,32 @@ export default function Map({ jobs, shape, currentRole }) {
                     fillColor: '#fef08a',
                     fillOpacity: 0.15,
                 }).addTo(map);
+                boundsTargets.push(boundary.getBounds());
+            }
 
-                map.fitBounds(boundary.getBounds(), { padding: [40, 40] });
+            if (currentProperty?.non_working_zone_center_lat) {
+                const zone = L.circle(
+                    [
+                        currentProperty.non_working_zone_center_lat,
+                        currentProperty.non_working_zone_center_lng,
+                    ],
+                    {
+                        radius: Number(currentProperty.non_working_zone_radius_meters),
+                        color: '#f59e0b',
+                        weight: 2,
+                        fillColor: '#f59e0b',
+                        fillOpacity: 0.2,
+                    },
+                ).addTo(map);
+                boundsTargets.push(zone.getBounds());
+            }
+
+            if (boundsTargets.length > 0) {
+                const combined = boundsTargets.reduce(
+                    (acc, b) => (acc ? acc.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast())),
+                    null,
+                );
+                map.fitBounds(combined, { padding: [40, 40] });
             } else if (jobsWithLocation.length > 1) {
                 // No boundary — fit to job markers
                 map.fitBounds(

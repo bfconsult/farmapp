@@ -6,7 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class Property extends Model
 {
-    protected $fillable = ['name', 'address'];
+    protected $fillable = [
+        'name',
+        'address',
+        'non_working_zone_center_lat',
+        'non_working_zone_center_lng',
+        'non_working_zone_radius_meters',
+    ];
 
     public function shape()
     {

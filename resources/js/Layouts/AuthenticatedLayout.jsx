@@ -93,7 +93,7 @@ export default function AuthenticatedLayout({ title, children }) {
             </nav>
 
             {/* Main content */}
-            <main className="pt-14 px-4 py-4">
+            <main className="pt-14 px-4 pb-4">
                 {flash?.error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                         {flash.error}

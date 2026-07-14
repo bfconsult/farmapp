@@ -92,6 +92,9 @@ export default function Show({ property, currentRole }) {
                                 {property.shape
                                     ? `Boundary set — ${property.shape.coordinates.length} points`
                                     : 'No boundary defined yet.'}
+                                {property.non_working_zone_center_lat && (
+                                    <> · Non-working zone: {property.non_working_zone_radius_meters}m radius</>
+                                )}
                             </p>
                         </div>
                     )}

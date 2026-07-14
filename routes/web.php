@@ -10,6 +10,7 @@ use App\Http\Controllers\WorkSessionController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\ShapeController;
+use App\Http\Controllers\NonWorkingZoneController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\HelpMessageController;
 use App\Http\Controllers\RecurringJobController;
@@ -187,6 +188,11 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::get('properties/{property}/shape/edit', [ShapeController::class, 'edit'])->name('shape.edit');
     Route::put('properties/{property}/shape', [ShapeController::class, 'update'])->name('shape.update');
     Route::delete('properties/{property}/shape', [ShapeController::class, 'destroy'])->name('shape.destroy');
+
+    // No `non-working-zone.edit` route - it's edited on the same page as the
+    // boundary (`shape.edit`), not a separate page.
+    Route::put('properties/{property}/non-working-zone', [NonWorkingZoneController::class, 'update'])->name('non-working-zone.update');
+    Route::delete('properties/{property}/non-working-zone', [NonWorkingZoneController::class, 'destroy'])->name('non-working-zone.destroy');
 });
 
 // Admin and Manager can manage invitations

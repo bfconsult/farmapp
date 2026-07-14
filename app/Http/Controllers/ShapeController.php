@@ -29,7 +29,10 @@ class ShapeController extends Controller
             ['coordinates' => $validated['coordinates']]
         );
 
-        return redirect()->route('properties.show', $property)
+        // Stays on the editor rather than returning to the property page,
+        // since an admin may still want to save the non-working zone on the
+        // same visit.
+        return redirect()->route('shape.edit', $property)
             ->with('status', 'Boundary saved.');
     }
 
@@ -37,7 +40,7 @@ class ShapeController extends Controller
     {
         $property->shape()->delete();
 
-        return redirect()->route('properties.show', $property)
+        return redirect()->route('shape.edit', $property)
             ->with('status', 'Boundary removed.');
     }
 }

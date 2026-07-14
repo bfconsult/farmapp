@@ -1,13 +1,19 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import HelpTip from '@/Components/HelpTip';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 
 export default function Shape({ property, shape }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
-    const drawnLayer = useRef(null);
+    const polygonLayer = useRef(null);
+    const circleLayer = useRef(null);
     const [hasShape, setHasShape] = useState(!!shape);
-    const [saving, setSaving] = useState(false);
+    const [hasZone, setHasZone] = useState(
+        !!property.non_working_zone_center_lat,
+    );
+    const [savingShape, setSavingShape] = useState(false);
+    const [savingZone, setSavingZone] = useState(false);
 
     useEffect(() => {
         if (mapInstance.current) return;
@@ -20,9 +26,12 @@ export default function Shape({ property, shape }) {
         ]).then(([L]) => {
             delete L.Icon.Default.prototype._getIconUrl;
             L.Icon.Default.mergeOptions({
-                iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                iconRetinaUrl:
+                    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+                iconUrl:
+                    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                shadowUrl:
+                    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
             });
 
             const map = L.map(mapRef.current).setView([-37.8136, 144.9631], 15);
@@ -33,27 +42,64 @@ export default function Shape({ property, shape }) {
                 maxZoom: 19,
             }).addTo(map);
 
-            // Load existing shape
+            // Load existing boundary
             if (shape?.coordinates) {
                 const polygon = L.polygon(shape.coordinates, {
                     color: '#16a34a',
                     fillColor: '#16a34a',
                     fillOpacity: 0.15,
                 }).addTo(map);
-                drawnLayer.current = polygon;
-                map.fitBounds(polygon.getBounds(), { padding: [40, 40] });
+                polygonLayer.current = polygon;
+            }
+
+            // Load existing non-working zone
+            if (property.non_working_zone_center_lat) {
+                const circle = L.circle(
+                    [
+                        property.non_working_zone_center_lat,
+                        property.non_working_zone_center_lng,
+                    ],
+                    {
+                        radius: property.non_working_zone_radius_meters,
+                        color: '#f59e0b',
+                        fillColor: '#f59e0b',
+                        fillOpacity: 0.2,
+                    },
+                ).addTo(map);
+                circleLayer.current = circle;
+            }
+
+            const existingBounds = [polygonLayer.current, circleLayer.current]
+                .filter(Boolean)
+                .map(
+                    (layer) =>
+                        layer.getBounds?.() ??
+                        layer.getLatLng().toBounds(layer.getRadius() * 2),
+                );
+            if (existingBounds.length > 0) {
+                const combined = existingBounds.reduce(
+                    (acc, b) =>
+                        acc
+                            ? acc.extend(b)
+                            : L.latLngBounds(
+                                  b.getSouthWest(),
+                                  b.getNorthEast(),
+                              ),
+                    null,
+                );
+                map.fitBounds(combined, { padding: [40, 40] });
             } else {
                 map.locate({ setView: true, maxZoom: 16 });
             }
 
-            // Enable geoman draw controls — polygon only
+            // Enable geoman draw controls — polygon (boundary) and circle
+            // (non-working zone), nothing else.
             map.pm.addControls({
                 position: 'topleft',
                 drawMarker: false,
                 drawCircleMarker: false,
                 drawPolyline: false,
                 drawRectangle: false,
-                drawCircle: false,
                 drawText: false,
                 editMode: true,
                 dragMode: false,
@@ -62,14 +108,15 @@ export default function Shape({ property, shape }) {
             });
 
             map.on('pm:create', (e) => {
-                // Remove previous shape if one existed
-                if (drawnLayer.current) {
-                    drawnLayer.current.remove();
+                if (e.shape === 'Circle') {
+                    if (circleLayer.current) circleLayer.current.remove();
+                    circleLayer.current = e.layer;
+                    setHasZone(true);
+                } else {
+                    if (polygonLayer.current) polygonLayer.current.remove();
+                    polygonLayer.current = e.layer;
+                    setHasShape(true);
                 }
-                drawnLayer.current = e.layer;
-                setHasShape(true);
-
-                // Disable draw mode after first polygon
                 map.pm.disableDraw();
             });
         });
@@ -82,49 +129,126 @@ export default function Shape({ property, shape }) {
         };
     }, []);
 
-    const save = () => {
-        if (!drawnLayer.current) return;
+    const saveShape = () => {
+        if (!polygonLayer.current) return;
 
-        const latlngs = drawnLayer.current.getLatLngs()[0].map((ll) => [ll.lat, ll.lng]);
-        setSaving(true);
+        const latlngs = polygonLayer.current
+            .getLatLngs()[0]
+            .map((ll) => [ll.lat, ll.lng]);
+        setSavingShape(true);
 
-        router.put(route('shape.update', property.id), { coordinates: latlngs }, {
-            onFinish: () => setSaving(false),
+        router.put(
+            route('shape.update', property.id),
+            { coordinates: latlngs },
+            {
+                preserveScroll: true,
+                onFinish: () => setSavingShape(false),
+            },
+        );
+    };
+
+    const removeZone = () => {
+        if (!confirm('Remove the non-working zone for this property?')) return;
+
+        router.delete(route('non-working-zone.destroy', property.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                if (circleLayer.current) {
+                    circleLayer.current.remove();
+                    circleLayer.current = null;
+                }
+                setHasZone(false);
+            },
         });
+    };
+
+    const saveZone = () => {
+        if (!circleLayer.current) return;
+
+        const center = circleLayer.current.getLatLng();
+        const radius = circleLayer.current.getRadius();
+        setSavingZone(true);
+
+        router.put(
+            route('non-working-zone.update', property.id),
+            {
+                center_lat: center.lat,
+                center_lng: center.lng,
+                radius_meters: Math.round(radius),
+            },
+            { preserveScroll: true, onFinish: () => setSavingZone(false) },
+        );
     };
 
     return (
         <AuthenticatedLayout>
             <Head title={`${property.name} — Boundary`} />
 
-            <div className="-mx-4 -mt-4">
+            {/* Colour the Geoman draw-tool icons to match the boundary (green)
+                and non-working zone (amber) colours used everywhere else on
+                this page, so the link between tool and purpose is obvious
+                without relying on the hover tooltip. */}
+            <style>{`
+                .leaflet-buttons-control-button:has(.leaflet-pm-icon-polygon) {
+                    background-color: #16a34a;
+                }
+                .leaflet-buttons-control-button:has(.leaflet-pm-icon-polygon) .leaflet-pm-icon-polygon {
+                    filter: brightness(0) invert(1);
+                }
+                .leaflet-buttons-control-button:has(.leaflet-pm-icon-circle) {
+                    background-color: #f59e0b;
+                }
+                .leaflet-buttons-control-button:has(.leaflet-pm-icon-circle) .leaflet-pm-icon-circle {
+                    filter: brightness(0) invert(1);
+                }
+            `}</style>
+
+            <div className="-mx-4">
                 {/* Toolbar */}
-                <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
-                    <span className="text-sm font-medium text-gray-700">
-                        {shape ? 'Edit boundary' : 'Draw boundary'} — {property.name}
-                    </span>
-                    <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-gray-200 bg-white px-4 py-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-1">
+                        <span className="truncate text-sm font-medium text-gray-700">
+                            {property.name} — boundary &amp; non-working zone
+                        </span>
+                        <HelpTip messageKey="properties.shape" />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
-                            onClick={() => router.visit(route('properties.show', property.id))}
+                            onClick={() =>
+                                router.visit(
+                                    route('properties.show', property.id),
+                                )
+                            }
                             className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900"
                         >
-                            Cancel
+                            Done
+                        </button>
+                        {hasZone && (
+                            <button
+                                onClick={removeZone}
+                                className="px-3 py-1.5 text-sm text-red-600 hover:text-red-800"
+                            >
+                                Remove zone
+                            </button>
+                        )}
+                        <button
+                            onClick={saveZone}
+                            disabled={!hasZone || savingZone}
+                            className="rounded-md bg-amber-500 px-3 py-1.5 text-sm text-white hover:bg-amber-600 disabled:opacity-50"
+                        >
+                            {savingZone ? 'Saving…' : 'Save zone'}
                         </button>
                         <button
-                            onClick={save}
-                            disabled={!hasShape || saving}
-                            className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                            onClick={saveShape}
+                            disabled={!hasShape || savingShape}
+                            className="rounded-md bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700 disabled:opacity-50"
                         >
-                            {saving ? 'Saving…' : 'Save boundary'}
+                            {savingShape ? 'Saving…' : 'Save boundary'}
                         </button>
                     </div>
                 </div>
 
-                <p className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-b border-gray-100">
-                    Use the polygon tool on the left to draw your property boundary. Click each corner, then click the first point to close the shape.
-                </p>
-
-                <div ref={mapRef} style={{ height: 'calc(100dvh - 10rem)' }} />
+                <div ref={mapRef} style={{ height: 'calc(100dvh - 7rem)' }} />
             </div>
         </AuthenticatedLayout>
     );
