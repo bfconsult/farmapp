@@ -15,6 +15,7 @@ class RecurringJob extends Model
 
     protected $fillable = [
         'property_id',
+        'zone_id',
         'created_by',
         'name',
         'description',
@@ -36,6 +37,11 @@ class RecurringJob extends Model
     public function property()
     {
         return $this->belongsTo(Property::class);
+    }
+
+    public function zone()
+    {
+        return $this->belongsTo(Zone::class);
     }
 
     public function createdBy()
@@ -90,6 +96,7 @@ class RecurringJob extends Model
             'job_status_id' => JobStatus::where('is_default', true)->value('id'),
             'user_id' => $this->created_by,
             'property_id' => $this->property_id,
+            'zone_id' => $this->zone_id,
             'recurring_job_id' => $this->id,
             'period_start' => $periodStart,
             'period_end' => $this->periodEndFor($periodStart),

@@ -10,11 +10,12 @@ class ShapeController extends Controller
 {
     public function edit(Property $property)
     {
-        $property->load('shape');
+        $property->load(['shape', 'zones']);
 
         return Inertia::render('Properties/Shape', [
             'property' => $property,
             'shape' => $property->shape,
+            'zones' => $property->zones,
         ]);
     }
 

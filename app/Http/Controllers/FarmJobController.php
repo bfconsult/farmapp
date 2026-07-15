@@ -58,7 +58,7 @@ class FarmJobController extends Controller
                 $query->where('property_id', $currentPropertyId);
             })
             ->whereBetween('created_at', [$dateFrom, $dateTo])
-            ->with(['priority', 'jobType', 'jobStatus', 'property', 'user'])
+            ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zone'])
             ->whereIn('job_status_id', $statusIds);
 
         // Status counts, scoped to the date range so they reflect what the
@@ -124,13 +124,14 @@ class FarmJobController extends Controller
     public function create()
     {
         $currentProperty = Auth::user()->properties()
+            ->with('zones')
             ->find(session('current_property_id'));
-    
+
         if (!$currentProperty) {
             return redirect()->route('properties.index')
                 ->with('error', 'Please select a property first.');
         }
-    
+
         return Inertia::render('Jobs/Create', [
             'priorities' => Priority::orderBy('order')->get(),
             'jobTypes' => JobType::orderBy('name')->get(),
@@ -151,6 +152,7 @@ class FarmJobController extends Controller
             'priority_id' => 'nullable|exists:priorities,id',
             'job_type_id' => 'nullable|exists:job_types,id',
             'job_status_id' => 'nullable|exists:job_statuses,id',
+            'zone_id' => 'nullable|exists:zones,id',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'intent' => 'nullable|in:camera,plan',
@@ -169,6 +171,7 @@ class FarmJobController extends Controller
         if ($repeats) {
             $recurringJob = RecurringJob::create([
                 'property_id' => session('current_property_id'),
+                'zone_id' => $validated['zone_id'] ?? null,
                 'created_by' => Auth::id(),
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
@@ -268,7 +271,7 @@ class FarmJobController extends Controller
             'priorities' => Priority::orderBy('order')->get(),
             'jobStatuses' => JobStatus::orderBy('order')->get(),
             'jobTypes' => JobType::orderBy('name')->get(),
-            'properties' => Auth::user()->properties()->get(),
+            'properties' => Auth::user()->properties()->with('zones')->get(),
             'teamRoles' => Property::find($farmJob->property_id)->roles()->with('user')->get(),
         ]);
     }
@@ -285,6 +288,7 @@ class FarmJobController extends Controller
             'job_type_id' => 'nullable|exists:job_types,id',
             'job_status_id' => 'nullable|exists:job_statuses,id',
             'property_id' => 'required|exists:properties,id',
+            'zone_id' => 'nullable|exists:zones,id',
             'assignee_ids' => 'nullable|array',
             'assignee_ids.*' => 'exists:users,id',
             'repeats' => 'boolean',
@@ -306,6 +310,7 @@ class FarmJobController extends Controller
         if ($repeats && !$farmJob->recurring_job_id) {
             $recurringJob = RecurringJob::create([
                 'property_id' => $validated['property_id'],
+                'zone_id' => $validated['zone_id'] ?? null,
                 'created_by' => Auth::id(),
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,

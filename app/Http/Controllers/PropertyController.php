@@ -43,7 +43,7 @@ class PropertyController extends Controller
 
     public function show(Property $property)
     {
-        $property->load('shape', 'farmJobs');
+        $property->load('shape');
 
         $currentRole = Auth::user()->roleOn($property);
 

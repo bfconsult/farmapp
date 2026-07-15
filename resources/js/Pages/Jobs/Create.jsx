@@ -16,6 +16,7 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
         priority_id: '',
         job_type_id: '',
         job_status_id: defaultStatus ? String(defaultStatus.id) : '',
+        zone_id: '',
         latitude: '',
         longitude: '',
         repeats: false,
@@ -76,6 +77,25 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                     <p className="text-xs text-gray-500">Property</p>
                     <p className="font-medium text-green-800">{currentProperty.name}</p>
                 </div>
+
+                {currentProperty.zones && currentProperty.zones.length > 0 && (
+                    <div className="mb-4">
+                        <label className="block text-xs text-gray-500 mb-1">
+                            Zone <span className="text-gray-400">optional</span>
+                        </label>
+                        <select
+                            value={data.zone_id}
+                            onChange={(e) => setData('zone_id', e.target.value)}
+                            className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
+                        >
+                            <option value="">No specific zone</option>
+                            {currentProperty.zones.map((zone) => (
+                                <option key={zone.id} value={zone.id}>{zone.name}</option>
+                            ))}
+                        </select>
+                        {errors.zone_id && <p className="mt-1 text-sm text-red-600">{errors.zone_id}</p>}
+                    </div>
+                )}
 
                 <form onSubmit={submit} className="space-y-4">
                     <div>

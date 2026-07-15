@@ -12,6 +12,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\ShapeController;
 use App\Http\Controllers\NonWorkingZoneController;
 use App\Http\Controllers\DiaryShareController;
+use App\Http\Controllers\ZoneController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\HelpMessageController;
 use App\Http\Controllers\RecurringJobController;
@@ -205,6 +206,13 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     // boundary (`shape.edit`), not a separate page.
     Route::put('properties/{property}/non-working-zone', [NonWorkingZoneController::class, 'update'])->name('non-working-zone.update');
     Route::delete('properties/{property}/non-working-zone', [NonWorkingZoneController::class, 'destroy'])->name('non-working-zone.destroy');
+
+    // Paddocks/other named areas - also managed on the boundary page
+    // (`shape.edit`), via its Zones tab. Unlike the boundary/non-working
+    // zone, a property can have any number, so these are keyed by id.
+    Route::post('properties/{property}/zones', [ZoneController::class, 'store'])->name('zones.store');
+    Route::put('properties/{property}/zones/{zone}', [ZoneController::class, 'update'])->name('zones.update');
+    Route::delete('properties/{property}/zones/{zone}', [ZoneController::class, 'destroy'])->name('zones.destroy');
 });
 
 // Admin and Manager can manage invitations

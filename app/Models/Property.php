@@ -19,6 +19,11 @@ class Property extends Model
         return $this->hasOne(Shape::class);
     }
 
+    public function zones()
+    {
+        return $this->hasMany(Zone::class);
+    }
+
     public function roles()
     {
         return $this->hasMany(Role::class);

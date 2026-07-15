@@ -70,8 +70,13 @@ function JobCard({ job }) {
                 </p>
             )}
 
-            {job.user && (
-                <p className="text-xs text-gray-400 mt-2">Created by {job.user.name}</p>
+            {(job.zone || job.user) && (
+                <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-gray-400">{job.zone?.name}</span>
+                    {job.user && (
+                        <span className="text-xs text-gray-400">Created by {job.user.name}</span>
+                    )}
+                </div>
             )}
         </Link>
     );

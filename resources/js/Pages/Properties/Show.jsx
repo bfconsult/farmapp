@@ -98,26 +98,6 @@ export default function Show({ property, currentRole }) {
                             </p>
                         </div>
                     )}
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-medium text-gray-900">
-                                Jobs
-                            </h2>
-                        </div>
-                        {property.farm_jobs && property.farm_jobs.length === 0 ? (
-                            <p className="text-gray-500 text-sm">No jobs yet.</p>
-                        ) : (
-                            <div className="grid gap-4">
-                                {property.farm_jobs && property.farm_jobs.map((job) => (
-                                    <div key={job.id} className="border rounded p-4">
-                                        <p className="font-medium">{job.name}</p>
-                                        <p className="text-sm text-gray-500">{job.description}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
                 </div>
             </div>
         </AuthenticatedLayout>

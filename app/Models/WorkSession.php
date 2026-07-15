@@ -15,6 +15,7 @@ class WorkSession extends Model
     protected $fillable = [
         'property_id',
         'farm_job_id',
+        'zone_id',
         'user_id',
         'description',
         'started_at',
@@ -39,6 +40,11 @@ class WorkSession extends Model
     public function farmJob()
     {
         return $this->belongsTo(FarmJob::class);
+    }
+
+    public function zone()
+    {
+        return $this->belongsTo(Zone::class);
     }
 
     public function user()
