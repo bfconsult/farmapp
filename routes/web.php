@@ -11,6 +11,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\ShapeController;
 use App\Http\Controllers\NonWorkingZoneController;
+use App\Http\Controllers\DiaryShareController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\HelpMessageController;
 use App\Http\Controllers\RecurringJobController;
@@ -110,9 +111,16 @@ Route::middleware(['auth', 'property.role:admin'])->group(function () {
     Route::resource('properties', PropertyController::class)->only(['edit', 'update', 'destroy']);
 });
 
+// Reports: admin/manager get the full ledger, approver gets a read-only
+// day-by-day diary (see ReportController::index) - both share the same
+// route/URL, just different views for different roles.
+Route::middleware(['auth', 'property.role:admin,manager,approver'])->group(function () {
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+});
+
 // Admin and Manager routes
 Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
-    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::post('reports/diary-share', [ReportController::class, 'storeDiaryShare'])->name('reports.diary-share.store');
     Route::get('recurring-jobs', [RecurringJobController::class, 'index'])->name('recurring-jobs.index');
     Route::patch('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'update'])->name('recurring-jobs.update');
     Route::delete('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'destroy'])->name('recurring-jobs.destroy');
@@ -182,6 +190,10 @@ Route::post('invitations/{token}', [InvitationController::class, 'process'])->na
 // Job share link (no auth required - the controller decides whether the
 // viewer sees the normal job page or a read-only share view)
 Route::get('share/jobs/{token}', [FarmJobController::class, 'share'])->name('jobs.share');
+
+// Diary share link (no auth required - a public read-only day-by-day
+// activity report for an approver, see DiaryShareController)
+Route::get('share/diary/{token}', [DiaryShareController::class, 'show'])->name('diary.share');
 
 // Admin and Manager can manage the property boundary
 Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {

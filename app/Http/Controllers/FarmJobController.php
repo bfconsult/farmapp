@@ -24,6 +24,15 @@ class FarmJobController extends Controller
 
         $currentPropertyId = session('current_property_id');
 
+        // An approver reviews everyone's work without being added to the
+        // team on individual jobs - see everything on the property instead
+        // of only jobs they're personally assigned to.
+        $isApprover = $currentPropertyId
+            && Auth::user()->roleOn(Property::find($currentPropertyId)) === Role::APPROVER;
+        $scopeToAssignee = fn ($query) => $isApprover
+            ? $query
+            : $query->whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()));
+
         $dateFrom = $request->date_from
             ? \Carbon\Carbon::parse($request->date_from)->startOfDay()
             : now()->startOfMonth();
@@ -43,7 +52,7 @@ class FarmJobController extends Controller
             $statusIds = JobStatus::where('can_book_time', true)->pluck('id')->all();
         }
 
-        $query = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
+        $query = $scopeToAssignee(FarmJob::query())
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
@@ -53,7 +62,7 @@ class FarmJobController extends Controller
 
         // Status counts, scoped to the date range so they reflect what the
         // checkboxes would currently show, but not to the status selection itself.
-        $countableJobs = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
+        $countableJobs = $scopeToAssignee(FarmJob::query())
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
@@ -84,7 +93,7 @@ class FarmJobController extends Controller
         $calendarMonthStart = \Carbon\Carbon::parse($calendarMonth . '-01')->startOfMonth();
         $calendarMonthEnd = $calendarMonthStart->copy()->endOfMonth();
 
-        $calendarJobs = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
+        $calendarJobs = $scopeToAssignee(FarmJob::query())
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })

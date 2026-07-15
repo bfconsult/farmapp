@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DiaryShare;
+use App\Models\Property;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class ReportController extends Controller
@@ -18,6 +21,19 @@ class ReportController extends Controller
         $dateTo = $request->date_to
             ? \Carbon\Carbon::parse($request->date_to)->endOfDay()
             : now()->endOfMonth();
+
+        // Approvers see the same day-by-day diary they'd get via a shared
+        // link (see DiaryShareController), just in-app with a date filter -
+        // not the admin/manager ledger view, which also carries billing
+        // figures an approver-only role shouldn't see.
+        $userRole = Auth::user()->roleOn(Property::find($currentPropertyId));
+        if ($userRole === 'approver') {
+            return Inertia::render('Reports/Diary', [
+                'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo),
+                'currentDateFrom' => $dateFrom->toDateString(),
+                'currentDateTo' => $dateTo->toDateString(),
+            ]);
+        }
 
         $sessions = WorkSession::where('property_id', $currentPropertyId)
             ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
@@ -41,11 +57,22 @@ class ReportController extends Controller
                         'duration_in_hours' => $session->duration_in_hours,
                         'billing_amount' => $session->billing_amount,
                         'status' => $session->status,
+                        'source' => $session->source,
                     ])->values(),
                 ];
             })
             ->sortBy(fn ($worker) => $worker['user']->name)
             ->values();
+
+        // Surfaced once, right after generating a link via storeDiaryShare -
+        // not persisted/re-shown on a plain page reload.
+        $justSharedUrl = null;
+        if ($request->shared) {
+            $share = DiaryShare::where('token', $request->shared)
+                ->where('property_id', $currentPropertyId)
+                ->first();
+            $justSharedUrl = $share ? route('diary.share', $share->token) : null;
+        }
 
         return Inertia::render('Reports/Index', [
             'workers' => $workers,
@@ -55,6 +82,34 @@ class ReportController extends Controller
             ],
             'currentDateFrom' => $dateFrom->toDateString(),
             'currentDateTo' => $dateTo->toDateString(),
+            'justSharedUrl' => $justSharedUrl,
+        ]);
+    }
+
+    /**
+     * Generates a public, unauthenticated link (see DiaryShareController)
+     * showing this property's finalised/approved activity for the given
+     * date range, day by day - for sharing with an approver who may not
+     * have (or want) an account yet.
+     */
+    public function storeDiaryShare(Request $request)
+    {
+        $validated = $request->validate([
+            'date_from' => 'required|date',
+            'date_to' => 'required|date|after_or_equal:date_from',
+        ]);
+
+        $share = DiaryShare::create([
+            'property_id' => session('current_property_id'),
+            'created_by' => Auth::id(),
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
+        ]);
+
+        return redirect()->route('reports.index', [
+            'date_from' => $validated['date_from'],
+            'date_to' => $validated['date_to'],
+            'shared' => $share->token,
         ]);
     }
 }

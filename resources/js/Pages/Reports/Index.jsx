@@ -3,6 +3,11 @@ import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
+function sessionLabel(session) {
+    if (session.farm_job) return session.farm_job.name;
+    return session.source === 'auto_tracked' ? 'Auto-tracked visit' : 'Ad-hoc work';
+}
+
 function currentMonthRange() {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
@@ -12,9 +17,10 @@ function currentMonthRange() {
     return { from, to };
 }
 
-export default function Index({ workers, grandTotal, currentDateFrom, currentDateTo }) {
+export default function Index({ workers, grandTotal, currentDateFrom, currentDateTo, justSharedUrl }) {
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     const goTo = (overrides = {}) => {
         router.get(route('reports.index'), {
@@ -24,6 +30,19 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
     };
 
     const changeRange = (dateFrom, dateTo) => goTo({ dateFrom, dateTo });
+
+    const shareDiary = () => {
+        router.post(route('reports.diary-share.store'), {
+            date_from: currentDateFrom,
+            date_to: currentDateTo,
+        });
+    };
+
+    const copyLink = () => {
+        navigator.clipboard.writeText(justSharedUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     const resetToThisMonth = () => {
         const { from, to } = currentMonthRange();
@@ -65,7 +84,7 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
                 </div>
 
                 {/* Filters toggle */}
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-3 gap-2">
                     <button
                         onClick={() => setShowFilters((v) => !v)}
                         className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
@@ -76,7 +95,35 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
                         </span>
                         <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
                     </button>
+                    <button
+                        onClick={shareDiary}
+                        className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600"
+                    >
+                        Share diary
+                    </button>
                 </div>
+
+                {justSharedUrl && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                        <p className="text-sm text-green-800 mb-2">
+                            Diary link created for this date range — anyone with this link can view it, no account needed.
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <input
+                                readOnly
+                                value={justSharedUrl}
+                                onFocus={(e) => e.target.select()}
+                                className="flex-1 min-w-0 text-xs border border-green-300 rounded-lg px-2 py-1.5 bg-white text-gray-700"
+                            />
+                            <button
+                                onClick={copyLink}
+                                className="flex-shrink-0 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium"
+                            >
+                                {copied ? 'Copied!' : 'Copy'}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {showFilters && (
                     <div className="bg-white rounded-lg shadow p-4 mb-4">
@@ -129,7 +176,7 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
                                         <div key={session.id} className="flex items-start justify-between gap-2 px-4 py-3">
                                             <div className="min-w-0">
                                                 <p className="text-sm text-gray-900 truncate">
-                                                    {session.farm_job?.name ?? 'Ad-hoc work'}
+                                                    {sessionLabel(session)}
                                                 </p>
                                                 <p className="text-xs text-gray-500 mt-1">
                                                     {formatSessionDate(session.started_at)} · {formatTime(session.started_at)} — {formatTime(session.ended_at)}

@@ -56,6 +56,42 @@ class WorkSession extends Model
         return $this->hasMany(WorkSessionWaypoint::class)->orderBy('recorded_at');
     }
 
+    /**
+     * Finalised/approved activity for a property over a date range, grouped
+     * by day - the shared shape behind both the public diary share
+     * (DiaryShareController) and the in-app approver diary (ReportController).
+     * Curated: no billing figures, only what's needed to recognise the work.
+     */
+    public static function diaryDays(int $propertyId, $dateFrom, $dateTo)
+    {
+        return static::where('property_id', $propertyId)
+            ->whereIn('status', [self::FINALISED, self::APPROVED])
+            ->whereBetween('started_at', [$dateFrom, $dateTo])
+            ->with(['farmJob', 'user', 'photos'])
+            ->orderBy('started_at')
+            ->get()
+            ->groupBy(fn ($session) => $session->started_at->toDateString())
+            ->map(fn ($daySessions, $date) => [
+                'date' => $date,
+                'entries' => $daySessions->map(fn ($session) => [
+                    'id' => $session->id,
+                    'user_name' => $session->user->name,
+                    'label' => $session->farmJob?->name
+                        ?? ($session->source === 'auto_tracked' ? 'Auto-tracked visit' : 'Ad-hoc work'),
+                    'started_at' => $session->started_at,
+                    'ended_at' => $session->ended_at,
+                    'duration_in_hours' => $session->duration_in_hours,
+                    'description' => $session->description,
+                    'photos' => $session->photos->map(fn ($photo) => [
+                        'id' => $photo->id,
+                        'url' => $photo->url,
+                    ]),
+                ])->values(),
+            ])
+            ->sortKeys()
+            ->values();
+    }
+
     public function getDurationInHoursAttribute()
     {
         if (!$this->ended_at) return null;

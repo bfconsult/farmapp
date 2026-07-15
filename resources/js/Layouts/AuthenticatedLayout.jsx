@@ -3,7 +3,7 @@ import ApplicationLogo from '@/Components/ApplicationLogo';
 
 export default function AuthenticatedLayout({ title, children }) {
     const { auth, properties, currentProperty, currentUserRole, flash } = usePage().props;
-    const canViewReports = currentUserRole === 'admin' || currentUserRole === 'manager';
+    const canViewReports = currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserRole === 'approver';
 
     const selectProperty = (e) => {
         router.post(route('property.select'), { property_id: e.target.value });
