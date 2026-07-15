@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import WaypointTrail from '@/Components/WaypointTrail';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { toLocalInputValue, fromLocalInputValue } from '@/dateInput';
 
-export default function Edit({ session, plannedJobs }) {
+export default function Edit({ session, plannedJobs, waypoints }) {
     const { data, setData, patch, processing, errors, transform } = useForm({
         description: session.description ?? '',
         farm_job_id: session.farm_job_id ?? '',
@@ -31,6 +32,8 @@ export default function Edit({ session, plannedJobs }) {
                     </Link>
                     <h1 className="text-xl font-semibold text-gray-900">Edit Session</h1>
                 </div>
+
+                <WaypointTrail waypoints={waypoints} />
 
                 <form onSubmit={submit} className="space-y-4">
                     <div className="bg-white rounded-lg shadow p-4 space-y-4">
@@ -63,7 +66,11 @@ export default function Edit({ session, plannedJobs }) {
                                 onChange={(e) => setData('farm_job_id', e.target.value)}
                                 className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
                             >
-                                <option value="">Ad-hoc work (no planned job)</option>
+                                <option value="">
+                                    {session.source === 'auto_tracked'
+                                        ? 'Auto-tracked visit (no planned job)'
+                                        : 'Ad-hoc work (no planned job)'}
+                                </option>
                                 {plannedJobs.map((job) => (
                                     <option key={job.id} value={job.id}>{job.name}</option>
                                 ))}

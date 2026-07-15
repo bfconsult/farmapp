@@ -51,6 +51,11 @@ class WorkSession extends Model
         return $this->hasMany(Photo::class);
     }
 
+    public function waypoints()
+    {
+        return $this->hasMany(WorkSessionWaypoint::class)->orderBy('recorded_at');
+    }
+
     public function getDurationInHoursAttribute()
     {
         if (!$this->ended_at) return null;

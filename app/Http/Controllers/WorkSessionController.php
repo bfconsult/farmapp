@@ -96,12 +96,13 @@ class WorkSessionController extends Controller
 
     public function show(WorkSession $workSession)
     {
-        $workSession->load(['farmJob', 'property', 'photos', 'user']);
+        $workSession->load(['farmJob', 'property', 'photos', 'user', 'waypoints']);
 
         return Inertia::render('WorkSessions/Show', [
             'session' => $workSession,
             'durationInHours' => $workSession->duration_in_hours,
             'billingAmount' => $workSession->billing_amount,
+            'waypoints' => $workSession->waypoints,
         ]);
     }
 
@@ -119,6 +120,7 @@ class WorkSessionController extends Controller
         return Inertia::render('WorkSessions/Edit', [
             'session' => $workSession,
             'plannedJobs' => $plannedJobs,
+            'waypoints' => $workSession->waypoints,
         ]);
     }
 

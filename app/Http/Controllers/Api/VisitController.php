@@ -26,6 +26,14 @@ class VisitController extends Controller
             'visits.*.ended_at' => 'required|date|after:visits.*.started_at',
             'visits.*.latitude' => 'nullable|numeric|between:-90,90',
             'visits.*.longitude' => 'nullable|numeric|between:-180,180',
+            // Periodic on-site location samples, shown on the web app's
+            // job-allocation screen (WorkSessions/Edit) - not sent for every
+            // visit, only ones long enough for the mobile app's periodic
+            // sampler to have fired.
+            'visits.*.waypoints' => 'nullable|array',
+            'visits.*.waypoints.*.lat' => 'required_with:visits.*.waypoints|numeric|between:-90,90',
+            'visits.*.waypoints.*.lng' => 'required_with:visits.*.waypoints|numeric|between:-180,180',
+            'visits.*.waypoints.*.recorded_at' => 'required_with:visits.*.waypoints|date',
         ]);
 
         $user = $request->user();
@@ -47,7 +55,7 @@ class VisitController extends Controller
             }
 
             try {
-                WorkSession::create([
+                $workSession = WorkSession::create([
                     'user_id' => $user->id,
                     'property_id' => $visit['property_id'],
                     'farm_job_id' => null,
@@ -59,6 +67,17 @@ class VisitController extends Controller
                     'source' => 'auto_tracked',
                     'external_uuid' => $visit['external_uuid'],
                 ]);
+
+                if (! empty($visit['waypoints'])) {
+                    $workSession->waypoints()->createMany(array_map(
+                        fn ($waypoint) => [
+                            'latitude' => $waypoint['lat'],
+                            'longitude' => $waypoint['lng'],
+                            'recorded_at' => $waypoint['recorded_at'],
+                        ],
+                        $visit['waypoints'],
+                    ));
+                }
 
                 $created++;
             } catch (QueryException $e) {

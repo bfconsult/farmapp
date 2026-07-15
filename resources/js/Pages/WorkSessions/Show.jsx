@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import WaypointTrail from '@/Components/WaypointTrail';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
@@ -15,7 +16,7 @@ const STATUS_COLORS = {
     approved: 'bg-green-100 text-green-700',
 };
 
-export default function Show({ session, durationInHours, billingAmount }) {
+export default function Show({ session, durationInHours, billingAmount, waypoints }) {
     const fileInput = useRef(null);
     const { flash } = usePage().props;
     const [uploading, setUploading] = useState(false);
@@ -151,7 +152,7 @@ export default function Show({ session, durationInHours, billingAmount }) {
                                 <span className="text-sm font-medium text-green-700">${billingAmount}</span>
                             </div>
                         )}
-                        {session.farm_job && (
+                        {session.farm_job ? (
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Planned Job</span>
                                 <Link
@@ -160,6 +161,11 @@ export default function Show({ session, durationInHours, billingAmount }) {
                                 >
                                     {session.farm_job.name}
                                 </Link>
+                            </div>
+                        ) : session.source === 'auto_tracked' && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-gray-500">Job</span>
+                                <span className="text-sm text-gray-900">Auto-tracked visit</span>
                             </div>
                         )}
                         {session.description && (
@@ -171,11 +177,13 @@ export default function Show({ session, durationInHours, billingAmount }) {
                     </div>
                 </div>
 
+                <WaypointTrail waypoints={waypoints} />
+
                 {/* Finalise */}
                 {session.status === 'draft' && session.ended_at && (
                     <button
                         onClick={finalise}
-                        className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+                        className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
                     >
                         Finalise Session
                     </button>

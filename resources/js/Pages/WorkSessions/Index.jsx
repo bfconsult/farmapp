@@ -14,6 +14,11 @@ const STATUS_COLORS = {
     approved: 'bg-green-100 text-green-700',
 };
 
+function sessionLabel(session) {
+    if (session.farm_job) return session.farm_job.name;
+    return session.source === 'auto_tracked' ? 'Auto-tracked visit' : 'Ad-hoc work';
+}
+
 export default function Index({ sessions, activeSession }) {
     const { currentProperty } = usePage().props;
 
@@ -44,7 +49,7 @@ export default function Index({ sessions, activeSession }) {
                     <div className="bg-green-600 rounded-lg p-4 text-white mb-4">
                         <p className="text-sm font-medium mb-1">⏱ Session in progress</p>
                         <p className="text-base font-semibold mb-3">
-                            {activeSession.farm_job?.name ?? 'Ad-hoc work'}
+                            {sessionLabel(activeSession)}
                         </p>
                         <p className="text-sm mb-3 opacity-90">
                             Started at {formatTime(activeSession.started_at)}
@@ -111,7 +116,7 @@ export default function Index({ sessions, activeSession }) {
                                 <div className="flex items-start justify-between">
                                     <div>
                                         <p className="font-medium text-gray-900">
-                                            {session.farm_job?.name ?? 'Ad-hoc work'}
+                                            {sessionLabel(session)}
                                         </p>
                                         <p className="text-sm text-gray-500 mt-1">
                                             {formatDate(session.started_at)} · {formatTime(session.started_at)} — {formatTime(session.ended_at)}
