@@ -14,7 +14,7 @@ const PRIORITY_COLORS = {
     'Critical': 'bg-red-100 text-red-700',
 };
 
-export default function SharedView({ job }) {
+export default function SharedView({ job, logoUrl }) {
     return (
         <>
             <Head title={job.name} />
@@ -22,7 +22,7 @@ export default function SharedView({ job }) {
             <div className="min-h-screen bg-gray-100 flex justify-center p-4">
                 <div className="max-w-lg w-full space-y-4 mt-8">
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-sm mb-2">
-                        <img src="/favicon.svg" className="w-5 h-5" alt="" />
+                        <img src={logoUrl} className="w-5 h-5" alt="" />
                         <span>FieldWerkz</span>
                     </div>
 

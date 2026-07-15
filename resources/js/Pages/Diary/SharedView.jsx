@@ -5,7 +5,7 @@ function formatRangeHeading(dateStr) {
     return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function SharedView({ property, dateFrom, dateTo, days }) {
+export default function SharedView({ property, dateFrom, dateTo, days, logoUrl }) {
     return (
         <>
             <Head title={`${property.name} — Activity Diary`} />
@@ -13,7 +13,7 @@ export default function SharedView({ property, dateFrom, dateTo, days }) {
             <div className="min-h-screen bg-gray-100 flex justify-center p-4">
                 <div className="max-w-lg w-full space-y-4 mt-8">
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-sm mb-2">
-                        <img src="/favicon.svg" className="w-5 h-5" alt="" />
+                        <img src={logoUrl} className="w-5 h-5" alt="" />
                         <span>FieldWerkz</span>
                     </div>
 

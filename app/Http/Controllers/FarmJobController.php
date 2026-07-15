@@ -259,6 +259,10 @@ class FarmJobController extends Controller
                     'url' => $photo->url,
                 ]),
             ],
+            // Not a plain "/favicon.svg" path - Vapor only serves favicon.ico
+            // and robots.txt directly from the app root; everything else in
+            // public/ needs asset(), which redirects to the CDN-backed URL.
+            'logoUrl' => asset('favicon.svg'),
         ]);
     }
 
