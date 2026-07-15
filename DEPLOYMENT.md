@@ -1,6 +1,6 @@
 # Deployment Procedure
 
-Fieldwerkz runs on **Laravel Vapor** — a Docker-based serverless deployment on AWS (Lambda + CloudFront + RDS), managed via the `vapor` CLI. There is no traditional server to SSH into; every deploy builds a fresh container image and Vapor swaps traffic over to it.
+FieldWerkz runs on **Laravel Vapor** — a Docker-based serverless deployment on AWS (Lambda + CloudFront + RDS), managed via the `vapor` CLI. There is no traditional server to SSH into; every deploy builds a fresh container image and Vapor swaps traffic over to it.
 
 - **Production URL:** https://fieldwerkz.com (https://farmtask.be also still resolves to the same environment during the migration off the old name)
 - **Config file:** `vapor.yml` (defines the `production` and `staging` environments)

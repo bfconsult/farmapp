@@ -46,7 +46,7 @@ const features = [
 export default function Welcome({ auth }) {
     return (
         <>
-            <Head title="Fieldwerkz" />
+            <Head title="FieldWerkz" />
             <div className="min-h-screen bg-gray-100">
                 <header className="border-b border-gray-200 bg-white">
                     <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -91,7 +91,7 @@ export default function Welcome({ auth }) {
                             Run your farm's day-to-day from one place
                         </h1>
                         <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600">
-                            Fieldwerkz helps you plan jobs, track work across your
+                            FieldWerkz helps you plan jobs, track work across your
                             properties, and see everything happening on the
                             map — built for teams working out in the field.
                         </p>
@@ -142,7 +142,7 @@ export default function Welcome({ auth }) {
                 </main>
 
                 <footer className="border-t border-gray-200 py-8 text-center text-sm text-gray-500">
-                    &copy; {new Date().getFullYear()} Fieldwerkz
+                    &copy; {new Date().getFullYear()} FieldWerkz
                 </footer>
             </div>
         </>

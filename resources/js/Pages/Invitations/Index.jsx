@@ -25,7 +25,7 @@ export default function Index({ property, roles, pendingInvitations, currentUser
     const [messageEdited, setMessageEdited] = useState(false);
 
     const defaultMessage = (role) =>
-        `${auth.user.name} has invited you to join ${property.name} on Fieldwerkz as a ${ROLE_LABELS[role]}.`;
+        `${auth.user.name} has invited you to join ${property.name} on FieldWerkz as a ${ROLE_LABELS[role]}.`;
 
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',

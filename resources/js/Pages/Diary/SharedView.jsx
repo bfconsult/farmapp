@@ -14,7 +14,7 @@ export default function SharedView({ property, dateFrom, dateTo, days }) {
                 <div className="max-w-lg w-full space-y-4 mt-8">
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-sm mb-2">
                         <img src="/favicon.svg" className="w-5 h-5" alt="" />
-                        <span>Fieldwerkz</span>
+                        <span>FieldWerkz</span>
                     </div>
 
                     <div className="text-center mb-4">

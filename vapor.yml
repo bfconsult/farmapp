@@ -27,7 +27,7 @@ environments:
         deploy:
             - 'php artisan migrate --force'
         environment:
-            APP_NAME: Fieldwerkz
+            APP_NAME: FieldWerkz
             APP_ENV: production
             APP_DEBUG: false
             APP_URL: https://fieldwerkz.com
@@ -59,7 +59,7 @@ environments:
         deploy:
             - 'php artisan migrate --force'
         environment:
-            APP_NAME: 'Fieldwerkz (Staging)'
+            APP_NAME: 'FieldWerkz (Staging)'
             APP_ENV: staging
             APP_DEBUG: true
             LOG_CHANNEL: stderr

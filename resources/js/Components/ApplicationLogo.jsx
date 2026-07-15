@@ -5,7 +5,7 @@ export default function ApplicationLogo(props) {
             viewBox="0 14 128 140"
             xmlns="http://www.w3.org/2000/svg"
             role="img"
-            aria-label="Fieldwerkz"
+            aria-label="FieldWerkz"
         >
             <defs>
                 <clipPath id="fieldwerkz-paddock">
