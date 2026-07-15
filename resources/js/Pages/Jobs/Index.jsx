@@ -69,6 +69,10 @@ function JobCard({ job }) {
                     {job.description}
                 </p>
             )}
+
+            {job.user && (
+                <p className="text-xs text-gray-400 mt-2">Created by {job.user.name}</p>
+            )}
         </Link>
     );
 }

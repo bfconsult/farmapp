@@ -97,6 +97,11 @@ class FarmJob extends Model
         return $this->belongsTo(Property::class);
     }
 
+    public function views()
+    {
+        return $this->hasMany(FarmJobView::class)->orderByDesc('viewed_at');
+    }
+
     public function photos()
     {
         return $this->hasMany(Photo::class, 'job_id');

@@ -26,7 +26,16 @@ function Spinner({ className = 'h-4 w-4' }) {
     );
 }
 
-export default function Show({ job }) {
+function formatViewedAt(datetime) {
+    return new Date(datetime).toLocaleString(undefined, {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+export default function Show({ job, seenBy }) {
     const fileInput = useRef(null);
     const { flash } = usePage().props;
     const [uploading, setUploading] = useState(false);
@@ -184,6 +193,12 @@ export default function Show({ job }) {
                             <span className="text-sm text-gray-500">Property</span>
                             <span className="text-sm text-gray-900">{job.property?.name}</span>
                         </div>
+                        {job.user && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-gray-500">Created by</span>
+                                <span className="text-sm text-gray-900">{job.user.name}</span>
+                            </div>
+                        )}
                         {job.scheduled_date && (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-500">Scheduled</span>
@@ -291,6 +306,21 @@ export default function Show({ job }) {
                 >
                     Delete Job
                 </button>
+
+                {/* Seen by */}
+                {seenBy && seenBy.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-4">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Seen by</h2>
+                        <div className="space-y-2">
+                            {seenBy.map((view) => (
+                                <div key={view.user_id} className="flex justify-between">
+                                    <span className="text-sm text-gray-900">{view.user_name}</span>
+                                    <span className="text-xs text-gray-500">{formatViewedAt(view.viewed_at)}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {showDeleteOptions && (

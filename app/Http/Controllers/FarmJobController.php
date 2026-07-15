@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\FarmJob;
+use App\Models\FarmJobView;
 use App\Models\Priority;
 use App\Models\JobType;
 use App\Models\JobStatus;
@@ -57,7 +58,7 @@ class FarmJobController extends Controller
                 $query->where('property_id', $currentPropertyId);
             })
             ->whereBetween('created_at', [$dateFrom, $dateTo])
-            ->with(['priority', 'jobType', 'jobStatus', 'property'])
+            ->with(['priority', 'jobType', 'jobStatus', 'property', 'user'])
             ->whereIn('job_status_id', $statusIds);
 
         // Status counts, scoped to the date range so they reflect what the
@@ -204,10 +205,22 @@ class FarmJobController extends Controller
 
     public function show(FarmJob $farmJob)
     {
-        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos']);
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos', 'user']);
+
+        // Logs (or refreshes) that the current user has seen this job - one
+        // row per user, most recent view time only, not a full visit log.
+        FarmJobView::updateOrCreate(
+            ['farm_job_id' => $farmJob->id, 'user_id' => Auth::id()],
+            ['viewed_at' => now()],
+        );
 
         return Inertia::render('Jobs/Show', [
             'job' => $farmJob,
+            'seenBy' => $farmJob->views()->with('user')->get()->map(fn ($view) => [
+                'user_id' => $view->user_id,
+                'user_name' => $view->user->name,
+                'viewed_at' => $view->viewed_at,
+            ]),
         ]);
     }
 
