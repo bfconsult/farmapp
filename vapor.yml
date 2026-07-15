@@ -27,10 +27,10 @@ environments:
         deploy:
             - 'php artisan migrate --force'
         environment:
-            APP_NAME: FarmTask
+            APP_NAME: Fieldwerkz
             APP_ENV: production
             APP_DEBUG: false
-            APP_URL: https://farmtask.be
+            APP_URL: https://fieldwerkz.com
             LOG_CHANNEL: stderr
             LOG_LEVEL: error
             DB_CONNECTION: mysql
@@ -59,7 +59,7 @@ environments:
         deploy:
             - 'php artisan migrate --force'
         environment:
-            APP_NAME: 'FarmTask (Staging)'
+            APP_NAME: 'Fieldwerkz (Staging)'
             APP_ENV: staging
             APP_DEBUG: true
             LOG_CHANNEL: stderr

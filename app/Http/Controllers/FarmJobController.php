@@ -369,10 +369,10 @@ class FarmJobController extends Controller
         $lines = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//FarmTask//EN',
+            'PRODID:-//Fieldwerkz//EN',
             'CALSCALE:GREGORIAN',
             'BEGIN:VEVENT',
-            "UID:farm-job-{$farmJob->id}@farmtask.be",
+            "UID:farm-job-{$farmJob->id}@fieldwerkz.com",
             "DTSTAMP:{$stamp}",
             "DTSTART;VALUE=DATE:{$start}",
             "DTEND;VALUE=DATE:{$end}",

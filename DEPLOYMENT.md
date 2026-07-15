@@ -1,8 +1,8 @@
 # Deployment Procedure
 
-FarmTask runs on **Laravel Vapor** — a Docker-based serverless deployment on AWS (Lambda + CloudFront + RDS), managed via the `vapor` CLI. There is no traditional server to SSH into; every deploy builds a fresh container image and Vapor swaps traffic over to it.
+Fieldwerkz runs on **Laravel Vapor** — a Docker-based serverless deployment on AWS (Lambda + CloudFront + RDS), managed via the `vapor` CLI. There is no traditional server to SSH into; every deploy builds a fresh container image and Vapor swaps traffic over to it.
 
-- **Production URL:** https://farmtask.be
+- **Production URL:** https://fieldwerkz.com (https://farmtask.be also still resolves to the same environment during the migration off the old name)
 - **Config file:** `vapor.yml` (defines the `production` and `staging` environments)
 - **Region:** ap-southeast-2 (Sydney)
 
@@ -29,9 +29,9 @@ You only need to do this once on any machine you plan to deploy from:
    ```
 2. **Deploy — always with `APP_URL` overridden for the build:**
    ```
-   APP_URL=https://farmtask.be vapor deploy production
+   APP_URL=https://fieldwerkz.com vapor deploy production
    ```
-   **Do not run plain `vapor deploy production` from a local dev machine.** See "Critical: APP_URL during builds" below for why.
+   **Do not run plain `vapor deploy production` from a local dev machine.** See "Critical: APP_URL during builds" below for why — this was actually missed for several deploys in a row (2026-07-15) before being caught, shipping a broken client-side `route()` base URL to production each time.
 
    This single command:
    - Runs the `build` steps from `vapor.yml` (composer install, `npm run build`, route/view/event caching)
@@ -42,8 +42,9 @@ You only need to do this once on any machine you plan to deploy from:
    - Takes roughly 10–15 minutes end to end. A `.vaporignore` file (gitignore-style syntax) excludes `vendor/`, `node_modules/`, `.git/`, and a few other directories from the build/Docker context — those get reinstalled fresh by `composer install`/`npm ci` regardless, so copying the local versions first was just wasted time (`vendor/` alone is 15,000+ files). If deploys start feeling slow again, check `.vaporignore` still exists and covers anything new and large.
 
 3. **Verify it worked:**
-   - `curl -s -o /dev/null -w "%{http_code}\n" https://farmtask.be/login` should return `200`
+   - `curl -s -o /dev/null -w "%{http_code}\n" https://fieldwerkz.com/login` should return `200`
    - Check migrations landed: `vapor command production --command="migrate:status"` — every migration should show `Ran`
+   - **Always also check for the localhost-bundle bug** (see below) — a 200 status alone doesn't catch it, since the page loads fine, only client-side navigation silently breaks.
 
 If a deploy fails, **check where it failed** before assuming anything went live:
 - If it failed during the build/image-push stage (before "Updating Function Code"), production is untouched — the previous version is still serving traffic, and migrations have not run.
@@ -53,17 +54,17 @@ If a deploy fails, **check where it failed** before assuming anything went live:
 
 For a Docker-runtime project like this one, Vapor's `build:` commands (`composer install`, `php artisan ziggy:generate`, `npm run build`, etc.) run **locally on the machine invoking `vapor deploy`**, before the Docker image is assembled — they are not run inside the production environment. That means they read your **local** `.env` file, not the production one.
 
-This matters specifically for `php artisan ziggy:generate`: it bakes the app's base URL into `resources/js/ziggy.js`, which then gets bundled into the shipped frontend JS and used as the base for every `route()`-generated link in the app (invitation-accept links, export downloads, any `route()` call in a React page). If your local `.env` has `APP_URL=http://localhost:8000` (the normal local dev setting), that's what ends up live in production — every generated link points at `localhost:8000` instead of `farmtask.be`, silently broken for anyone but whoever's running the local dev server.
+This matters specifically for `php artisan ziggy:generate`: it bakes the app's base URL into `resources/js/ziggy.js`, which then gets bundled into the shipped frontend JS and used as the base for every `route()`-generated link in the app (invitation-accept links, export downloads, any `route()` call in a React page). If your local `.env` has `APP_URL=http://localhost:8000` (the normal local dev setting), that's what ends up live in production — every generated link points at `localhost:8000` instead of the real domain, silently broken for anyone but whoever's running the local dev server. This is easy to miss: the page itself still loads fine (HTTP 200), only client-side `<Link>`/`router.visit()` navigation silently fails with a browser-console CORS error, so a quick "does the site load" check won't catch it.
 
 **Fix:** always prefix the deploy command with the correct URL as a real shell environment variable (not by editing `.env`, which risks being left in place and breaking local dev):
 ```
-APP_URL=https://farmtask.be vapor deploy production
+APP_URL=https://fieldwerkz.com vapor deploy production
 ```
 A real environment variable takes precedence over the value in `.env`, so this overrides it just for that one command without touching any files.
 
 **How to tell if this has happened:** fetch the live app's JS bundle and search for `localhost`:
 ```
-curl -s https://farmtask.be/login | grep -o 'src="[^"]*app-[^"]*\.js"'
+curl -s https://fieldwerkz.com/login | grep -o 'src="[^"]*app-[^"]*\.js"'
 curl -s "<that asset URL>" | grep -o "localhost[^\"']*"
 ```
 If that prints anything, the bundle has the wrong base URL baked in — redeploy with the `APP_URL=` prefix above to fix it.

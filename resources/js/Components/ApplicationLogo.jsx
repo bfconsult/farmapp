@@ -5,17 +5,17 @@ export default function ApplicationLogo(props) {
             viewBox="0 14 128 140"
             xmlns="http://www.w3.org/2000/svg"
             role="img"
-            aria-label="FarmTask"
+            aria-label="Fieldwerkz"
         >
             <defs>
-                <clipPath id="farmtask-paddock">
+                <clipPath id="fieldwerkz-paddock">
                     <polygon points="0,40 128,16 112,152 0,152" />
                 </clipPath>
             </defs>
 
             <polygon points="0,40 128,16 112,152 0,152" fill="#1A5C38" />
 
-            <g clipPath="url(#farmtask-paddock)">
+            <g clipPath="url(#fieldwerkz-paddock)">
                 <path
                     d="M-16,124 C0,68 36,34 68,28 C102,22 136,44 144,80 C150,108 137,138 112,152 C78,168 16,162 -8,138 C-26,122 -30,140 -16,124Z"
                     fill="none"

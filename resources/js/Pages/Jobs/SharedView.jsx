@@ -23,7 +23,7 @@ export default function SharedView({ job }) {
                 <div className="max-w-lg w-full space-y-4 mt-8">
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-sm mb-2">
                         <img src="/favicon.svg" className="w-5 h-5" alt="" />
-                        <span>FarmTask</span>
+                        <span>Fieldwerkz</span>
                     </div>
 
                     <div className="bg-white rounded-lg shadow p-4">
@@ -88,7 +88,7 @@ export default function SharedView({ job }) {
                     )}
 
                     <p className="text-center text-xs text-gray-400 pt-2 pb-8">
-                        Shared view — sign in to your FarmTask account to see more.
+                        Shared view — sign in to your Fieldwerkz account to see more.
                     </p>
                 </div>
             </div>

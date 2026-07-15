@@ -29,7 +29,7 @@ class PropertyInvitation extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "You're invited to join {$this->invitation->property->name} on FarmTask",
+            subject: "You're invited to join {$this->invitation->property->name} on Fieldwerkz",
         );
     }
 
@@ -50,7 +50,7 @@ class PropertyInvitation extends Mailable
     private function defaultMessage(): string
     {
         return sprintf(
-            '%s has invited you to join %s on FarmTask as a %s.',
+            '%s has invited you to join %s on Fieldwerkz as a %s.',
             $this->invitation->invitedBy->name,
             $this->invitation->property->name,
             ucfirst($this->invitation->role)

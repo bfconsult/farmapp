@@ -29,8 +29,8 @@ Route::get('/', function () {
 // file would 404 there, since Vapor only auto-redirects favicon.ico/robots.txt.
 Route::get('manifest.webmanifest', function () {
     return response()->json([
-        'name' => 'FarmTask',
-        'short_name' => 'FarmTask',
+        'name' => 'Fieldwerkz',
+        'short_name' => 'Fieldwerkz',
         'description' => 'Farm job and work session tracking',
         'start_url' => '/work-sessions',
         'scope' => '/',
