@@ -8,7 +8,9 @@ environments:
         memory: 1024
         cli-memory: 512
         scheduler: true
-        domain: farmtask.be
+        domain:
+            - farmtask.be
+            - fieldwerkz.com
         database: FarmApp
         storage: farmtask-production
         queues:
