@@ -1,10 +1,20 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-export default function Map({ jobs, shape, currentRole }) {
+const ZONE_COLOR = '#7c3aed';
+// Below this zoom level, zone name labels are hidden (but the outlines stay
+// visible) - at wider zooms the fixed-size permanent tooltips overlap each
+// other and obscure the zones they're meant to label.
+const ZONE_LABEL_MIN_ZOOM = 16;
+
+export default function Map({ jobs, shape, zones, currentRole }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
+    const zoneLayerGroup = useRef(null);
+    const updateZoneLabels = useRef(null);
+    const [showZones, setShowZones] = useState(false);
+    const [mapReady, setMapReady] = useState(false);
     const { currentProperty } = usePage().props;
     const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
 
@@ -83,6 +93,32 @@ export default function Map({ jobs, shape, currentRole }) {
                 boundsTargets.push(zone.getBounds());
             }
 
+            // Named zones (paddocks) - built up front but left off the map
+            // until the "Show zones" toggle is switched on (see the
+            // visibility-sync effect below), so they don't clutter the
+            // default view or affect the initial fitBounds.
+            zoneLayerGroup.current = L.layerGroup(
+                (zones ?? []).map((zone) =>
+                    L.polygon(zone.coordinates, {
+                        color: ZONE_COLOR,
+                        weight: 2,
+                        fillColor: ZONE_COLOR,
+                        fillOpacity: 0.15,
+                    }).bindTooltip(zone.name, { permanent: true, direction: 'center' }),
+                ),
+            );
+
+            updateZoneLabels.current = () => {
+                const group = zoneLayerGroup.current;
+                if (!group || !map.hasLayer(group)) return;
+                const showLabels = map.getZoom() >= ZONE_LABEL_MIN_ZOOM;
+                group.eachLayer((layer) => {
+                    if (showLabels) layer.openTooltip();
+                    else layer.closeTooltip();
+                });
+            };
+            map.on('zoomend', updateZoneLabels.current);
+
             if (boundsTargets.length > 0) {
                 const combined = boundsTargets.reduce(
                     (acc, b) => (acc ? acc.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast())),
@@ -99,6 +135,8 @@ export default function Map({ jobs, shape, currentRole }) {
                 // No boundary, no multiple jobs — try geolocation
                 map.locate({ setView: true, maxZoom: 16 });
             }
+
+            setMapReady(true);
         });
 
         return () => {
@@ -108,6 +146,17 @@ export default function Map({ jobs, shape, currentRole }) {
             }
         };
     }, []);
+
+    useEffect(() => {
+        if (!mapReady) return;
+
+        if (showZones) {
+            zoneLayerGroup.current.addTo(mapInstance.current);
+            updateZoneLabels.current?.();
+        } else {
+            zoneLayerGroup.current.remove();
+        }
+    }, [showZones, mapReady]);
 
     return (
         <AuthenticatedLayout>
@@ -130,10 +179,34 @@ export default function Map({ jobs, shape, currentRole }) {
                         No jobs with location data yet. Add jobs in the field to see them on the map.
                     </div>
                 )}
-                <div
-                    ref={mapRef}
-                    style={{ height: 'calc(100dvh - 8.5rem)' }}
-                />
+                <div className="relative">
+                    {zones && zones.length > 0 && (
+                        <div className="absolute right-4 top-4 z-[1000] flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md">
+                            <span className="text-sm font-medium text-gray-700">
+                                Zones
+                            </span>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={showZones}
+                                onClick={() => setShowZones((v) => !v)}
+                                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                    showZones ? 'bg-violet-600' : 'bg-gray-300'
+                                }`}
+                            >
+                                <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                        showZones ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                />
+                            </button>
+                        </div>
+                    )}
+                    <div
+                        ref={mapRef}
+                        style={{ height: 'calc(100dvh - 8.5rem)' }}
+                    />
+                </div>
             </div>
         </AuthenticatedLayout>
     );

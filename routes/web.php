@@ -162,7 +162,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
         $currentPropertyId = session('current_property_id');
 
         $currentProperty = $currentPropertyId
-            ? \App\Models\Property::with('shape')->find($currentPropertyId)
+            ? \App\Models\Property::with(['shape', 'zones'])->find($currentPropertyId)
             : null;
 
         $jobs = $user->farmJobs()
@@ -179,6 +179,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
         return Inertia::render('Map', [
             'jobs' => $jobs,
             'shape' => $currentProperty?->shape,
+            'zones' => $currentProperty?->zones ?? [],
             'currentRole' => $currentRole,
         ]);
     })->name('map');
