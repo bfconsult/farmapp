@@ -424,7 +424,7 @@ export default function Shape({ property, shape, zones }) {
                         {(!zones || zones.length === 0) ? (
                             <p className="text-sm text-gray-500">No zones yet.</p>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="max-h-40 space-y-2 overflow-y-auto">
                                 {zones.map((zone) => (
                                     <div
                                         key={zone.id}
