@@ -87,6 +87,39 @@ class ReportController extends Controller
     }
 
     /**
+     * Renders the exact same page a recipient would see (Diary/SharedView),
+     * for the current property and a given date range, without creating a
+     * DiaryShare record - lets an admin/manager sanity-check the content
+     * before committing to storeDiaryShare below. Auth-protected, unlike the
+     * real share link, since it's not meant to be sent to anyone.
+     */
+    public function previewDiary(Request $request)
+    {
+        $currentPropertyId = session('current_property_id');
+
+        $dateFrom = $request->date_from
+            ? \Carbon\Carbon::parse($request->date_from)->startOfDay()
+            : now()->startOfMonth();
+        $dateTo = $request->date_to
+            ? \Carbon\Carbon::parse($request->date_to)->endOfDay()
+            : now()->endOfMonth();
+
+        $property = Property::findOrFail($currentPropertyId);
+
+        return Inertia::render('Diary/SharedView', [
+            'property' => $property->only(['name']),
+            'dateFrom' => $dateFrom->toDateString(),
+            'dateTo' => $dateTo->toDateString(),
+            'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo),
+            'logoUrl' => asset('favicon.svg'),
+            'backUrl' => route('reports.index', [
+                'date_from' => $dateFrom->toDateString(),
+                'date_to' => $dateTo->toDateString(),
+            ]),
+        ]);
+    }
+
+    /**
      * Generates a public, unauthenticated link (see DiaryShareController)
      * showing this property's finalised/approved activity for the given
      * date range, day by day - for sharing with an approver who may not

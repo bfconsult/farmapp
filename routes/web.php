@@ -122,6 +122,7 @@ Route::middleware(['auth', 'property.role:admin,manager,approver'])->group(funct
 // Admin and Manager routes
 Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('reports/diary-share', [ReportController::class, 'storeDiaryShare'])->name('reports.diary-share.store');
+    Route::get('reports/diary-preview', [ReportController::class, 'previewDiary'])->name('reports.diary-preview');
     Route::get('recurring-jobs', [RecurringJobController::class, 'index'])->name('recurring-jobs.index');
     Route::patch('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'update'])->name('recurring-jobs.update');
     Route::delete('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'destroy'])->name('recurring-jobs.destroy');

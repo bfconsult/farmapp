@@ -21,6 +21,7 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [confirmingShare, setConfirmingShare] = useState(false);
 
     const goTo = (overrides = {}) => {
         router.get(route('reports.index'), {
@@ -31,11 +32,17 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
 
     const changeRange = (dateFrom, dateTo) => goTo({ dateFrom, dateTo });
 
-    const shareDiary = () => {
+    const previewUrl = route('reports.diary-preview', {
+        date_from: currentDateFrom,
+        date_to: currentDateTo,
+    });
+
+    const confirmShare = () => {
         router.post(route('reports.diary-share.store'), {
             date_from: currentDateFrom,
             date_to: currentDateTo,
         });
+        setConfirmingShare(false);
     };
 
     const copyLink = () => {
@@ -96,12 +103,41 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
                         <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
                     </button>
                     <button
-                        onClick={shareDiary}
+                        onClick={() => setConfirmingShare((v) => !v)}
                         className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600"
                     >
                         Share diary
                     </button>
                 </div>
+
+                {confirmingShare && (
+                    <div className="bg-white border border-gray-200 rounded-lg p-3 mb-4">
+                        <p className="text-sm text-gray-700 mb-3">
+                            Create a link for {formatDate(currentDateFrom)} → {formatDate(currentDateTo)}?
+                            Anyone with the link will be able to view it, no account needed.
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <a
+                                href={previewUrl}
+                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700"
+                            >
+                                Preview
+                            </a>
+                            <button
+                                onClick={confirmShare}
+                                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium"
+                            >
+                                Create link
+                            </button>
+                            <button
+                                onClick={() => setConfirmingShare(false)}
+                                className="px-3 py-1.5 text-sm text-gray-500"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {justSharedUrl && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">

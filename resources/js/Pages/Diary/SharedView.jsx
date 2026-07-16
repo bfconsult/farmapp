@@ -1,17 +1,29 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import DiaryDays from '@/Components/DiaryDays';
 
 function formatRangeHeading(dateStr) {
     return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function SharedView({ property, dateFrom, dateTo, days, logoUrl }) {
+export default function SharedView({ property, dateFrom, dateTo, days, logoUrl, backUrl }) {
     return (
         <>
             <Head title={`${property.name} — Activity Diary`} />
 
             <div className="min-h-screen bg-gray-100 flex justify-center p-4">
                 <div className="max-w-lg w-full space-y-4 mt-8">
+                    {/* Only set when this is the in-app preview (see
+                        ReportController::previewDiary) - absent on the real
+                        public share link, which has no app to return to. */}
+                    {backUrl && (
+                        <Link
+                            href={backUrl}
+                            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+                        >
+                            ← Back to Reports
+                        </Link>
+                    )}
+
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-sm mb-2">
                         <img src={logoUrl} className="w-5 h-5" alt="" />
                         <span>FieldWerkz</span>
