@@ -24,6 +24,11 @@ class Property extends Model
         return $this->hasMany(Zone::class);
     }
 
+    public function metrics()
+    {
+        return $this->hasMany(Metric::class);
+    }
+
     public function roles()
     {
         return $this->hasMany(Role::class);

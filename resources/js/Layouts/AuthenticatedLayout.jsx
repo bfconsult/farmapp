@@ -2,8 +2,9 @@ import { Link, router, usePage } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 
 export default function AuthenticatedLayout({ title, children }) {
-    const { auth, properties, currentProperty, currentUserRole, flash } = usePage().props;
+    const { auth, properties, currentProperty, currentUserRole, hasIncompleteMetrics, flash } = usePage().props;
     const canViewReports = currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserRole === 'approver';
+    const canViewMetrics = currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserRole === 'worker' || currentUserRole === 'approver';
 
     const selectProperty = (e) => {
         router.post(route('property.select'), { property_id: e.target.value });
@@ -149,6 +150,23 @@ export default function AuthenticatedLayout({ title, children }) {
                         </svg>
                         Map
                     </Link>
+
+                    {canViewMetrics && (
+                        <Link
+                            href={route('metrics.index')}
+                            className={`flex flex-col items-center text-xs gap-1 px-4 py-2 ${route().current('metrics.*') || route().current('metric-measurements.*') ? 'text-green-600' : 'text-gray-500'}`}
+                        >
+                            <span className="relative">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6M9 16h6" />
+                                </svg>
+                                {hasIncompleteMetrics && (
+                                    <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" />
+                                )}
+                            </span>
+                            Metrics
+                        </Link>
+                    )}
 
                     {canViewReports && (
                         <Link

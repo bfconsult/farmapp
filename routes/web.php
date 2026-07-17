@@ -16,6 +16,8 @@ use App\Http\Controllers\ZoneController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\HelpMessageController;
 use App\Http\Controllers\RecurringJobController;
+use App\Http\Controllers\MetricController;
+use App\Http\Controllers\MetricMeasurementController;
 
 
 
@@ -137,6 +139,24 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::patch('settings/job-statuses/{jobStatus}', [SettingsController::class, 'updateJobStatus'])->name('settings.job-statuses.update');
     Route::delete('settings/job-statuses/{jobStatus}', [SettingsController::class, 'destroyJobStatus'])->name('settings.job-statuses.destroy');
     Route::patch('settings/billing-block', [SettingsController::class, 'updateBillingBlock'])->name('settings.billing-block.update');
+    Route::post('metrics', [MetricController::class, 'store'])->name('metrics.store');
+    Route::patch('metrics/{metric}', [MetricController::class, 'update'])->name('metrics.update');
+    Route::delete('metrics/{metric}', [MetricController::class, 'destroy'])->name('metrics.destroy');
+});
+
+// Admin, Manager, and Worker can log measurements - approvers stay
+// read-only, so they're excluded from entering/editing a measurement.
+Route::middleware(['auth', 'property.role:admin,manager,worker'])->group(function () {
+    Route::get('metric-measurements/{metricMeasurement}', [MetricMeasurementController::class, 'show'])->name('metric-measurements.show');
+    Route::patch('metric-measurements/{metricMeasurement}', [MetricMeasurementController::class, 'update'])->name('metric-measurements.update');
+    Route::post('metric-measurements/{metricMeasurement}/photos', [PhotoController::class, 'storeForMetricMeasurement'])->name('photos.store-metric-measurement');
+});
+
+// All four roles can reach the Metrics index - it self-adjusts which tabs
+// are shown (Measure/Manage are hidden for approver, who only gets View).
+Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->group(function () {
+    Route::get('metrics', [MetricController::class, 'index'])->name('metrics.index');
+    Route::get('metrics/{metric}/history', [MetricController::class, 'history'])->name('metrics.history');
 });
 
     // All authenticated users with a property

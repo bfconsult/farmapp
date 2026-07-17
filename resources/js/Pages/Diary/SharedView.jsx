@@ -1,11 +1,12 @@
 import { Head, Link } from '@inertiajs/react';
 import DiaryDays from '@/Components/DiaryDays';
+import MetricsView from '@/Components/MetricsView';
 
 function formatRangeHeading(dateStr) {
     return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function SharedView({ property, dateFrom, dateTo, days, logoUrl, backUrl }) {
+export default function SharedView({ property, dateFrom, dateTo, days, metrics, logoUrl, backUrl }) {
     return (
         <>
             <Head title={`${property.name} — Activity Diary`} />
@@ -37,6 +38,15 @@ export default function SharedView({ property, dateFrom, dateTo, days, logoUrl, 
                     </div>
 
                     <DiaryDays days={days} />
+
+                    {metrics && metrics.length > 0 && (
+                        <>
+                            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mt-6 mb-3">
+                                Metrics
+                            </h2>
+                            <MetricsView metrics={metrics} showHistoryLinks={false} showStatusBadge={false} showPhotos />
+                        </>
+                    )}
 
                     <p className="text-center text-xs text-gray-400 pt-2 pb-8">
                         Shared view — read-only.

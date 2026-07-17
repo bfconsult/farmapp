@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DiaryShare;
+use App\Models\Metric;
 use App\Models\Property;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
@@ -32,6 +33,10 @@ class ReportController extends Controller
                 'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo),
                 'currentDateFrom' => $dateFrom->toDateString(),
                 'currentDateTo' => $dateTo->toDateString(),
+                'metrics' => Metric::where('property_id', $currentPropertyId)
+                    ->with('latestMeasurement.photos')
+                    ->orderBy('name')
+                    ->get(),
             ]);
         }
 
@@ -111,6 +116,10 @@ class ReportController extends Controller
             'dateFrom' => $dateFrom->toDateString(),
             'dateTo' => $dateTo->toDateString(),
             'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo),
+            'metrics' => Metric::where('property_id', $currentPropertyId)
+                ->with('latestMeasurement.photos')
+                ->orderBy('name')
+                ->get(),
             'logoUrl' => asset('favicon.svg'),
             'backUrl' => route('reports.index', [
                 'date_from' => $dateFrom->toDateString(),

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 
 class Photo extends Model
 {
-    protected $fillable = ['job_id', 'work_session_id', 'file', 'time_taken', 'location'];
+    protected $fillable = ['job_id', 'work_session_id', 'metric_measurement_id', 'file', 'time_taken', 'location'];
 
     protected $casts = [
         'time_taken' => 'datetime',
@@ -23,6 +23,11 @@ class Photo extends Model
     public function workSession()
     {
         return $this->belongsTo(WorkSession::class);
+    }
+
+    public function metricMeasurement()
+    {
+        return $this->belongsTo(MetricMeasurement::class);
     }
 
     public function getUrlAttribute()

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DiaryShare;
+use App\Models\Metric;
 use App\Models\WorkSession;
 use Inertia\Inertia;
 
@@ -30,6 +31,10 @@ class DiaryShareController extends Controller
             'dateFrom' => $share->date_from->toDateString(),
             'dateTo' => $share->date_to->toDateString(),
             'days' => $days,
+            'metrics' => Metric::where('property_id', $share->property_id)
+                ->with('latestMeasurement.photos')
+                ->orderBy('name')
+                ->get(),
             // Not a plain "/favicon.svg" path - Vapor only serves favicon.ico
             // and robots.txt directly from the app root; everything else in
             // public/ needs asset(), which redirects to the CDN-backed URL.

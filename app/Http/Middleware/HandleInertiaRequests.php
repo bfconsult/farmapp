@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Metric;
+use App\Models\MetricMeasurement;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -54,6 +56,15 @@ class HandleInertiaRequests extends Middleware
         ? $user->properties()->find($currentPropertyId)
         : null;
 
+    // Drives the red dot on the Metrics nav icon - true if any active
+    // metric's current (latest) measurement is still incomplete.
+    $hasIncompleteMetrics = $currentProperty
+        ? Metric::where('property_id', $currentProperty->id)
+            ->where('is_active', true)
+            ->whereHas('latestMeasurement', fn ($q) => $q->where('status', MetricMeasurement::INCOMPLETE))
+            ->exists()
+        : false;
+
     return [
         ...parent::share($request),
         'auth' => [
@@ -62,6 +73,7 @@ class HandleInertiaRequests extends Middleware
         'properties' => $properties,
         'currentProperty' => $currentProperty,
         'currentUserRole' => $user && $currentProperty ? $user->roleOn($currentProperty) : null,
+        'hasIncompleteMetrics' => $hasIncompleteMetrics,
         'flash' => [
             'addPhoto' => session('addPhoto'),
             'error' => session('error'),

@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import DiaryDays from '@/Components/DiaryDays';
+import MetricsView from '@/Components/MetricsView';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -13,7 +14,7 @@ function currentMonthRange() {
     return { from, to };
 }
 
-export default function Diary({ days, currentDateFrom, currentDateTo }) {
+export default function Diary({ days, currentDateFrom, currentDateTo, metrics }) {
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
 
@@ -84,6 +85,11 @@ export default function Diary({ days, currentDateFrom, currentDateTo }) {
                 )}
 
                 <DiaryDays days={days} />
+
+                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mt-6 mb-3">
+                    Metrics
+                </h2>
+                <MetricsView metrics={metrics} showStatusBadge={false} showHistoryLinks={false} showPhotos />
             </div>
         </AuthenticatedLayout>
     );

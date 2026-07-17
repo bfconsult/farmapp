@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('jobs:generate-recurring')->daily();
+Schedule::command('metrics:generate-measurements')->daily();
