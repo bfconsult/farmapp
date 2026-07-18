@@ -41,6 +41,7 @@ function MaintenanceItemRow({ item, canManage, canConvert }) {
         description: item.description ?? '',
         start_date: item.start_date.slice(0, 10),
         repeat_period_days: item.repeat_period_days,
+        auto_generate: item.auto_generate,
     });
 
     const save = () => {
@@ -103,6 +104,15 @@ function MaintenanceItemRow({ item, canManage, canConvert }) {
                         />
                     </div>
                 </div>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                        type="checkbox"
+                        checked={values.auto_generate}
+                        onChange={(e) => setValues({ ...values, auto_generate: e.target.checked })}
+                        className="rounded text-green-600 focus:ring-green-500"
+                    />
+                    Auto-generate the job when due
+                </label>
                 <div className="flex gap-2">
                     <button onClick={save} className="flex-1 py-1.5 bg-green-600 text-white rounded-lg text-xs">Save</button>
                     <button onClick={() => setEditing(false)} className="flex-1 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs">Cancel</button>
@@ -123,6 +133,11 @@ function MaintenanceItemRow({ item, canManage, canConvert }) {
                         {isOverdue ? 'Overdue' : 'Due'} {formatDate(item.next_due_date.slice(0, 10))}
                     </span>
                     <span className="text-xs text-gray-400">every {item.repeat_period_days}d</span>
+                    {item.auto_generate && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
+                            Auto
+                        </span>
+                    )}
                 </div>
                 <div className="flex gap-3 mt-1 text-xs">
                     {canConvert && (
@@ -143,7 +158,7 @@ function MaintenanceItemRow({ item, canManage, canConvert }) {
 function AddMaintenanceItemForm({ asset }) {
     const todayIso = () => new Date().toISOString().slice(0, 10);
     const [adding, setAdding] = useState(false);
-    const [values, setValues] = useState({ name: '', description: '', start_date: todayIso(), repeat_period_days: 90 });
+    const [values, setValues] = useState({ name: '', description: '', start_date: todayIso(), repeat_period_days: 90, auto_generate: false });
 
     const create = () => {
         router.post(route('maintenance-items.store', asset.id), values, {
@@ -151,7 +166,7 @@ function AddMaintenanceItemForm({ asset }) {
             preserveState: true,
             onSuccess: () => {
                 setAdding(false);
-                setValues({ name: '', description: '', start_date: todayIso(), repeat_period_days: 90 });
+                setValues({ name: '', description: '', start_date: todayIso(), repeat_period_days: 90, auto_generate: false });
             },
         });
     };
@@ -204,6 +219,15 @@ function AddMaintenanceItemForm({ asset }) {
                     />
                 </div>
             </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                    type="checkbox"
+                    checked={values.auto_generate}
+                    onChange={(e) => setValues({ ...values, auto_generate: e.target.checked })}
+                    className="rounded text-green-600 focus:ring-green-500"
+                />
+                Auto-generate the job when due
+            </label>
             <div className="flex gap-2">
                 <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Item</button>
                 <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>

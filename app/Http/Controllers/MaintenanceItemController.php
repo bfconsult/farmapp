@@ -21,6 +21,7 @@ class MaintenanceItemController extends Controller
             ...$validated,
             'created_by' => $request->user()->id,
             'next_due_date' => $validated['start_date'],
+            'auto_generate' => $request->boolean('auto_generate'),
         ]);
 
         return back()->with('success', 'Maintenance item added.');
@@ -35,7 +36,10 @@ class MaintenanceItemController extends Controller
             'repeat_period_days' => 'required|integer|min:1',
         ]);
 
-        $maintenanceItem->update($validated);
+        $maintenanceItem->update([
+            ...$validated,
+            'auto_generate' => $request->boolean('auto_generate'),
+        ]);
 
         return back()->with('success', 'Maintenance item updated.');
     }

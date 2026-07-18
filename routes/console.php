@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('jobs:generate-recurring')->daily();
 Schedule::command('metrics:generate-measurements')->daily();
+Schedule::command('maintenance:generate-jobs')->daily();

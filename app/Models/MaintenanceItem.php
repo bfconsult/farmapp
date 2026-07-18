@@ -14,11 +14,13 @@ class MaintenanceItem extends Model
         'start_date',
         'repeat_period_days',
         'next_due_date',
+        'auto_generate',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'next_due_date' => 'date',
+        'auto_generate' => 'boolean',
     ];
 
     public function asset()
@@ -41,8 +43,11 @@ class MaintenanceItem extends Model
      * RecurringJob::createInstance(). Advances next_due_date by
      * repeat_period_days from its current value (not from today), so a late
      * conversion doesn't skip ahead further than the repeat period itself.
+     * $user is the person clicking "Turn into Job" - omitted when called from
+     * the auto-generate scheduler, which falls back to created_by instead
+     * (mirroring how RecurringJob::createInstance() has no acting user either).
      */
-    public function convertToJob(User $user): FarmJob
+    public function convertToJob(?User $user = null): FarmJob
     {
         $job = FarmJob::create([
             'name' => "{$this->asset->name} - {$this->name}",
@@ -50,7 +55,7 @@ class MaintenanceItem extends Model
             'latitude' => $this->asset->latitude,
             'longitude' => $this->asset->longitude,
             'job_status_id' => JobStatus::where('is_default', true)->value('id'),
-            'user_id' => $user->id,
+            'user_id' => $user->id ?? $this->created_by,
             'property_id' => $this->asset->property_id,
             'maintenance_item_id' => $this->id,
         ]);
