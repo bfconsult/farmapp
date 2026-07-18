@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ChecklistTemplate;
 use App\Models\FarmJob;
 use App\Models\FarmJobView;
 use App\Models\Priority;
@@ -59,6 +60,7 @@ class FarmJobController extends Controller
             })
             ->whereBetween('created_at', [$dateFrom, $dateTo])
             ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zone'])
+            ->withCount('incompleteChecklists')
             ->whereIn('job_status_id', $statusIds);
 
         // Status counts, scoped to the date range so they reflect what the
@@ -106,6 +108,7 @@ class FarmJobController extends Controller
                     });
             })
             ->with(['priority', 'jobType', 'jobStatus'])
+            ->withCount('incompleteChecklists')
             ->get();
 
         return Inertia::render('Jobs/Index', [
@@ -208,7 +211,7 @@ class FarmJobController extends Controller
 
     public function show(FarmJob $farmJob)
     {
-        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos', 'user']);
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos', 'user', 'checklists.items']);
 
         // Logs (or refreshes) that the current user has seen this job - one
         // row per user, most recent view time only, not a full visit log.
@@ -219,6 +222,10 @@ class FarmJobController extends Controller
 
         return Inertia::render('Jobs/Show', [
             'job' => $farmJob,
+            'checklistTemplates' => ChecklistTemplate::where('property_id', $farmJob->property_id)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(),
             'seenBy' => $farmJob->views()->with('user')->get()->map(fn ($view) => [
                 'user_id' => $view->user_id,
                 'user_name' => $view->user->name,

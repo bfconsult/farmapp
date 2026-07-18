@@ -63,6 +63,11 @@ function JobCard({ job }) {
                         {job.job_type.name}
                     </span>
                 )}
+                {job.incomplete_checklists_count > 0 && (
+                    <span className="text-xs px-2 py-1 rounded-full font-medium bg-red-100 text-red-700">
+                        Checklist incomplete
+                    </span>
+                )}
             </div>
 
             {job.description && (

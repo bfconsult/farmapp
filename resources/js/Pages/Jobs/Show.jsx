@@ -18,6 +18,11 @@ const PRIORITY_COLORS = {
     'Critical': 'bg-red-100 text-red-700',
 };
 
+const CHECKLIST_TYPE_LABELS = {
+    before_start: 'Before Start',
+    at_completion: 'At Completion',
+};
+
 function Spinner({ className = 'h-4 w-4' }) {
     return (
         <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
@@ -32,13 +37,24 @@ function formatViewedAt(datetime) {
     return `${formatDate(datetime, { year: false })}, ${time}`;
 }
 
-export default function Show({ job, seenBy }) {
+export default function Show({ job, checklistTemplates, seenBy }) {
     const fileInput = useRef(null);
-    const { flash } = usePage().props;
+    const { flash, currentUserRole } = usePage().props;
     const [uploading, setUploading] = useState(false);
     const [showDeleteOptions, setShowDeleteOptions] = useState(false);
     const [showShare, setShowShare] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [selectedTemplateId, setSelectedTemplateId] = useState('');
+
+    const canAttachChecklist = currentUserRole !== 'approver';
+    const hasIncompleteChecklists = (job.checklists ?? []).some((c) => c.status === 'incomplete');
+
+    const attachChecklist = () => {
+        router.post(route('checklists.store'), {
+            farm_job_id: job.id,
+            checklist_template_id: selectedTemplateId,
+        }, { preserveScroll: true, onSuccess: () => setSelectedTemplateId('') });
+    };
 
     useEffect(() => {
         if (flash?.addPhoto && fileInput.current) {
@@ -185,6 +201,11 @@ export default function Show({ job, seenBy }) {
                                 {job.job_type.name}
                             </span>
                         )}
+                        {hasIncompleteChecklists && (
+                            <span className="text-xs px-2 py-1 rounded-full font-medium bg-red-100 text-red-700">
+                                Checklist incomplete
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -299,6 +320,62 @@ export default function Show({ job, seenBy }) {
                                 </div>
                             ))}
                         </div>
+                    )}
+                </div>
+
+                {/* Checklists */}
+                <div className="bg-white rounded-lg shadow p-4">
+                    <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Checklists</h2>
+
+                    {job.checklists && job.checklists.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                            {job.checklists.map((checklist) => {
+                                const checkedCount = checklist.items.filter((item) => item.is_checked).length;
+                                return (
+                                    <Link
+                                        key={checklist.id}
+                                        href={route('checklists.show', checklist.id)}
+                                        className="flex items-center justify-between gap-2 border border-gray-200 rounded-lg p-3 hover:bg-gray-50"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="text-sm text-gray-900">{checklist.name}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">{CHECKLIST_TYPE_LABELS[checklist.type]}</p>
+                                        </div>
+                                        <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${
+                                            checklist.status === 'complete' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                        }`}>
+                                            {checkedCount}/{checklist.items.length} checked
+                                        </span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {canAttachChecklist && checklistTemplates?.length > 0 && (
+                        <div className="flex gap-2">
+                            <select
+                                value={selectedTemplateId}
+                                onChange={(e) => setSelectedTemplateId(e.target.value)}
+                                className="flex-1 border-gray-300 rounded-lg text-sm"
+                            >
+                                <option value="">Select a checklist…</option>
+                                {checklistTemplates.map((template) => (
+                                    <option key={template.id} value={template.id}>{template.name}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={attachChecklist}
+                                disabled={!selectedTemplateId}
+                                className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm disabled:opacity-50"
+                            >
+                                Attach
+                            </button>
+                        </div>
+                    )}
+
+                    {(!job.checklists || job.checklists.length === 0) && (!canAttachChecklist || !checklistTemplates?.length) && (
+                        <p className="text-sm text-gray-400">No checklists attached.</p>
                     )}
                 </div>
 

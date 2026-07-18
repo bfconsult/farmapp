@@ -18,6 +18,11 @@ use App\Http\Controllers\HelpMessageController;
 use App\Http\Controllers\RecurringJobController;
 use App\Http\Controllers\MetricController;
 use App\Http\Controllers\MetricMeasurementController;
+use App\Http\Controllers\ManageController;
+use App\Http\Controllers\ChecklistTemplateController;
+use App\Http\Controllers\ChecklistTemplateItemController;
+use App\Http\Controllers\ChecklistController;
+use App\Http\Controllers\ChecklistItemController;
 
 
 
@@ -143,6 +148,12 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('metrics', [MetricController::class, 'store'])->name('metrics.store');
     Route::patch('metrics/{metric}', [MetricController::class, 'update'])->name('metrics.update');
     Route::delete('metrics/{metric}', [MetricController::class, 'destroy'])->name('metrics.destroy');
+    Route::post('checklist-templates', [ChecklistTemplateController::class, 'store'])->name('checklist-templates.store');
+    Route::patch('checklist-templates/{checklistTemplate}', [ChecklistTemplateController::class, 'update'])->name('checklist-templates.update');
+    Route::delete('checklist-templates/{checklistTemplate}', [ChecklistTemplateController::class, 'destroy'])->name('checklist-templates.destroy');
+    Route::post('checklist-templates/{checklistTemplate}/items', [ChecklistTemplateItemController::class, 'store'])->name('checklist-template-items.store');
+    Route::patch('checklist-template-items/{checklistTemplateItem}', [ChecklistTemplateItemController::class, 'update'])->name('checklist-template-items.update');
+    Route::delete('checklist-template-items/{checklistTemplateItem}', [ChecklistTemplateItemController::class, 'destroy'])->name('checklist-template-items.destroy');
 });
 
 // Admin, Manager, and Worker can log measurements - approvers stay
@@ -151,6 +162,10 @@ Route::middleware(['auth', 'property.role:admin,manager,worker'])->group(functio
     Route::get('metric-measurements/{metricMeasurement}', [MetricMeasurementController::class, 'show'])->name('metric-measurements.show');
     Route::patch('metric-measurements/{metricMeasurement}', [MetricMeasurementController::class, 'update'])->name('metric-measurements.update');
     Route::post('metric-measurements/{metricMeasurement}/photos', [PhotoController::class, 'storeForMetricMeasurement'])->name('photos.store-metric-measurement');
+    Route::post('checklists', [ChecklistController::class, 'store'])->name('checklists.store');
+    Route::get('checklists/{checklist}', [ChecklistController::class, 'show'])->name('checklists.show');
+    Route::patch('checklist-items/{checklistItem}', [ChecklistItemController::class, 'update'])->name('checklist-items.update');
+    Route::post('checklist-items/{checklistItem}/photos', [PhotoController::class, 'storeForChecklistItem'])->name('photos.store-checklist-item');
 });
 
 // All four roles can reach the Metrics index - it self-adjusts which tabs
@@ -158,6 +173,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker'])->group(functio
 Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->group(function () {
     Route::get('metrics', [MetricController::class, 'index'])->name('metrics.index');
     Route::get('metrics/{metric}/history', [MetricController::class, 'history'])->name('metrics.history');
+    Route::get('manage', [ManageController::class, 'index'])->name('manage.index');
 });
 
     // All authenticated users with a property

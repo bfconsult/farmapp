@@ -153,8 +153,12 @@ export default function AuthenticatedLayout({ title, children }) {
 
                     {canViewMetrics && (
                         <Link
-                            href={route('metrics.index')}
-                            className={`flex flex-col items-center text-xs gap-1 px-4 py-2 ${route().current('metrics.*') || route().current('metric-measurements.*') ? 'text-green-600' : 'text-gray-500'}`}
+                            href={route('manage.index')}
+                            className={`flex flex-col items-center text-xs gap-1 px-4 py-2 ${
+                                route().current('manage.*') || route().current('metrics.*') || route().current('metric-measurements.*') || route().current('checklist-templates.*') || route().current('checklists.*') || route().current('checklist-items.*')
+                                    ? 'text-green-600'
+                                    : 'text-gray-500'
+                            }`}
                         >
                             <span className="relative">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,7 +168,7 @@ export default function AuthenticatedLayout({ title, children }) {
                                     <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" />
                                 )}
                             </span>
-                            Metrics
+                            Manage
                         </Link>
                     )}
 
