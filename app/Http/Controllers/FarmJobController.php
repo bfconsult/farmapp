@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Checklist;
 use App\Models\ChecklistTemplate;
 use App\Models\FarmJob;
 use App\Models\FarmJobView;
@@ -140,6 +141,10 @@ class FarmJobController extends Controller
             'jobTypes' => JobType::orderBy('name')->get(),
             'jobStatuses' => JobStatus::orderBy('order')->get(),
             'currentProperty' => $currentProperty,
+            'checklistTemplates' => ChecklistTemplate::where('property_id', session('current_property_id'))
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
@@ -163,11 +168,14 @@ class FarmJobController extends Controller
             'interval' => 'required_if:repeats,true|in:' . implode(',', RecurringJob::INTERVALS),
             'starts_on' => 'required_if:repeats,true|date',
             'scheduled_date' => 'nullable|date',
+            'checklist_template_ids' => 'nullable|array',
+            'checklist_template_ids.*' => 'exists:checklist_templates,id',
         ]);
 
         $intent = $validated['intent'] ?? 'camera';
         $repeats = $validated['repeats'] ?? false;
-        unset($validated['intent'], $validated['repeats']);
+        $checklistTemplateIds = $validated['checklist_template_ids'] ?? [];
+        unset($validated['intent'], $validated['repeats'], $validated['checklist_template_ids']);
 
         // A repeating job's first instance is created immediately, in the
         // same action, rather than waiting for the scheduler to pick it up.
@@ -189,6 +197,7 @@ class FarmJobController extends Controller
             ]);
 
             $farmJob = $recurringJob->createInstance($recurringJob->starts_on);
+            $this->attachChecklistTemplates($farmJob, $checklistTemplateIds, $request->user());
 
             return redirect()->route('jobs.edit', $farmJob);
         }
@@ -198,6 +207,7 @@ class FarmJobController extends Controller
         $validated['job_status_id'] = $validated['job_status_id'] ?? JobStatus::where('is_default', true)->value('id');
 
         $farmJob = FarmJob::create($validated);
+        $this->attachChecklistTemplates($farmJob, $checklistTemplateIds, $request->user());
 
         $teamUserIds = Role::where('property_id', $farmJob->property_id)->pluck('user_id');
         $farmJob->assignees()->attach($teamUserIds);
@@ -222,10 +232,6 @@ class FarmJobController extends Controller
 
         return Inertia::render('Jobs/Show', [
             'job' => $farmJob,
-            'checklistTemplates' => ChecklistTemplate::where('property_id', $farmJob->property_id)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(),
             'seenBy' => $farmJob->views()->with('user')->get()->map(fn ($view) => [
                 'user_id' => $view->user_id,
                 'user_name' => $view->user->name,
@@ -275,13 +281,17 @@ class FarmJobController extends Controller
 
     public function edit(FarmJob $farmJob)
     {
-        $farmJob->load('assignees');
+        $farmJob->load('assignees', 'checklists');
 
         return Inertia::render('Jobs/Edit', [
             'job' => $farmJob,
             'priorities' => Priority::orderBy('order')->get(),
             'jobStatuses' => JobStatus::orderBy('order')->get(),
             'jobTypes' => JobType::orderBy('name')->get(),
+            'checklistTemplates' => ChecklistTemplate::where('property_id', $farmJob->property_id)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(),
             'properties' => Auth::user()->properties()->with('zones')->get(),
             'teamRoles' => Property::find($farmJob->property_id)->roles()->with('user')->get(),
         ]);
@@ -306,13 +316,16 @@ class FarmJobController extends Controller
             'interval' => 'required_if:repeats,true|in:' . implode(',', RecurringJob::INTERVALS),
             'starts_on' => 'required_if:repeats,true|date',
             'scheduled_date' => 'nullable|date',
+            'checklist_template_ids' => 'nullable|array',
+            'checklist_template_ids.*' => 'exists:checklist_templates,id',
         ]);
 
         $assigneeIds = $validated['assignee_ids'] ?? [];
         $repeats = $validated['repeats'] ?? false;
         $interval = $validated['interval'] ?? null;
         $startsOn = $validated['starts_on'] ?? null;
-        unset($validated['assignee_ids'], $validated['repeats'], $validated['interval'], $validated['starts_on']);
+        $checklistTemplateIds = $validated['checklist_template_ids'] ?? [];
+        unset($validated['assignee_ids'], $validated['repeats'], $validated['interval'], $validated['starts_on'], $validated['checklist_template_ids']);
 
         $validated['job_status_id'] = $validated['job_status_id'] ?? JobStatus::where('is_default', true)->value('id');
 
@@ -344,7 +357,30 @@ class FarmJobController extends Controller
         $farmJob->update($validated);
         $farmJob->assignees()->sync($assigneeIds);
 
+        // Only attach templates not already on this job - editing never
+        // removes an existing checklist, since that would discard any
+        // progress already recorded against it.
+        $alreadyAttached = $farmJob->checklists()->pluck('checklist_template_id')->all();
+        $this->attachChecklistTemplates($farmJob, array_diff($checklistTemplateIds, $alreadyAttached), $request->user());
+
         return redirect()->route('jobs.show', $farmJob);
+    }
+
+    /**
+     * Attach templates picked on the Create/Edit forms - the more logical
+     * point to decide which checklists a job needs, rather than after the
+     * fact on the job's own view page.
+     */
+    private function attachChecklistTemplates(FarmJob $farmJob, array $templateIds, $user): void
+    {
+        if (empty($templateIds)) {
+            return;
+        }
+
+        ChecklistTemplate::whereIn('id', $templateIds)
+            ->where('property_id', $farmJob->property_id)
+            ->get()
+            ->each(fn (ChecklistTemplate $template) => Checklist::attach($template, $farmJob, $user));
     }
 
     /**

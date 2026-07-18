@@ -37,24 +37,15 @@ function formatViewedAt(datetime) {
     return `${formatDate(datetime, { year: false })}, ${time}`;
 }
 
-export default function Show({ job, checklistTemplates, seenBy }) {
+export default function Show({ job, seenBy }) {
     const fileInput = useRef(null);
-    const { flash, currentUserRole } = usePage().props;
+    const { flash } = usePage().props;
     const [uploading, setUploading] = useState(false);
     const [showDeleteOptions, setShowDeleteOptions] = useState(false);
     const [showShare, setShowShare] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
-    const canAttachChecklist = currentUserRole !== 'approver';
     const hasIncompleteChecklists = (job.checklists ?? []).some((c) => c.status === 'incomplete');
-
-    const attachChecklist = () => {
-        router.post(route('checklists.store'), {
-            farm_job_id: job.id,
-            checklist_template_id: selectedTemplateId,
-        }, { preserveScroll: true, onSuccess: () => setSelectedTemplateId('') });
-    };
 
     useEffect(() => {
         if (flash?.addPhoto && fileInput.current) {
@@ -352,30 +343,11 @@ export default function Show({ job, checklistTemplates, seenBy }) {
                         </div>
                     )}
 
-                    {canAttachChecklist && checklistTemplates?.length > 0 && (
-                        <div className="flex gap-2">
-                            <select
-                                value={selectedTemplateId}
-                                onChange={(e) => setSelectedTemplateId(e.target.value)}
-                                className="flex-1 border-gray-300 rounded-lg text-sm"
-                            >
-                                <option value="">Select a checklist…</option>
-                                {checklistTemplates.map((template) => (
-                                    <option key={template.id} value={template.id}>{template.name}</option>
-                                ))}
-                            </select>
-                            <button
-                                onClick={attachChecklist}
-                                disabled={!selectedTemplateId}
-                                className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm disabled:opacity-50"
-                            >
-                                Attach
-                            </button>
-                        </div>
-                    )}
-
-                    {(!job.checklists || job.checklists.length === 0) && (!canAttachChecklist || !checklistTemplates?.length) && (
-                        <p className="text-sm text-gray-400">No checklists attached.</p>
+                    {(!job.checklists || job.checklists.length === 0) && (
+                        <p className="text-sm text-gray-400">
+                            No checklists attached. Add one from{' '}
+                            <Link href={route('jobs.edit', job.id)} className="text-green-600">Edit</Link>.
+                        </p>
                     )}
                 </div>
 

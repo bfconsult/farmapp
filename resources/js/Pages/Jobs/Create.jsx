@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
-export default function Create({ priorities, jobTypes, jobStatuses, currentProperty }) {
+export default function Create({ priorities, jobTypes, jobStatuses, currentProperty, checklistTemplates }) {
     const defaultStatus = jobStatuses.find((status) => status.is_default);
 
     const { data, setData, post, transform, processing, errors } = useForm({
@@ -23,7 +23,16 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
         interval: 'monthly',
         starts_on: todayIso(),
         scheduled_date: '',
+        checklist_template_ids: [],
     });
+
+    const toggleChecklistTemplate = (templateId) => {
+        setData('checklist_template_ids',
+            data.checklist_template_ids.includes(templateId)
+                ? data.checklist_template_ids.filter((id) => id !== templateId)
+                : [...data.checklist_template_ids, templateId]
+        );
+    };
 
     const [locationStatus, setLocationStatus] = useState('getting');
     const [showOptional, setShowOptional] = useState(false);
@@ -224,6 +233,30 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                                     />
                                 </div>
                             </div>
+
+                            {checklistTemplates.length > 0 && (
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">
+                                        Checklists <span className="text-gray-400">optional</span>
+                                    </label>
+                                    <div className="space-y-1 border border-gray-200 rounded-lg divide-y divide-gray-100">
+                                        {checklistTemplates.map((template) => (
+                                            <label
+                                                key={template.id}
+                                                className="flex items-center gap-2 px-3 py-2 cursor-pointer"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={data.checklist_template_ids.includes(template.id)}
+                                                    onChange={() => toggleChecklistTemplate(template.id)}
+                                                    className="rounded text-green-600 focus:ring-green-500"
+                                                />
+                                                <span className="text-sm text-gray-900">{template.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

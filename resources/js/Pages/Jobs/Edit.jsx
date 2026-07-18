@@ -15,7 +15,11 @@ const ROLE_COLORS = {
     approver: 'bg-yellow-100 text-yellow-700',
 };
 
-export default function Edit({ job, priorities, jobTypes, jobStatuses, properties, teamRoles }) {
+export default function Edit({ job, priorities, jobTypes, jobStatuses, properties, teamRoles, checklistTemplates }) {
+    const attachedTemplateIds = (job.checklists ?? [])
+        .map((checklist) => checklist.checklist_template_id)
+        .filter((id) => id !== null);
+
     const { data, setData, patch, processing, errors } = useForm({
         name: job.name,
         description: job.description ?? '',
@@ -32,7 +36,17 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
         interval: 'monthly',
         starts_on: job.created_at ? job.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
         scheduled_date: job.scheduled_date ? job.scheduled_date.slice(0, 10) : '',
+        checklist_template_ids: [...attachedTemplateIds],
     });
+
+    const toggleChecklistTemplate = (templateId) => {
+        if (attachedTemplateIds.includes(templateId)) return;
+        setData('checklist_template_ids',
+            data.checklist_template_ids.includes(templateId)
+                ? data.checklist_template_ids.filter((id) => id !== templateId)
+                : [...data.checklist_template_ids, templateId]
+        );
+    };
 
     const selectedProperty = properties.find((property) => property.id === Number(data.property_id));
     const zonesForSelectedProperty = selectedProperty?.zones ?? [];
@@ -248,6 +262,37 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                                 </div>
                                 {errors.assignee_ids && <p className="mt-1 text-sm text-red-600">{errors.assignee_ids}</p>}
                             </div>
+
+                            {checklistTemplates.length > 0 && (
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Checklists</label>
+                                    <div className="space-y-1 border border-gray-200 rounded-md divide-y divide-gray-100">
+                                        {checklistTemplates.map((template) => {
+                                            const alreadyAttached = attachedTemplateIds.includes(template.id);
+                                            return (
+                                                <label
+                                                    key={template.id}
+                                                    className={`flex items-center justify-between gap-2 px-3 py-2 ${alreadyAttached ? '' : 'cursor-pointer'}`}
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={data.checklist_template_ids.includes(template.id)}
+                                                            onChange={() => toggleChecklistTemplate(template.id)}
+                                                            disabled={alreadyAttached}
+                                                            className="rounded text-green-600 focus:ring-green-500 disabled:opacity-50"
+                                                        />
+                                                        <span className="text-sm text-gray-900">{template.name}</span>
+                                                    </span>
+                                                    {alreadyAttached && (
+                                                        <span className="text-xs text-gray-400">Already attached</span>
+                                                    )}
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {!job.recurring_job_id && (
                                 <div className="mb-6 border-t border-gray-200 pt-4">
