@@ -214,6 +214,14 @@ export default function Show({ job, seenBy }) {
                                 <span className="text-sm text-gray-900">{job.user.name}</span>
                             </div>
                         )}
+                        {job.maintenance_item && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-gray-500">Maintenance</span>
+                                <span className="text-sm text-gray-900">
+                                    {job.maintenance_item.asset.name} → {job.maintenance_item.name}
+                                </span>
+                            </div>
+                        )}
                         {job.scheduled_date && (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-500">Scheduled</span>

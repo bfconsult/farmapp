@@ -147,40 +147,53 @@ const BILLING_BLOCK_LABELS = {
     60: '1 hour',
 };
 
-export default function Index({ priorities, jobTypes, jobStatuses, billingBlockMinutes, billingBlockOptions }) {
+export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, billingBlockMinutes, billingBlockOptions }) {
     const [activeTab, setActiveTab] = useState('priorities');
 
     const tabs = [
         { key: 'priorities', label: 'Priorities' },
         { key: 'jobTypes', label: 'Types' },
         { key: 'jobStatuses', label: 'Statuses' },
+        { key: 'assetTypes', label: 'Asset Types' },
         { key: 'billing', label: 'Billing' },
     ];
 
+    // Every action below stays on the current tab (preserveState: true) -
+    // without it, Laravel's back() redirect remounts the whole page and
+    // resets activeTab to its default ('priorities').
+    const preserve = { preserveState: true, preserveScroll: true };
+
     // Priorities
-    const addPriority = (values) => router.post(route('settings.priorities.store'), values);
-    const savePriority = (id, values) => router.patch(route('settings.priorities.update', id), values);
+    const addPriority = (values) => router.post(route('settings.priorities.store'), values, preserve);
+    const savePriority = (id, values) => router.patch(route('settings.priorities.update', id), values, preserve);
     const deletePriority = (id) => {
-        if (confirm('Delete this priority?')) router.delete(route('settings.priorities.destroy', id));
+        if (confirm('Delete this priority?')) router.delete(route('settings.priorities.destroy', id), preserve);
     };
 
     // Job Types
-    const addJobType = (values) => router.post(route('settings.job-types.store'), { name: values.name });
-    const saveJobType = (id, values) => router.patch(route('settings.job-types.update', id), { name: values.name });
+    const addJobType = (values) => router.post(route('settings.job-types.store'), { name: values.name }, preserve);
+    const saveJobType = (id, values) => router.patch(route('settings.job-types.update', id), { name: values.name }, preserve);
     const deleteJobType = (id) => {
-        if (confirm('Delete this job type?')) router.delete(route('settings.job-types.destroy', id));
+        if (confirm('Delete this job type?')) router.delete(route('settings.job-types.destroy', id), preserve);
+    };
+
+    // Asset Types
+    const addAssetType = (values) => router.post(route('settings.asset-types.store'), { name: values.name }, preserve);
+    const saveAssetType = (id, values) => router.patch(route('settings.asset-types.update', id), { name: values.name }, preserve);
+    const deleteAssetType = (id) => {
+        if (confirm('Delete this asset type?')) router.delete(route('settings.asset-types.destroy', id), preserve);
     };
 
     // Job Statuses
-    const addJobStatus = (values) => router.post(route('settings.job-statuses.store'), values);
-    const saveJobStatus = (id, values) => router.patch(route('settings.job-statuses.update', id), values);
+    const addJobStatus = (values) => router.post(route('settings.job-statuses.store'), values, preserve);
+    const saveJobStatus = (id, values) => router.patch(route('settings.job-statuses.update', id), values, preserve);
     const deleteJobStatus = (id) => {
-        if (confirm('Delete this status?')) router.delete(route('settings.job-statuses.destroy', id));
+        if (confirm('Delete this status?')) router.delete(route('settings.job-statuses.destroy', id), preserve);
     };
 
     // Billing block
     const setBillingBlock = (minutes) => {
-        router.patch(route('settings.billing-block.update'), { billing_block_minutes: minutes });
+        router.patch(route('settings.billing-block.update'), { billing_block_minutes: minutes }, preserve);
     };
 
     const orderField = (values, setValues) => (
@@ -290,6 +303,20 @@ export default function Index({ priorities, jobTypes, jobStatuses, billingBlockM
                                 />
                             ))}
                             <AddRow onAdd={addJobType} />
+                        </>
+                    )}
+
+                    {activeTab === 'assetTypes' && (
+                        <>
+                            {assetTypes.map((item) => (
+                                <LookupRow
+                                    key={item.id}
+                                    item={item}
+                                    onSave={saveAssetType}
+                                    onDelete={deleteAssetType}
+                                />
+                            ))}
+                            <AddRow onAdd={addAssetType} />
                         </>
                     )}
 

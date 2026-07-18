@@ -24,6 +24,7 @@ class FarmJob extends Model
         'property_id',
         'zone_id',
         'recurring_job_id',
+        'maintenance_item_id',
         'period_start',
         'period_end',
         'scheduled_date',
@@ -71,6 +72,11 @@ class FarmJob extends Model
     public function recurringJob()
     {
         return $this->belongsTo(RecurringJob::class);
+    }
+
+    public function maintenanceItem()
+    {
+        return $this->belongsTo(MaintenanceItem::class);
     }
 
     public function priority()

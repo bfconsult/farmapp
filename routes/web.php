@@ -23,6 +23,8 @@ use App\Http\Controllers\ChecklistTemplateController;
 use App\Http\Controllers\ChecklistTemplateItemController;
 use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ChecklistItemController;
+use App\Http\Controllers\AssetController;
+use App\Http\Controllers\MaintenanceItemController;
 
 
 
@@ -154,6 +156,16 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('checklist-templates/{checklistTemplate}/items', [ChecklistTemplateItemController::class, 'store'])->name('checklist-template-items.store');
     Route::patch('checklist-template-items/{checklistTemplateItem}', [ChecklistTemplateItemController::class, 'update'])->name('checklist-template-items.update');
     Route::delete('checklist-template-items/{checklistTemplateItem}', [ChecklistTemplateItemController::class, 'destroy'])->name('checklist-template-items.destroy');
+    Route::post('settings/asset-types', [SettingsController::class, 'storeAssetType'])->name('settings.asset-types.store');
+    Route::patch('settings/asset-types/{assetType}', [SettingsController::class, 'updateAssetType'])->name('settings.asset-types.update');
+    Route::delete('settings/asset-types/{assetType}', [SettingsController::class, 'destroyAssetType'])->name('settings.asset-types.destroy');
+    Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
+    Route::patch('assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
+    Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+    Route::put('assets/{asset}/location', [AssetController::class, 'updateLocation'])->name('assets.update-location');
+    Route::post('assets/{asset}/maintenance-items', [MaintenanceItemController::class, 'store'])->name('maintenance-items.store');
+    Route::patch('maintenance-items/{maintenanceItem}', [MaintenanceItemController::class, 'update'])->name('maintenance-items.update');
+    Route::delete('maintenance-items/{maintenanceItem}', [MaintenanceItemController::class, 'destroy'])->name('maintenance-items.destroy');
 });
 
 // Admin, Manager, and Worker can log measurements - approvers stay
@@ -166,6 +178,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker'])->group(functio
     Route::get('checklists/{checklist}', [ChecklistController::class, 'show'])->name('checklists.show');
     Route::patch('checklist-items/{checklistItem}', [ChecklistItemController::class, 'update'])->name('checklist-items.update');
     Route::post('checklist-items/{checklistItem}/photos', [PhotoController::class, 'storeForChecklistItem'])->name('photos.store-checklist-item');
+    Route::post('maintenance-items/{maintenanceItem}/convert', [MaintenanceItemController::class, 'convertToJob'])->name('maintenance-items.convert');
 });
 
 // All four roles can reach the Metrics index - it self-adjusts which tabs
@@ -174,6 +187,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
     Route::get('metrics', [MetricController::class, 'index'])->name('metrics.index');
     Route::get('metrics/{metric}/history', [MetricController::class, 'history'])->name('metrics.history');
     Route::get('manage', [ManageController::class, 'index'])->name('manage.index');
+    Route::get('assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
 });
 
     // All authenticated users with a property
@@ -214,10 +228,15 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             ? $user->roleOn($currentProperty)
             : null;
 
+        $assets = \App\Models\Asset::where('property_id', $currentPropertyId)
+            ->with('assetType')
+            ->get();
+
         return Inertia::render('Map', [
             'jobs' => $jobs,
             'shape' => $currentProperty?->shape,
             'zones' => $currentProperty?->zones ?? [],
+            'assets' => $assets,
             'currentRole' => $currentRole,
         ]);
     })->name('map');

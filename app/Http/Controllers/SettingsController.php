@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Priority;
 use App\Models\JobType;
 use App\Models\JobStatus;
+use App\Models\AssetType;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,6 +19,7 @@ class SettingsController extends Controller
             'priorities' => Priority::orderBy('order')->get(),
             'jobTypes' => JobType::orderBy('name')->get(),
             'jobStatuses' => JobStatus::orderBy('order')->get(),
+            'assetTypes' => AssetType::orderBy('name')->get(),
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
             'billingBlockOptions' => User::BILLING_BLOCK_OPTIONS,
         ]);
@@ -83,6 +85,31 @@ class SettingsController extends Controller
     public function destroyJobType(JobType $jobType)
     {
         $jobType->delete();
+        return back();
+    }
+
+    // Asset Types
+    public function storeAssetType(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+        AssetType::create($validated);
+        return back();
+    }
+
+    public function updateAssetType(Request $request, AssetType $assetType)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+        $assetType->update($validated);
+        return back();
+    }
+
+    public function destroyAssetType(AssetType $assetType)
+    {
+        $assetType->delete();
         return back();
     }
 

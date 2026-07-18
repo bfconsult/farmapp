@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asset;
+use App\Models\AssetType;
 use App\Models\ChecklistTemplate;
 use App\Models\Metric;
 use App\Models\Property;
@@ -28,9 +30,18 @@ class ManageController extends Controller
                 ->get()
             : [];
 
+        // Visible to every role, unlike checklistTemplates - only the
+        // CRUD/location controls on top of this are canManage-gated.
+        $assets = Asset::where('property_id', $currentPropertyId)
+            ->with(['assetType', 'maintenanceItems'])
+            ->orderBy('name')
+            ->get();
+
         return Inertia::render('Manage/Index', [
             'metrics' => $metrics,
             'checklistTemplates' => $checklistTemplates,
+            'assets' => $assets,
+            'assetTypes' => $canManage ? AssetType::orderBy('name')->get() : [],
             'canManage' => $canManage,
         ]);
     }

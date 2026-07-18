@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             PrioritySeeder::class,
             JobTypeSeeder::class,
             JobStatusSeeder::class,
+            AssetTypeSeeder::class,
         ]);
 
         User::factory()->create([

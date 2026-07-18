@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class MaintenanceItem extends Model
+{
+    protected $fillable = [
+        'asset_id',
+        'created_by',
+        'name',
+        'description',
+        'start_date',
+        'repeat_period_days',
+        'next_due_date',
+    ];
+
+    protected $casts = [
+        'start_date' => 'date',
+        'next_due_date' => 'date',
+    ];
+
+    public function asset()
+    {
+        return $this->belongsTo(Asset::class);
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function jobs()
+    {
+        return $this->hasMany(FarmJob::class);
+    }
+
+    /**
+     * Create a job from this maintenance item - mirrors
+     * RecurringJob::createInstance(). Advances next_due_date by
+     * repeat_period_days from its current value (not from today), so a late
+     * conversion doesn't skip ahead further than the repeat period itself.
+     */
+    public function convertToJob(User $user): FarmJob
+    {
+        $job = FarmJob::create([
+            'name' => $this->name,
+            'description' => $this->description,
+            'latitude' => $this->asset->latitude,
+            'longitude' => $this->asset->longitude,
+            'job_status_id' => JobStatus::where('is_default', true)->value('id'),
+            'user_id' => $user->id,
+            'property_id' => $this->asset->property_id,
+            'maintenance_item_id' => $this->id,
+        ]);
+
+        $teamUserIds = Role::where('property_id', $job->property_id)->pluck('user_id');
+        $job->assignees()->attach($teamUserIds);
+
+        $this->update(['next_due_date' => $this->next_due_date->copy()->addDays($this->repeat_period_days)]);
+
+        return $job;
+    }
+}
