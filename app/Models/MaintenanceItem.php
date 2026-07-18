@@ -45,7 +45,7 @@ class MaintenanceItem extends Model
     public function convertToJob(User $user): FarmJob
     {
         $job = FarmJob::create([
-            'name' => $this->name,
+            'name' => "{$this->asset->name} - {$this->name}",
             'description' => $this->description,
             'latitude' => $this->asset->latitude,
             'longitude' => $this->asset->longitude,
