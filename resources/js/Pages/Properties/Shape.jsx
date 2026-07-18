@@ -20,10 +20,34 @@ export default function Shape({ property, shape, zones }) {
     const [savingZone, setSavingZone] = useState(false);
     const [activeTab, setActiveTab] = useState('boundary');
     const activeTabRef = useRef(activeTab);
+    const zonesRef = useRef(zones);
 
     useEffect(() => {
         activeTabRef.current = activeTab;
     }, [activeTab]);
+
+    useEffect(() => {
+        zonesRef.current = zones;
+    }, [zones]);
+
+    // Persists a zone's reshaping the moment the user finishes dragging a
+    // vertex (pm:edit fires once per completed drag, not continuously) -
+    // matches the existing "no separate Save step" convention for zones
+    // (see pm:create below). Reads the name from zonesRef rather than
+    // closing over it, since this listener is attached once per layer and
+    // must still see a later rename.
+    const attachZoneEditSave = (polygon, zoneId) => {
+        polygon.on('pm:edit', (e) => {
+            const latlngs = e.layer.getLatLngs()[0].map((ll) => [ll.lat, ll.lng]);
+            const currentZone = zonesRef.current.find((z) => z.id === zoneId);
+
+            router.put(
+                route('zones.update', [property.id, zoneId]),
+                { name: currentZone?.name, coordinates: latlngs },
+                { preserveScroll: true },
+            );
+        });
+    };
 
     useEffect(() => {
         if (mapInstance.current) return;
@@ -90,6 +114,7 @@ export default function Shape({ property, shape, zones }) {
                     fillColor: ZONE_COLOR,
                     fillOpacity: 0.15,
                 }).bindTooltip(zone.name, { permanent: true, direction: 'center' });
+                attachZoneEditSave(polygon, zone.id);
                 zoneLayers.current[zone.id] = polygon;
             });
 
@@ -200,6 +225,7 @@ export default function Shape({ property, shape, zones }) {
                 fillColor: ZONE_COLOR,
                 fillOpacity: 0.15,
             }).bindTooltip(zone.name, { permanent: true, direction: 'center' });
+            attachZoneEditSave(polygon, zone.id);
             if (activeTabRef.current === 'zones') polygon.addTo(map);
             zoneLayers.current[zone.id] = polygon;
         });
@@ -207,8 +233,10 @@ export default function Shape({ property, shape, zones }) {
 
     // Swap which geoman draw tools are offered per tab - circle only makes
     // sense for the non-working zone (Boundary tab); Zones only ever draws
-    // polygons. Zone shapes themselves are also only shown on the map while
-    // the Zones tab is active, kept off the Boundary view entirely.
+    // polygons. Edit Mode is available on both tabs (see attachZoneEditSave
+    // for how a reshaped zone gets persisted). Zone shapes themselves are
+    // also only shown on the map while the Zones tab is active, kept off
+    // the Boundary view entirely.
     useEffect(() => {
         const map = mapInstance.current;
         if (!map) return;
@@ -223,7 +251,7 @@ export default function Shape({ property, shape, zones }) {
             drawText: false,
             drawPolygon: true,
             drawCircle: activeTab === 'boundary',
-            editMode: activeTab === 'boundary',
+            editMode: true,
             dragMode: false,
             cutPolygon: false,
             removalMode: false,
@@ -419,7 +447,9 @@ export default function Shape({ property, shape, zones }) {
                         <p className="text-xs text-gray-500 mb-2">
                             Use the polygon tool to draw a paddock or other named
                             area - you'll be asked to name it as soon as you finish
-                            drawing. Each zone saves immediately.
+                            drawing. Each zone saves immediately. To reshape an
+                            existing zone, turn on Edit Mode (top-left) and drag
+                            its points - changes save as soon as you drop a point.
                         </p>
                         {(!zones || zones.length === 0) ? (
                             <p className="text-sm text-gray-500">No zones yet.</p>
