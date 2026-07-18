@@ -31,7 +31,13 @@ function currentMonthRange() {
     return { from, to };
 }
 
-export default function Index({ sessions, activeSession, currentDateFrom, currentDateTo }) {
+const STATUS_FILTERS = [
+    { value: 'all', label: 'Both' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'finalised', label: 'Finalised' },
+];
+
+export default function Index({ sessions, activeSession, currentDateFrom, currentDateTo, currentStatus }) {
     const { currentProperty } = usePage().props;
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
@@ -44,10 +50,13 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
         router.get(route('work-sessions.index'), {
             date_from: overrides.dateFrom ?? currentDateFrom,
             date_to: overrides.dateTo ?? currentDateTo,
+            status: overrides.status ?? currentStatus,
         }, { preserveState: true, preserveScroll: true });
     };
 
     const changeRange = (dateFrom, dateTo) => goTo({ dateFrom, dateTo });
+
+    const changeStatus = (status) => goTo({ status });
 
     const resetToThisMonth = () => {
         const { from, to } = currentMonthRange();
@@ -114,61 +123,80 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                     </Link>
                 )}
 
-                {/* Finalise & share / export */}
-                <div className="flex items-center justify-end gap-3 mb-3">
-                    <div className="flex items-center gap-1 px-3 py-2 bg-white rounded-lg shadow">
-                        <Link
-                            href={route('work-sessions.finalise-and-share')}
-                            className="text-sm font-medium text-green-600"
-                        >
-                            Finalise & Share →
-                        </Link>
-                        <HelpTip messageKey="work-sessions.finalise-and-share" />
-                    </div>
-                    <Link
-                        href={route('work-sessions.export')}
-                        className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600"
-                    >
-                        Export →
-                    </Link>
-                </div>
-
-                {/* Filters toggle */}
-                <div className="flex items-center justify-between mb-3">
+                {/* Filters / Finalise & share / export */}
+                <div className="flex items-center justify-between gap-2 mb-3">
                     <button
                         onClick={() => setShowFilters((v) => !v)}
                         className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
                     >
-                        <span>Date range</span>
-                        <span className="text-xs text-gray-500 font-normal">
-                            {isThisMonth ? 'This month' : `${currentDateFrom} → ${currentDateTo}`}
-                        </span>
+                        <span>Filter</span>
+                        {(!isThisMonth || currentStatus !== 'all') && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
+                        )}
                         <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
                     </button>
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 px-3 py-2 bg-white rounded-lg shadow">
+                            <Link
+                                href={route('work-sessions.finalise-and-share')}
+                                className="text-sm font-medium text-green-600"
+                            >
+                                Finalise & Share →
+                            </Link>
+                            <HelpTip messageKey="work-sessions.finalise-and-share" />
+                        </div>
+                        <Link
+                            href={route('work-sessions.export')}
+                            className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600"
+                        >
+                            Export →
+                        </Link>
+                    </div>
                 </div>
 
                 {showFilters && (
-                    <div className="bg-white rounded-lg shadow p-4 mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-700">Date range</span>
-                            {!isThisMonth && (
-                                <button onClick={resetToThisMonth} className="text-xs text-green-600">
-                                    Reset to this month
-                                </button>
+                    <div className="bg-white rounded-lg shadow p-4 mb-4 space-y-4">
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-gray-700">Date range</span>
+                                {!isThisMonth && (
+                                    <button onClick={resetToThisMonth} className="text-xs text-green-600">
+                                        Reset to this month
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => setShowCalendar((v) => !v)}
+                                className="w-full flex items-center justify-between text-sm border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
+                            >
+                                <span>{formatDateDayFirst(currentDateFrom)} → {formatDateDayFirst(currentDateTo)}</span>
+                                <span className="text-gray-400">{showCalendar ? '▲' : '▼'}</span>
+                            </button>
+                            {showCalendar && (
+                                <div className="mt-2 border border-gray-200 rounded-lg p-3">
+                                    <DateRangeCalendar from={currentDateFrom} to={currentDateTo} onChange={changeRange} />
+                                </div>
                             )}
                         </div>
-                        <button
-                            onClick={() => setShowCalendar((v) => !v)}
-                            className="w-full flex items-center justify-between text-sm border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
-                        >
-                            <span>{formatDateDayFirst(currentDateFrom)} → {formatDateDayFirst(currentDateTo)}</span>
-                            <span className="text-gray-400">{showCalendar ? '▲' : '▼'}</span>
-                        </button>
-                        {showCalendar && (
-                            <div className="mt-2 border border-gray-200 rounded-lg p-3">
-                                <DateRangeCalendar from={currentDateFrom} to={currentDateTo} onChange={changeRange} />
+
+                        <div>
+                            <span className="text-sm font-medium text-gray-700 block mb-2">Status</span>
+                            <div className="flex gap-2">
+                                {STATUS_FILTERS.map(({ value, label }) => (
+                                    <button
+                                        key={value}
+                                        onClick={() => changeStatus(value)}
+                                        className={`flex-1 text-sm py-2 rounded-lg border ${
+                                            currentStatus === value
+                                                ? 'bg-green-600 border-green-600 text-white font-medium'
+                                                : 'border-gray-300 text-gray-700'
+                                        }`}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
                             </div>
-                        )}
+                        </div>
                     </div>
                 )}
 
