@@ -4,6 +4,7 @@ import DiaryDays from '@/Components/DiaryDays';
 import MetricsView from '@/Components/MetricsView';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { formatDate } from '@/dateInput';
 
 function currentMonthRange() {
     const now = new Date();
@@ -36,9 +37,6 @@ export default function Diary({ days, currentDateFrom, currentDateTo, metrics })
         const { from, to } = currentMonthRange();
         return currentDateFrom === from && currentDateTo === to;
     })();
-
-    const formatDate = (iso) =>
-        new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 
     return (
         <AuthenticatedLayout title="Diary">

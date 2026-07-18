@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import { formatDate } from '@/dateInput';
 
 const STATUS_COLORS = {
     'Pending': 'bg-yellow-100 text-yellow-800',
@@ -181,7 +182,7 @@ function JobsCalendar({ month, jobs, onMonthChange }) {
                 <div>
                     <p className="text-xs text-gray-500 mb-2">
                         {selectedJobs.length} job{selectedJobs.length === 1 ? '' : 's'} on{' '}
-                        {new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        {formatDate(selectedDate, { weekday: 'long', month: 'long', year: false })}
                     </p>
                     {selectedJobs.length === 0 ? (
                         <p className="text-sm text-gray-400 bg-white rounded-lg shadow p-4 text-center">
@@ -230,9 +231,6 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
     const changeOrder = (e) => goTo({ order: e.target.value });
     const changeRange = (dateFrom, dateTo) => goTo({ dateFrom, dateTo });
     const changeCalendarMonth = (newMonth) => goTo({ calendarMonth: newMonth });
-
-    const formatDate = (iso) =>
-        new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
 
     const resetToThisMonth = () => {
         const { from, to } = currentMonthRange();

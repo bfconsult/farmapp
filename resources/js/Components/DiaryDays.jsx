@@ -1,10 +1,7 @@
+import { formatDate } from '@/dateInput';
+
 function formatDayHeading(dateStr) {
-    return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-    });
+    return formatDate(dateStr, { weekday: 'long', month: 'long', year: 'numeric' });
 }
 
 function formatTime(datetime) {

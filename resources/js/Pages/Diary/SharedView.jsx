@@ -1,9 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import DiaryDays from '@/Components/DiaryDays';
 import MetricsView from '@/Components/MetricsView';
+import { formatDate } from '@/dateInput';
 
 function formatRangeHeading(dateStr) {
-    return new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    return formatDate(dateStr, { year: 'numeric' });
 }
 
 export default function SharedView({ property, dateFrom, dateTo, days, metrics, logoUrl, backUrl }) {

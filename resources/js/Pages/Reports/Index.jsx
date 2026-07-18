@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { formatDate } from '@/dateInput';
 
 function sessionLabel(session) {
     if (session.farm_job) return session.farm_job.name;
@@ -61,9 +62,6 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
         return currentDateFrom === from && currentDateTo === to;
     })();
 
-    const formatDate = (iso) =>
-        new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-
     const formatTime = (datetime) => {
         if (!datetime) return '—';
         return new Date(datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -71,7 +69,7 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
 
     const formatSessionDate = (datetime) => {
         if (!datetime) return '—';
-        return new Date(datetime).toLocaleDateString();
+        return formatDate(datetime);
     };
 
     return (

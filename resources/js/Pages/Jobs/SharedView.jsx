@@ -1,4 +1,5 @@
 import { Head } from '@inertiajs/react';
+import { formatDate } from '@/dateInput';
 
 const STATUS_COLORS = {
     'Pending': 'bg-yellow-100 text-yellow-800',
@@ -59,7 +60,7 @@ export default function SharedView({ job, logoUrl }) {
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Scheduled</span>
                                 <span className="text-sm text-gray-900">
-                                    {new Date(`${job.scheduled_date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+                                    {formatDate(job.scheduled_date.slice(0, 10), { weekday: 'short', year: false })}
                                 </span>
                             </div>
                         )}

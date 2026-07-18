@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import HelpTip from '@/Components/HelpTip';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { formatDate as formatDateDayFirst } from '@/dateInput';
 
 const STATUS_LABELS = {
     draft: 'Draft',
@@ -33,7 +34,7 @@ export default function Index({ sessions, activeSession }) {
 
     const formatDate = (datetime) => {
         if (!datetime) return '—';
-        return new Date(datetime).toLocaleDateString();
+        return formatDateDayFirst(datetime);
     };
 
     return (

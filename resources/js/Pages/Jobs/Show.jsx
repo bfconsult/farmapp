@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
+import { formatDate } from '@/dateInput';
 
 const STATUS_COLORS = {
     'Pending': 'bg-yellow-100 text-yellow-800',
@@ -27,12 +28,8 @@ function Spinner({ className = 'h-4 w-4' }) {
 }
 
 function formatViewedAt(datetime) {
-    return new Date(datetime).toLocaleString(undefined, {
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    const time = new Date(datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `${formatDate(datetime, { year: false })}, ${time}`;
 }
 
 export default function Show({ job, seenBy }) {
@@ -204,7 +201,7 @@ export default function Show({ job, seenBy }) {
                                 <span className="text-sm text-gray-500">Scheduled</span>
                                 <span className="flex items-center gap-2">
                                     <span className="text-sm text-gray-900">
-                                        {new Date(`${job.scheduled_date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+                                        {formatDate(job.scheduled_date.slice(0, 10), { weekday: 'short', year: false })}
                                     </span>
                                     <a
                                         href={route('jobs.calendar', job.id)}

@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
+import { formatDate } from '@/dateInput';
 
 function currentMonthRange() {
     const now = new Date();
@@ -42,9 +43,6 @@ export default function FinaliseAndShare({ sessions, currentDateFrom, currentDat
         return currentDateFrom === from && currentDateTo === to;
     })();
 
-    const formatDate = (iso) =>
-        new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-
     const toggleSession = (id) => {
         setSelectedIds((current) =>
             current.includes(id) ? current.filter((x) => x !== id) : [...current, id]
@@ -61,7 +59,7 @@ export default function FinaliseAndShare({ sessions, currentDateFrom, currentDat
 
     const formatSessionDate = (datetime) => {
         if (!datetime) return '—';
-        return new Date(datetime).toLocaleDateString();
+        return formatDate(datetime);
     };
 
     const submit = () => {

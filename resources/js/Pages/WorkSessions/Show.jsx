@@ -3,6 +3,7 @@ import WaypointTrail from '@/Components/WaypointTrail';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
+import { formatDate as formatDateDayFirst } from '@/dateInput';
 
 const STATUS_LABELS = {
     draft: 'Draft',
@@ -80,7 +81,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
 
     const formatDate = (datetime) => {
         if (!datetime) return '—';
-        return new Date(datetime).toLocaleDateString();
+        return formatDateDayFirst(datetime);
     };
 
     return (

@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
+import { formatDate } from '@/dateInput';
 
 const STATUS_LABELS = {
     incomplete: 'Incomplete',
@@ -13,9 +14,10 @@ const STATUS_COLORS = {
     complete: 'bg-green-100 text-green-700',
 };
 
+// No year - this renders in a compact table (see NumberHistoryTable below)
+// that's already tuned to exactly fit a narrow mobile viewport.
 function formatPeriod(measurement) {
-    const format = (dateStr) =>
-        new Date(`${dateStr.slice(0, 10)}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+    const format = (dateStr) => formatDate(dateStr.slice(0, 10), { year: false });
 
     return `${format(measurement.period_start)} – ${format(measurement.period_end)}`;
 }

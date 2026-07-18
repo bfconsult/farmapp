@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
+import { formatDate } from '@/dateInput';
 
 const STATUS_LABELS = {
     incomplete: 'Incomplete',
@@ -64,9 +65,6 @@ export default function Show({ measurement }) {
         });
     };
 
-    const formatDate = (dateStr) =>
-        new Date(`${dateStr.slice(0, 10)}T00:00:00`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-
     return (
         <AuthenticatedLayout>
             <Head title={measurement.name} />
@@ -87,7 +85,7 @@ export default function Show({ measurement }) {
                         </span>
                     </div>
                     <p className="text-sm text-gray-500">
-                        {formatDate(measurement.period_start)} – {formatDate(measurement.period_end)}
+                        {formatDate(measurement.period_start.slice(0, 10), { year: 'numeric' })} – {formatDate(measurement.period_end.slice(0, 10), { year: 'numeric' })}
                     </p>
                 </div>
 
