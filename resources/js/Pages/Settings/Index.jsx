@@ -62,6 +62,11 @@ function LookupRow({ item, onSave, onDelete, extraFields }) {
                         recurring-closed default
                     </span>
                 )}
+                {item.is_finished_default && (
+                    <span className="text-xs ml-2 px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                        finished default
+                    </span>
+                )}
             </div>
             {item.is_protected ? (
                 <span className="text-xs text-gray-400">Default</span>
@@ -87,11 +92,11 @@ function LookupRow({ item, onSave, onDelete, extraFields }) {
 
 function AddRow({ onAdd, extraFields }) {
     const [adding, setAdding] = useState(false);
-    const [values, setValues] = useState({ name: '', order: 0, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false });
+    const [values, setValues] = useState({ name: '', order: 0, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false });
 
     const save = () => {
         onAdd(values);
-        setValues({ name: '', order: 0, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false });
+        setValues({ name: '', order: 0, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false });
         setAdding(false);
     };
 
@@ -223,6 +228,15 @@ export default function Index({ priorities, jobTypes, jobStatuses, billingBlockM
                     className="rounded"
                 />
                 Switch a recurring job's instance to this status once its period ends
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                    type="checkbox"
+                    checked={values.is_finished_default ?? false}
+                    onChange={(e) => setValues({ ...values, is_finished_default: e.target.checked })}
+                    className="rounded"
+                />
+                Switch a job to this status when "Finish Job" is tapped
             </label>
         </>
     );

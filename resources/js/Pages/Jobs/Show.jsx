@@ -46,6 +46,12 @@ export default function Show({ job, seenBy }) {
         }
     }, [flash]);
 
+    const finishJob = () => {
+        if (confirm('Mark this job as finished?')) {
+            router.post(route('jobs.finish', job.id));
+        }
+    };
+
     const destroy = () => {
         if (job.recurring_job_id) {
             setShowDeleteOptions(true);
@@ -295,6 +301,16 @@ export default function Show({ job, seenBy }) {
                         </div>
                     )}
                 </div>
+
+                {/* Finish job */}
+                {!job.job_status?.is_finished_default && (
+                    <button
+                        onClick={finishJob}
+                        className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
+                    >
+                        Finish Job
+                    </button>
+                )}
 
                 {/* Delete job */}
                 <button

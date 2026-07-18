@@ -62,6 +62,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::resource('jobs', FarmJobController::class);
     Route::get('jobs/{farmJob}/calendar', [FarmJobController::class, 'calendar'])->name('jobs.calendar');
+    Route::post('jobs/{farmJob}/finish', [FarmJobController::class, 'finish'])->name('jobs.finish');
     Route::post('jobs/{farmJob}/photos', [PhotoController::class, 'store'])->name('photos.store');
     Route::delete('photos/{photo}', [PhotoController::class, 'destroy'])->name('photos.destroy');
     Route::get('map', function () {

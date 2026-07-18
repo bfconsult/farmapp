@@ -340,6 +340,27 @@ class FarmJobController extends Controller
         return redirect()->route('jobs.show', $farmJob);
     }
 
+    /**
+     * Switches a job to whichever status is flagged as the "finished"
+     * default - statuses are user-configurable, so this is how the app
+     * knows which one means "done" (mirrors how promoteJobToInProgress in
+     * WorkSessionController finds the in-progress default). Unlike that
+     * automatic promotion, this is a deliberate user action, so it applies
+     * regardless of the job's current status.
+     */
+    public function finish(FarmJob $farmJob)
+    {
+        $finishedStatusId = JobStatus::where('is_finished_default', true)->value('id');
+
+        if (!$finishedStatusId) {
+            return back()->with('error', 'No status is set as the "finished" default yet - set one in Settings first.');
+        }
+
+        $farmJob->update(['job_status_id' => $finishedStatusId]);
+
+        return redirect()->route('jobs.show', $farmJob);
+    }
+
     public function destroy(Request $request, FarmJob $farmJob)
     {
         // Deleting the template stops future instances being generated, but
