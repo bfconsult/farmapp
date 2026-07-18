@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\WorkSession;
+use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 
@@ -40,6 +41,7 @@ class VisitController extends Controller
         $allowedPropertyIds = $user->properties()->pluck('properties.id')->all();
 
         $created = 0;
+        $extended = 0;
         $skippedDuplicate = 0;
         $skippedForbidden = 0;
 
@@ -49,8 +51,33 @@ class VisitController extends Controller
                 continue;
             }
 
-            if (WorkSession::where('external_uuid', $visit['external_uuid'])->exists()) {
-                $skippedDuplicate++;
+            $existing = WorkSession::where('external_uuid', $visit['external_uuid'])->first();
+
+            if ($existing) {
+                // The mobile app coalesces a visit that re-opens shortly after
+                // closing (GPS jitter bouncing across a small geofence, e.g. a
+                // tight non-working zone) into the same external_uuid with a
+                // later ended_at, rather than starting a new visit - see
+                // VisitRepository.recordEntry. Only extend a still-draft
+                // session: once reviewed/finalised in the web app, a later
+                // sync shouldn't silently change it.
+                if ($existing->status === WorkSession::DRAFT && Carbon::parse($visit['ended_at'])->gt($existing->ended_at)) {
+                    $existing->update(['ended_at' => $visit['ended_at']]);
+                    $existing->waypoints()->delete();
+                    if (! empty($visit['waypoints'])) {
+                        $existing->waypoints()->createMany(array_map(
+                            fn ($waypoint) => [
+                                'latitude' => $waypoint['lat'],
+                                'longitude' => $waypoint['lng'],
+                                'recorded_at' => $waypoint['recorded_at'],
+                            ],
+                            $visit['waypoints'],
+                        ));
+                    }
+                    $extended++;
+                } else {
+                    $skippedDuplicate++;
+                }
                 continue;
             }
 
@@ -96,6 +123,7 @@ class VisitController extends Controller
 
         return response()->json([
             'created' => $created,
+            'extended' => $extended,
             'skipped_duplicate' => $skippedDuplicate,
             'skipped_forbidden' => $skippedForbidden,
         ]);
