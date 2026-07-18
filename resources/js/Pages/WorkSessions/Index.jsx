@@ -1,6 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import HelpTip from '@/Components/HelpTip';
+import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 import { formatDate as formatDateDayFirst } from '@/dateInput';
 
 const STATUS_LABELS = {
@@ -20,12 +22,42 @@ function sessionLabel(session) {
     return session.source === 'auto_tracked' ? 'Auto-tracked visit' : 'Ad-hoc work';
 }
 
-export default function Index({ sessions, activeSession }) {
+function currentMonthRange() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const from = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const to = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(lastDay)}`;
+    return { from, to };
+}
+
+export default function Index({ sessions, activeSession, currentDateFrom, currentDateTo }) {
     const { currentProperty } = usePage().props;
+    const [showFilters, setShowFilters] = useState(false);
+    const [showCalendar, setShowCalendar] = useState(false);
 
     const stop = () => {
         router.post(route('work-sessions.stop', activeSession.id));
     };
+
+    const goTo = (overrides = {}) => {
+        router.get(route('work-sessions.index'), {
+            date_from: overrides.dateFrom ?? currentDateFrom,
+            date_to: overrides.dateTo ?? currentDateTo,
+        }, { preserveState: true, preserveScroll: true });
+    };
+
+    const changeRange = (dateFrom, dateTo) => goTo({ dateFrom, dateTo });
+
+    const resetToThisMonth = () => {
+        const { from, to } = currentMonthRange();
+        goTo({ dateFrom: from, dateTo: to });
+    };
+
+    const isThisMonth = (() => {
+        const { from, to } = currentMonthRange();
+        return currentDateFrom === from && currentDateTo === to;
+    })();
 
     const formatTime = (datetime) => {
         if (!datetime) return '—';
@@ -101,10 +133,49 @@ export default function Index({ sessions, activeSession }) {
                     </Link>
                 </div>
 
+                {/* Filters toggle */}
+                <div className="flex items-center justify-between mb-3">
+                    <button
+                        onClick={() => setShowFilters((v) => !v)}
+                        className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
+                    >
+                        <span>Date range</span>
+                        <span className="text-xs text-gray-500 font-normal">
+                            {isThisMonth ? 'This month' : `${currentDateFrom} → ${currentDateTo}`}
+                        </span>
+                        <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
+                    </button>
+                </div>
+
+                {showFilters && (
+                    <div className="bg-white rounded-lg shadow p-4 mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-700">Date range</span>
+                            {!isThisMonth && (
+                                <button onClick={resetToThisMonth} className="text-xs text-green-600">
+                                    Reset to this month
+                                </button>
+                            )}
+                        </div>
+                        <button
+                            onClick={() => setShowCalendar((v) => !v)}
+                            className="w-full flex items-center justify-between text-sm border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
+                        >
+                            <span>{formatDateDayFirst(currentDateFrom)} → {formatDateDayFirst(currentDateTo)}</span>
+                            <span className="text-gray-400">{showCalendar ? '▲' : '▼'}</span>
+                        </button>
+                        {showCalendar && (
+                            <div className="mt-2 border border-gray-200 rounded-lg p-3">
+                                <DateRangeCalendar from={currentDateFrom} to={currentDateTo} onChange={changeRange} />
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Sessions list */}
                 {sessions.length === 0 ? (
                     <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-                        No work sessions yet.
+                        No work sessions in this date range.
                     </div>
                 ) : (
                     <div className="space-y-3">

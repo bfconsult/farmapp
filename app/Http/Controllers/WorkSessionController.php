@@ -12,14 +12,16 @@ use Inertia\Inertia;
 
 class WorkSessionController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $currentPropertyId = session('current_property_id');
+        [$dateFrom, $dateTo] = $this->parseDateRange($request);
 
         $sessions = Auth::user()->workSessions()
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
+            ->whereBetween('started_at', [$dateFrom, $dateTo])
             ->with(['farmJob', 'property', 'user'])
             ->latest('started_at')
             ->get()
@@ -31,10 +33,14 @@ class WorkSessionController extends Controller
 
         return Inertia::render('WorkSessions/Index', [
             'sessions' => $sessions,
+            // Not date-filtered - a session still running "right now" is
+            // shown regardless of which historical range is selected below.
             'activeSession' => Auth::user()->workSessions()
                 ->whereNull('ended_at')
                 ->with('farmJob')
                 ->first(),
+            'currentDateFrom' => $dateFrom->toDateString(),
+            'currentDateTo' => $dateTo->toDateString(),
         ]);
     }
 
