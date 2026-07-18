@@ -16,15 +16,20 @@ class WorkSessionController extends Controller
     {
         $currentPropertyId = session('current_property_id');
         [$dateFrom, $dateTo] = $this->parseDateRange($request);
-        $status = in_array($request->status, ['draft', 'finalised'], true) ? $request->status : 'all';
+        $showDraft = $request->has('status_draft') ? $request->boolean('status_draft') : true;
+        $showFinalised = $request->has('status_finalised') ? $request->boolean('status_finalised') : true;
+
+        $includedStatuses = [
+            ...($showDraft ? [WorkSession::DRAFT] : []),
+            ...($showFinalised ? [WorkSession::FINALISED, WorkSession::APPROVED] : []),
+        ];
 
         $sessions = Auth::user()->workSessions()
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
             ->whereBetween('started_at', [$dateFrom, $dateTo])
-            ->when($status === 'draft', fn ($query) => $query->where('status', WorkSession::DRAFT))
-            ->when($status === 'finalised', fn ($query) => $query->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED]))
+            ->when(!($showDraft && $showFinalised), fn ($query) => $query->whereIn('status', $includedStatuses))
             ->with(['farmJob', 'property', 'user'])
             ->latest('started_at')
             ->get()
@@ -44,7 +49,8 @@ class WorkSessionController extends Controller
                 ->first(),
             'currentDateFrom' => $dateFrom->toDateString(),
             'currentDateTo' => $dateTo->toDateString(),
-            'currentStatus' => $status,
+            'currentStatusDraft' => $showDraft,
+            'currentStatusFinalised' => $showFinalised,
         ]);
     }
 

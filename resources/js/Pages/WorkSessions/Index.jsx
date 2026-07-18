@@ -31,13 +31,7 @@ function currentMonthRange() {
     return { from, to };
 }
 
-const STATUS_FILTERS = [
-    { value: 'all', label: 'Both' },
-    { value: 'draft', label: 'Draft' },
-    { value: 'finalised', label: 'Finalised' },
-];
-
-export default function Index({ sessions, activeSession, currentDateFrom, currentDateTo, currentStatus }) {
+export default function Index({ sessions, activeSession, currentDateFrom, currentDateTo, currentStatusDraft, currentStatusFinalised }) {
     const { currentProperty } = usePage().props;
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
@@ -50,13 +44,16 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
         router.get(route('work-sessions.index'), {
             date_from: overrides.dateFrom ?? currentDateFrom,
             date_to: overrides.dateTo ?? currentDateTo,
-            status: overrides.status ?? currentStatus,
+            status_draft: overrides.statusDraft ?? currentStatusDraft,
+            status_finalised: overrides.statusFinalised ?? currentStatusFinalised,
         }, { preserveState: true, preserveScroll: true });
     };
 
     const changeRange = (dateFrom, dateTo) => goTo({ dateFrom, dateTo });
 
-    const changeStatus = (status) => goTo({ status });
+    const toggleStatusDraft = () => goTo({ statusDraft: !currentStatusDraft });
+
+    const toggleStatusFinalised = () => goTo({ statusFinalised: !currentStatusFinalised });
 
     const resetToThisMonth = () => {
         const { from, to } = currentMonthRange();
@@ -130,7 +127,7 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                         className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
                     >
                         <span>Filter</span>
-                        {(!isThisMonth || currentStatus !== 'all') && (
+                        {(!isThisMonth || !currentStatusDraft || !currentStatusFinalised) && (
                             <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
                         )}
                         <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
@@ -181,20 +178,25 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
 
                         <div>
                             <span className="text-sm font-medium text-gray-700 block mb-2">Status</span>
-                            <div className="flex gap-2">
-                                {STATUS_FILTERS.map(({ value, label }) => (
-                                    <button
-                                        key={value}
-                                        onClick={() => changeStatus(value)}
-                                        className={`flex-1 text-sm py-2 rounded-lg border ${
-                                            currentStatus === value
-                                                ? 'bg-green-600 border-green-600 text-white font-medium'
-                                                : 'border-gray-300 text-gray-700'
-                                        }`}
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
+                            <div className="flex gap-4">
+                                <label className="flex items-center gap-2 text-sm text-gray-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={currentStatusDraft}
+                                        onChange={toggleStatusDraft}
+                                        className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                    />
+                                    Draft
+                                </label>
+                                <label className="flex items-center gap-2 text-sm text-gray-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={currentStatusFinalised}
+                                        onChange={toggleStatusFinalised}
+                                        className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                    />
+                                    Finalised
+                                </label>
                             </div>
                         </div>
                     </div>
