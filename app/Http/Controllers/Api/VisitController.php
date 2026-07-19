@@ -24,7 +24,13 @@ class VisitController extends Controller
             'visits.*.external_uuid' => 'required|uuid|distinct',
             'visits.*.property_id' => 'required|integer',
             'visits.*.started_at' => 'required|date',
-            'visits.*.ended_at' => 'required|date|after:visits.*.started_at',
+            // Not `after:visits.*.started_at` here - a wildcard-to-wildcard
+            // comparison rule makes one invalid item fail validation for the
+            // *entire* request (Laravel validates the whole array as a unit),
+            // which would block every other visit in the same batch from
+            // syncing too. Checked per-item in the loop below instead, where
+            // an invalid item can be skipped on its own.
+            'visits.*.ended_at' => 'required|date',
             'visits.*.latitude' => 'nullable|numeric|between:-90,90',
             'visits.*.longitude' => 'nullable|numeric|between:-180,180',
             // Periodic on-site location samples, shown on the web app's
@@ -44,10 +50,20 @@ class VisitController extends Controller
         $extended = 0;
         $skippedDuplicate = 0;
         $skippedForbidden = 0;
+        $skippedInvalid = 0;
 
         foreach ($validated['visits'] as $visit) {
             if (! in_array($visit['property_id'], $allowedPropertyIds, true)) {
                 $skippedForbidden++;
+                continue;
+            }
+
+            // A near-instant visit (GPS jitter bouncing in and out within the
+            // same second) can end up with ended_at <= started_at once
+            // truncated to whole seconds in storage - not worth a session
+            // either way, so skip it rather than reject the whole batch.
+            if (Carbon::parse($visit['ended_at'])->lte(Carbon::parse($visit['started_at']))) {
+                $skippedInvalid++;
                 continue;
             }
 
@@ -126,6 +142,7 @@ class VisitController extends Controller
             'extended' => $extended,
             'skipped_duplicate' => $skippedDuplicate,
             'skipped_forbidden' => $skippedForbidden,
+            'skipped_invalid' => $skippedInvalid,
         ]);
     }
 }
