@@ -15,6 +15,48 @@ export function fromLocalInputValue(localValue) {
     return new Date(localValue).toISOString();
 }
 
+// Splits a toLocalInputValue()-style "YYYY-MM-DDTHH:mm" string into separate
+// date/time pieces for a pair of <input type="date">/<input type="time">
+// fields - editing just the time (the common case) is otherwise awkward
+// with a single combined datetime-local input.
+export function splitLocalValue(localValue) {
+    if (!localValue) return { date: '', time: '' };
+    const [date, time] = localValue.split('T');
+    return { date, time };
+}
+
+// The inverse of splitLocalValue - recombines separate date/time pieces back
+// into a toLocalInputValue()-style string for fromLocalInputValue().
+export function joinLocalValue(date, time) {
+    if (!date || !time) return '';
+    return `${date}T${time}`;
+}
+
+// Human label for a billing_block_minutes value (see User::BILLING_BLOCK_OPTIONS).
+export function billingBlockLabel(minutes) {
+    if (minutes === 60) return '1 hour';
+    if (minutes === 1) return '1 minute';
+    return `${minutes} minutes`;
+}
+
+// Every "HH:mm" time-of-day value at a billing_block_minutes granularity,
+// for a <select> that can only ever choose a block-aligned time - unlike
+// <input type="time" step>, whose step is only honoured by some browsers'
+// arrow-key increments, not by the actual picker widget most show.
+export function timeOptionsForBlock(blockMinutes) {
+    const step = blockMinutes || 1;
+    const options = [];
+    for (let minutes = 0; minutes < 24 * 60; minutes += step) {
+        const hour = Math.floor(minutes / 60);
+        const minute = minutes % 60;
+        options.push({
+            value: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+            label: new Date(2000, 0, 1, hour, minute).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+        });
+    }
+    return options;
+}
+
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

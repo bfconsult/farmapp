@@ -112,6 +112,19 @@ class WorkSessionController extends Controller
 
     public function show(WorkSession $workSession)
     {
+        // An auto-tracked visit hasn't had a human look at it yet - send
+        // straight to Edit instead of the normal Show page until it's been
+        // saved through that form once (see update() below, which sets
+        // reviewed_at). Guarded on status === DRAFT too, since edit() itself
+        // redirects non-draft sessions back to show() - without that guard,
+        // a non-draft session that somehow never got reviewed would bounce
+        // between the two forever.
+        if ($workSession->source === 'auto_tracked'
+            && !$workSession->reviewed_at
+            && $workSession->status === WorkSession::DRAFT) {
+            return redirect()->route('work-sessions.edit', $workSession);
+        }
+
         $workSession->load(['farmJob', 'property', 'photos', 'user', 'waypoints']);
 
         return Inertia::render('WorkSessions/Show', [
@@ -137,6 +150,7 @@ class WorkSessionController extends Controller
             'session' => $workSession,
             'plannedJobs' => $plannedJobs,
             'waypoints' => $workSession->waypoints,
+            'billingBlockMinutes' => Auth::user()->billing_block_minutes,
         ]);
     }
 
@@ -162,7 +176,7 @@ class WorkSessionController extends Controller
             ]);
         }
 
-        $workSession->update($validated);
+        $workSession->update([...$validated, 'reviewed_at' => $workSession->reviewed_at ?? now()]);
 
         return redirect()->route('work-sessions.show', $workSession);
     }

@@ -1,36 +1,69 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import WaypointTrail from '@/Components/WaypointTrail';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { toLocalInputValue, fromLocalInputValue } from '@/dateInput';
+import { useMemo } from 'react';
+import { toLocalInputValue, fromLocalInputValue, splitLocalValue, joinLocalValue, billingBlockLabel, timeOptionsForBlock } from '@/dateInput';
 
-export default function Edit({ session, plannedJobs, waypoints }) {
+// A session's recorded time can fall off the billing-block grid (e.g. an
+// auto-tracked visit's exact GPS timestamp, or a block setting changed
+// after the fact) - insert it as its own option rather than silently
+// snapping the displayed value to the nearest block one when the form loads.
+function withCurrentTime(options, currentValue) {
+    if (!currentValue || options.some((option) => option.value === currentValue)) return options;
+
+    const [hour, minute] = currentValue.split(':').map(Number);
+    const label = new Date(2000, 0, 1, hour, minute).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    return [...options, { value: currentValue, label: `${label} (current)` }]
+        .sort((a, b) => a.value.localeCompare(b.value));
+}
+
+export default function Edit({ session, plannedJobs, waypoints, billingBlockMinutes }) {
+    const startedLocal = splitLocalValue(toLocalInputValue(session.started_at));
+    const endedLocal = splitLocalValue(toLocalInputValue(session.ended_at));
+
     const { data, setData, patch, processing, errors, transform } = useForm({
         description: session.description ?? '',
         farm_job_id: session.farm_job_id ?? '',
-        started_at: toLocalInputValue(session.started_at),
-        ended_at: toLocalInputValue(session.ended_at),
+        started_date: startedLocal.date,
+        started_time: startedLocal.time,
+        ended_date: endedLocal.date,
+        ended_time: endedLocal.time,
     });
+
+    const baseTimeOptions = useMemo(() => timeOptionsForBlock(billingBlockMinutes), [billingBlockMinutes]);
+    const startedTimeOptions = useMemo(() => withCurrentTime(baseTimeOptions, startedLocal.time), [baseTimeOptions, startedLocal.time]);
+    const endedTimeOptions = useMemo(() => {
+        const options = withCurrentTime(baseTimeOptions, endedLocal.time);
+        // An active session has no end time yet - keep that choice available
+        // rather than forcing a real time onto it just by opening the form.
+        return endedLocal.time ? options : [{ value: '', label: '— Still active —' }, ...options];
+    }, [baseTimeOptions, endedLocal.time]);
 
     const submit = (e) => {
         e.preventDefault();
         transform((data) => ({
             ...data,
-            started_at: fromLocalInputValue(data.started_at),
-            ended_at: fromLocalInputValue(data.ended_at),
+            started_at: fromLocalInputValue(joinLocalValue(data.started_date, data.started_time)),
+            ended_at: fromLocalInputValue(joinLocalValue(data.ended_date, data.ended_time)),
         }));
         patch(route('work-sessions.update', session.id));
     };
 
+    const isAutoTracked = session.source === 'auto_tracked';
+
     return (
         <AuthenticatedLayout>
-            <Head title="Edit Work Session" />
+            <Head title={isAutoTracked ? 'Auto Tracked Visit' : 'Edit Work Session'} />
 
             <div className="max-w-lg mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <Link href={route('work-sessions.show', session.id)} className="text-green-600 text-sm">
                         ← Back
                     </Link>
-                    <h1 className="text-xl font-semibold text-gray-900">Edit Session</h1>
+                    <h1 className="text-xl font-semibold text-gray-900">
+                        {isAutoTracked ? 'Auto Tracked Visit' : 'Edit Session'}
+                    </h1>
                 </div>
 
                 <WaypointTrail waypoints={waypoints} />
@@ -38,24 +71,56 @@ export default function Edit({ session, plannedJobs, waypoints }) {
                 <form onSubmit={submit} className="space-y-4">
                     <div className="bg-white rounded-lg shadow p-4 space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Started At</label>
-                            <input
-                                type="datetime-local"
-                                value={data.started_at}
-                                onChange={(e) => setData('started_at', e.target.value)}
-                                className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
-                            />
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Started At
+                                {billingBlockMinutes && (
+                                    <span className="text-gray-400 font-normal"> (in steps of {billingBlockLabel(billingBlockMinutes)})</span>
+                                )}
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <input
+                                    type="date"
+                                    value={data.started_date}
+                                    onChange={(e) => setData('started_date', e.target.value)}
+                                    className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                />
+                                <select
+                                    value={data.started_time}
+                                    onChange={(e) => setData('started_time', e.target.value)}
+                                    className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                >
+                                    {startedTimeOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </div>
                             {errors.started_at && <p className="mt-1 text-sm text-red-600">{errors.started_at}</p>}
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Ended At</label>
-                            <input
-                                type="datetime-local"
-                                value={data.ended_at}
-                                onChange={(e) => setData('ended_at', e.target.value)}
-                                className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
-                            />
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Ended At
+                                {billingBlockMinutes && (
+                                    <span className="text-gray-400 font-normal"> (in steps of {billingBlockLabel(billingBlockMinutes)})</span>
+                                )}
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <input
+                                    type="date"
+                                    value={data.ended_date}
+                                    onChange={(e) => setData('ended_date', e.target.value)}
+                                    className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                />
+                                <select
+                                    value={data.ended_time}
+                                    onChange={(e) => setData('ended_time', e.target.value)}
+                                    className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                >
+                                    {endedTimeOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </div>
                             {errors.ended_at && <p className="mt-1 text-sm text-red-600">{errors.ended_at}</p>}
                         </div>
 
@@ -66,11 +131,7 @@ export default function Edit({ session, plannedJobs, waypoints }) {
                                 onChange={(e) => setData('farm_job_id', e.target.value)}
                                 className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
                             >
-                                <option value="">
-                                    {session.source === 'auto_tracked'
-                                        ? 'Auto-tracked visit (no planned job)'
-                                        : 'Ad-hoc work (no planned job)'}
-                                </option>
+                                <option value="">Ad hoc work (no planned job)</option>
                                 {plannedJobs.map((job) => (
                                     <option key={job.id} value={job.id}>{job.name}</option>
                                 ))}
@@ -78,7 +139,7 @@ export default function Edit({ session, plannedJobs, waypoints }) {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                             <textarea
                                 value={data.description}
                                 onChange={(e) => setData('description', e.target.value)}

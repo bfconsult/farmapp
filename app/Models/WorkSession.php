@@ -25,11 +25,13 @@ class WorkSession extends Model
         'status',
         'source',
         'external_uuid',
+        'reviewed_at',
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
+        'reviewed_at' => 'datetime',
     ];
 
     public function property()

@@ -1,13 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
-import { fromLocalInputValue } from '@/dateInput';
-
-function billingBlockLabel(minutes) {
-    if (minutes === 60) return '1 hour';
-    if (minutes === 1) return '1 minute';
-    return `${minutes} minutes`;
-}
+import { fromLocalInputValue, billingBlockLabel } from '@/dateInput';
 
 function floorToBillingBlock(date, blockMinutes) {
     if (!blockMinutes) return date;
