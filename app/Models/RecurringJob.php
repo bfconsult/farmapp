@@ -65,6 +65,17 @@ class RecurringJob extends Model
     }
 
     /**
+     * The checklist templates every instance of this recurring job should
+     * get attached (see createInstance()) - captured once when the
+     * recurring job is created, since it has no ongoing UI of its own to
+     * manage the list.
+     */
+    public function checklistTemplates()
+    {
+        return $this->belongsToMany(ChecklistTemplate::class);
+    }
+
+    /**
      * The end date of a period starting on the given date, per this
      * template's interval — monthly/yearly snap to calendar boundaries.
      */
@@ -104,6 +115,10 @@ class RecurringJob extends Model
 
         $teamUserIds = Role::where('property_id', $job->property_id)->pluck('user_id');
         $job->assignees()->attach($teamUserIds);
+
+        $this->checklistTemplates->each(
+            fn (ChecklistTemplate $template) => Checklist::attach($template, $job, $this->createdBy)
+        );
 
         return $job;
     }
