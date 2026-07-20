@@ -188,6 +188,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
     Route::get('metrics/{metric}/history', [MetricController::class, 'history'])->name('metrics.history');
     Route::get('manage', [ManageController::class, 'index'])->name('manage.index');
     Route::get('assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
+    Route::get('assets/{asset}/jobs', [AssetController::class, 'jobHistory'])->name('assets.jobs');
 });
 
     // All authenticated users with a property

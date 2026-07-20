@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asset;
 use App\Models\Checklist;
 use App\Models\ChecklistTemplate;
 use App\Models\FarmJob;
@@ -125,7 +126,7 @@ class FarmJobController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $currentProperty = Auth::user()->properties()
             ->with('zones')
@@ -145,6 +146,8 @@ class FarmJobController extends Controller
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(),
+            'assets' => Asset::where('property_id', session('current_property_id'))->orderBy('name')->get(),
+            'selectedAssetId' => $request->integer('asset_id') ?: null,
         ]);
     }
 
@@ -161,6 +164,7 @@ class FarmJobController extends Controller
             'job_type_id' => 'nullable|exists:job_types,id',
             'job_status_id' => 'nullable|exists:job_statuses,id',
             'zone_id' => 'nullable|exists:zones,id',
+            'asset_id' => 'nullable|exists:assets,id',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'intent' => 'nullable|in:camera,plan',
@@ -195,9 +199,9 @@ class FarmJobController extends Controller
                 'starts_on' => $validated['starts_on'],
                 'is_active' => true,
             ]);
+            $recurringJob->checklistTemplates()->attach($checklistTemplateIds);
 
             $farmJob = $recurringJob->createInstance($recurringJob->starts_on);
-            $this->attachChecklistTemplates($farmJob, $checklistTemplateIds, $request->user());
 
             return redirect()->route('jobs.edit', $farmJob);
         }
@@ -221,7 +225,7 @@ class FarmJobController extends Controller
 
     public function show(FarmJob $farmJob)
     {
-        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset']);
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset']);
 
         // Logs (or refreshes) that the current user has seen this job - one
         // row per user, most recent view time only, not a full visit log.
@@ -347,6 +351,7 @@ class FarmJobController extends Controller
                 'starts_on' => $startsOn,
                 'is_active' => true,
             ]);
+            $recurringJob->checklistTemplates()->attach($checklistTemplateIds);
 
             $periodStart = \Carbon\Carbon::parse($startsOn);
             $validated['recurring_job_id'] = $recurringJob->id;

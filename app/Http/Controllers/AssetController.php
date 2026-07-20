@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\FarmJob;
+use App\Models\WorkSession;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -72,10 +74,29 @@ class AssetController extends Controller
 
     public function show(Asset $asset)
     {
-        $asset->load(['assetType', 'maintenanceItems']);
+        $asset->load(['assetType', 'maintenanceItems', 'property.shape']);
+
+        $jobIds = $asset->jobs()->pluck('farm_jobs.id');
 
         return Inertia::render('Assets/Show', [
             'asset' => $asset,
+            'recentJobs' => FarmJob::whereIn('id', $jobIds)->with('jobStatus')->latest()->take(5)->get(),
+            'jobsCount' => $jobIds->count(),
+            'bookedHours' => round(
+                WorkSession::whereIn('farm_job_id', $jobIds)
+                    ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
+                    ->get()
+                    ->sum('duration_in_hours'),
+                2
+            ),
+        ]);
+    }
+
+    public function jobHistory(Asset $asset)
+    {
+        return Inertia::render('Assets/JobHistory', [
+            'asset' => $asset,
+            'jobs' => $asset->jobs()->with('jobStatus')->latest('farm_jobs.created_at')->get(),
         ]);
     }
 

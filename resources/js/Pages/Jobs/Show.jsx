@@ -222,6 +222,14 @@ export default function Show({ job, seenBy }) {
                                 </span>
                             </div>
                         )}
+                        {job.asset && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-gray-500">Asset</span>
+                                <Link href={route('assets.show', job.asset.id)} className="text-sm text-green-600">
+                                    {job.asset.name}
+                                </Link>
+                            </div>
+                        )}
                         {job.scheduled_date && (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-gray-500">Scheduled</span>

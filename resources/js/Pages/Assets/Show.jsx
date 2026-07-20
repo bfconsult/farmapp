@@ -1,9 +1,197 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Modal from '@/Components/Modal';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
 
 const ASSET_COLOR = '#2563eb';
+const PROPERTY_BOUNDARY_COLOR = '#9ca3af';
+
+function loadLeaflet() {
+    return Promise.all([
+        import('leaflet'),
+        import('leaflet/dist/leaflet.css'),
+    ]).then(([L]) => {
+        delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        });
+        return L;
+    });
+}
+
+/** Small non-interactive preview: the asset's pin/shape in the context of its property's boundary. */
+function LocationThumbnail({ asset, propertyBoundary }) {
+    const mapRef = useRef(null);
+    const mapInstance = useRef(null);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        loadLeaflet().then((L) => {
+            if (cancelled || mapInstance.current) return;
+
+            const map = L.map(mapRef.current, {
+                zoomControl: false,
+                attributionControl: false,
+                dragging: false,
+                scrollWheelZoom: false,
+                doubleClickZoom: false,
+                boxZoom: false,
+                keyboard: false,
+                touchZoom: false,
+            });
+            mapInstance.current = map;
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+            const bounds = L.latLngBounds([]);
+
+            if (propertyBoundary) {
+                const boundary = L.polygon(propertyBoundary, {
+                    color: PROPERTY_BOUNDARY_COLOR,
+                    weight: 1,
+                    fillOpacity: 0.05,
+                    interactive: false,
+                }).addTo(map);
+                bounds.extend(boundary.getBounds());
+            }
+
+            if (asset.shape) {
+                const shape = L.polygon(asset.shape, {
+                    color: ASSET_COLOR,
+                    fillColor: ASSET_COLOR,
+                    fillOpacity: 0.2,
+                    interactive: false,
+                }).addTo(map);
+                bounds.extend(shape.getBounds());
+            } else if (asset.latitude && asset.longitude) {
+                L.marker([asset.latitude, asset.longitude], { interactive: false }).addTo(map);
+                bounds.extend([asset.latitude, asset.longitude]);
+            }
+
+            map.fitBounds(bounds, { padding: [16, 16] });
+        });
+
+        return () => {
+            cancelled = true;
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+            }
+        };
+    }, []);
+
+    return (
+        <div
+            ref={mapRef}
+            style={{ height: '140px', position: 'relative', zIndex: 0 }}
+            className="rounded-lg pointer-events-none"
+        />
+    );
+}
+
+/** Full interactive map + Geoman drawing controls, shown inside the Location modal. */
+function LocationEditorMap({ asset, propertyBoundary, canManage, onSaved }) {
+    const mapRef = useRef(null);
+    const mapInstance = useRef(null);
+    const locationLayer = useRef(null);
+
+    useEffect(() => {
+        Promise.all([
+            loadLeaflet(),
+            import('@geoman-io/leaflet-geoman-free'),
+            import('@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'),
+        ]).then(([L]) => {
+            if (mapInstance.current) return;
+
+            const map = L.map(mapRef.current).setView([-37.8136, 144.9631], 15);
+            mapInstance.current = map;
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19,
+            }).addTo(map);
+
+            let boundaryBounds = null;
+            if (propertyBoundary) {
+                const boundary = L.polygon(propertyBoundary, {
+                    color: PROPERTY_BOUNDARY_COLOR,
+                    weight: 1,
+                    fillOpacity: 0.05,
+                    interactive: false,
+                }).addTo(map);
+                boundaryBounds = boundary.getBounds();
+            }
+
+            if (asset.shape) {
+                locationLayer.current = L.polygon(asset.shape, {
+                    color: ASSET_COLOR,
+                    fillColor: ASSET_COLOR,
+                    fillOpacity: 0.15,
+                }).addTo(map);
+            } else if (asset.latitude && asset.longitude) {
+                locationLayer.current = L.marker([asset.latitude, asset.longitude]).addTo(map);
+            }
+
+            // Always open on the whole property's extents (plus the asset's
+            // own location, if set) rather than zooming in tight on just the
+            // pin - gives context for where the asset sits on the property,
+            // and room to place a new pin when there isn't one yet.
+            if (boundaryBounds) {
+                if (locationLayer.current) boundaryBounds.extend(locationLayer.current.getBounds?.() ?? locationLayer.current.getLatLng());
+                map.fitBounds(boundaryBounds, { padding: [40, 40] });
+            } else if (locationLayer.current) {
+                map.fitBounds(locationLayer.current.getBounds?.() ?? L.latLngBounds([locationLayer.current.getLatLng()]), { padding: [40, 40] });
+            } else {
+                map.locate({ setView: true, maxZoom: 16 });
+            }
+
+            if (canManage) {
+                map.pm.addControls({
+                    position: 'topleft',
+                    drawMarker: true,
+                    drawCircleMarker: false,
+                    drawPolyline: false,
+                    drawRectangle: false,
+                    drawCircle: false,
+                    drawText: false,
+                    editMode: true,
+                    dragMode: false,
+                    cutPolygon: false,
+                    removalMode: false,
+                });
+
+                map.on('pm:create', (e) => {
+                    if (locationLayer.current) locationLayer.current.remove();
+                    locationLayer.current = e.layer;
+                    map.pm.disableDraw();
+
+                    const payload = e.shape === 'Marker'
+                        ? { latitude: e.layer.getLatLng().lat, longitude: e.layer.getLatLng().lng }
+                        : { shape: e.layer.getLatLngs()[0].map((ll) => [ll.lat, ll.lng]) };
+
+                    router.put(route('assets.update-location', asset.id), payload, {
+                        preserveScroll: true,
+                        preserveState: true,
+                        onSuccess: () => onSaved(),
+                    });
+                });
+            }
+        });
+
+        return () => {
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+            }
+        };
+    }, []);
+
+    return <div ref={mapRef} style={{ height: '350px' }} />;
+}
 
 function AssetFields({ values, setValues }) {
     return (
@@ -155,9 +343,8 @@ function MaintenanceItemRow({ item, canManage, canConvert }) {
     );
 }
 
-function AddMaintenanceItemForm({ asset }) {
+function AddMaintenanceItemForm({ asset, onClose }) {
     const todayIso = () => new Date().toISOString().slice(0, 10);
-    const [adding, setAdding] = useState(false);
     const [values, setValues] = useState({ name: '', description: '', start_date: todayIso(), repeat_period_days: 90, auto_generate: false });
 
     const create = () => {
@@ -165,25 +352,14 @@ function AddMaintenanceItemForm({ asset }) {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
-                setAdding(false);
+                onClose();
                 setValues({ name: '', description: '', start_date: todayIso(), repeat_period_days: 90, auto_generate: false });
             },
         });
     };
 
-    if (!adding) {
-        return (
-            <button
-                onClick={() => setAdding(true)}
-                className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
-            >
-                + Add Maintenance Item
-            </button>
-        );
-    }
-
     return (
-        <div className="bg-white rounded-lg shadow p-4 space-y-3">
+        <div className="p-4 space-y-3 border-t border-gray-100">
             <input
                 type="text"
                 value={values.name}
@@ -230,13 +406,13 @@ function AddMaintenanceItemForm({ asset }) {
             </label>
             <div className="flex gap-2">
                 <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Item</button>
-                <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
+                <button onClick={onClose} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
             </div>
         </div>
     );
 }
 
-export default function Show({ asset }) {
+export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canConvert = canManage || currentUserRole === 'worker';
@@ -248,9 +424,10 @@ export default function Show({ asset }) {
         value: asset.value ?? '',
     });
 
-    const mapRef = useRef(null);
-    const mapInstance = useRef(null);
-    const locationLayer = useRef(null);
+    const [showLocationModal, setShowLocationModal] = useState(false);
+    const hasLocation = Boolean(asset.shape || (asset.latitude && asset.longitude));
+
+    const [addingMaintenanceItem, setAddingMaintenanceItem] = useState(false);
 
     const save = () => {
         router.patch(route('assets.update', asset.id), values, {
@@ -262,85 +439,8 @@ export default function Show({ asset }) {
 
     const clearLocation = () => {
         if (!confirm('Clear this asset\'s location?')) return;
-        router.put(route('assets.update-location', asset.id), {}, { preserveScroll: true });
+        router.put(route('assets.update-location', asset.id), {}, { preserveScroll: true, preserveState: true });
     };
-
-    useEffect(() => {
-        if (mapInstance.current) return;
-
-        Promise.all([
-            import('leaflet'),
-            import('@geoman-io/leaflet-geoman-free'),
-            import('leaflet/dist/leaflet.css'),
-            import('@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'),
-        ]).then(([L]) => {
-            delete L.Icon.Default.prototype._getIconUrl;
-            L.Icon.Default.mergeOptions({
-                iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-            });
-
-            const map = L.map(mapRef.current).setView([-37.8136, 144.9631], 15);
-            mapInstance.current = map;
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors',
-                maxZoom: 19,
-            }).addTo(map);
-
-            if (asset.shape) {
-                locationLayer.current = L.polygon(asset.shape, {
-                    color: ASSET_COLOR,
-                    fillColor: ASSET_COLOR,
-                    fillOpacity: 0.15,
-                }).addTo(map);
-                map.fitBounds(locationLayer.current.getBounds(), { padding: [40, 40] });
-            } else if (asset.latitude && asset.longitude) {
-                locationLayer.current = L.marker([asset.latitude, asset.longitude]).addTo(map);
-                map.setView([asset.latitude, asset.longitude], 17);
-            } else {
-                map.locate({ setView: true, maxZoom: 16 });
-            }
-
-            if (canManage) {
-                map.pm.addControls({
-                    position: 'topleft',
-                    drawMarker: true,
-                    drawCircleMarker: false,
-                    drawPolyline: false,
-                    drawRectangle: false,
-                    drawCircle: false,
-                    drawText: false,
-                    editMode: true,
-                    dragMode: false,
-                    cutPolygon: false,
-                    removalMode: false,
-                });
-
-                map.on('pm:create', (e) => {
-                    if (locationLayer.current) locationLayer.current.remove();
-                    locationLayer.current = e.layer;
-                    map.pm.disableDraw();
-
-                    if (e.shape === 'Marker') {
-                        const { lat, lng } = e.layer.getLatLng();
-                        router.put(route('assets.update-location', asset.id), { latitude: lat, longitude: lng }, { preserveScroll: true });
-                    } else {
-                        const coordinates = e.layer.getLatLngs()[0].map((ll) => [ll.lat, ll.lng]);
-                        router.put(route('assets.update-location', asset.id), { shape: coordinates }, { preserveScroll: true });
-                    }
-                });
-            }
-        });
-
-        return () => {
-            if (mapInstance.current) {
-                mapInstance.current.remove();
-                mapInstance.current = null;
-            }
-        };
-    }, []);
 
     return (
         <AuthenticatedLayout>
@@ -388,17 +488,52 @@ export default function Show({ asset }) {
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Location</h2>
-                        {canManage && (asset.shape || (asset.latitude && asset.longitude)) && (
+                        {canManage && hasLocation && (
                             <button onClick={clearLocation} className="text-xs text-red-500">Clear location</button>
                         )}
                     </div>
-                    <div ref={mapRef} style={{ height: '300px' }} />
+                    <div className="p-3">
+                        {hasLocation ? (
+                            <button onClick={() => setShowLocationModal(true)} className="block w-full">
+                                <LocationThumbnail asset={asset} propertyBoundary={asset.property?.shape?.coordinates} />
+                                <p className="text-xs text-gray-400 mt-1">{canManage ? 'Tap to edit' : 'Tap to view'}</p>
+                            </button>
+                        ) : canManage ? (
+                            <button onClick={() => setShowLocationModal(true)} className="text-sm text-green-600">
+                                + Set location
+                            </button>
+                        ) : (
+                            <p className="text-sm text-gray-400">No location set.</p>
+                        )}
+                    </div>
                 </div>
 
+                <Modal show={showLocationModal} onClose={() => setShowLocationModal(false)} maxWidth="lg">
+                    <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-medium text-gray-700">Location</h3>
+                            <button onClick={() => setShowLocationModal(false)} className="text-sm text-gray-500">Close</button>
+                        </div>
+                        {showLocationModal && (
+                            <LocationEditorMap
+                                asset={asset}
+                                propertyBoundary={asset.property?.shape?.coordinates}
+                                canManage={canManage}
+                                onSaved={() => setShowLocationModal(false)}
+                            />
+                        )}
+                    </div>
+                </Modal>
+
                 <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide px-4 py-2 border-b border-gray-100">
-                        Maintenance Items
-                    </h2>
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Maintenance Items</h2>
+                        {canManage && !addingMaintenanceItem && (
+                            <button onClick={() => setAddingMaintenanceItem(true)} className="text-xs text-green-600 font-medium">
+                                + Add
+                            </button>
+                        )}
+                    </div>
                     {asset.maintenance_items.length === 0 ? (
                         <p className="text-sm text-gray-400 p-4">No maintenance items yet.</p>
                     ) : (
@@ -408,9 +543,53 @@ export default function Show({ asset }) {
                             ))}
                         </div>
                     )}
+                    {addingMaintenanceItem && (
+                        <AddMaintenanceItemForm asset={asset} onClose={() => setAddingMaintenanceItem(false)} />
+                    )}
                 </div>
 
-                {canManage && <AddMaintenanceItemForm asset={asset} />}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Jobs</h2>
+                        <div className="flex items-center gap-3">
+                            {bookedHours > 0 && (
+                                <span className="text-xs text-gray-500">{bookedHours}h booked</span>
+                            )}
+                            {canConvert && (
+                                <Link href={route('jobs.create', { asset_id: asset.id })} className="text-xs text-green-600 font-medium">
+                                    + New Job
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+                    {recentJobs.length === 0 ? (
+                        <p className="text-sm text-gray-400 p-4">No jobs related to this asset yet.</p>
+                    ) : (
+                        <div className="divide-y divide-gray-100">
+                            {recentJobs.map((job) => (
+                                <Link key={job.id} href={route('jobs.show', job.id)} className="block px-4 py-3">
+                                    <p className="text-sm text-gray-900">{job.name}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs text-gray-400">{formatDate(job.created_at.slice(0, 10))}</span>
+                                        {job.job_status && (
+                                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600">
+                                                {job.job_status.name}
+                                            </span>
+                                        )}
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                    {jobsCount > 0 && (
+                        <Link
+                            href={route('assets.jobs', asset.id)}
+                            className="block text-center py-2 text-sm text-green-600 border-t border-gray-100"
+                        >
+                            View all {jobsCount} job{jobsCount === 1 ? '' : 's'} →
+                        </Link>
+                    )}
+                </div>
             </div>
         </AuthenticatedLayout>
     );

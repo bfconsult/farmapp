@@ -25,6 +25,7 @@ class FarmJob extends Model
         'zone_id',
         'recurring_job_id',
         'maintenance_item_id',
+        'asset_id',
         'period_start',
         'period_end',
         'scheduled_date',
@@ -77,6 +78,15 @@ class FarmJob extends Model
     public function maintenanceItem()
     {
         return $this->belongsTo(MaintenanceItem::class);
+    }
+
+    /**
+     * Direct asset link for ad-hoc work not tied to a maintenance schedule -
+     * see Asset::jobs().
+     */
+    public function asset()
+    {
+        return $this->belongsTo(Asset::class);
     }
 
     public function priority()

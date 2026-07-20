@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
-export default function Create({ priorities, jobTypes, jobStatuses, currentProperty, checklistTemplates }) {
+export default function Create({ priorities, jobTypes, jobStatuses, currentProperty, checklistTemplates, assets, selectedAssetId }) {
     const defaultStatus = jobStatuses.find((status) => status.is_default);
 
     const { data, setData, post, transform, processing, errors } = useForm({
@@ -17,6 +17,7 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
         job_type_id: '',
         job_status_id: defaultStatus ? String(defaultStatus.id) : '',
         zone_id: '',
+        asset_id: selectedAssetId ? String(selectedAssetId) : '',
         latitude: '',
         longitude: '',
         repeats: false,
@@ -103,6 +104,25 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                             ))}
                         </select>
                         {errors.zone_id && <p className="mt-1 text-sm text-red-600">{errors.zone_id}</p>}
+                    </div>
+                )}
+
+                {assets.length > 0 && (
+                    <div className="mb-4">
+                        <label className="block text-xs text-gray-500 mb-1">
+                            Asset <span className="text-gray-400">optional</span>
+                        </label>
+                        <select
+                            value={data.asset_id}
+                            onChange={(e) => setData('asset_id', e.target.value)}
+                            className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
+                        >
+                            <option value="">Not related to an asset</option>
+                            {assets.map((asset) => (
+                                <option key={asset.id} value={asset.id}>{asset.name}</option>
+                            ))}
+                        </select>
+                        {errors.asset_id && <p className="mt-1 text-sm text-red-600">{errors.asset_id}</p>}
                     </div>
                 )}
 
