@@ -108,8 +108,10 @@ export default function AuthenticatedLayout({ title, children }) {
                 {children}
             </main>
 
-            {/* Floating Add Job button — only where adding a job actually makes sense */}
-            {currentProperty && (route().current('jobs.*') || route().current('map')) && (
+            {/* Floating Add Job button — Jobs itself now has its own dashed
+                "+ Add Job" button at the top of the list instead; the Map
+                page has no such list to put one in, so it keeps the FAB. */}
+            {currentProperty && route().current('map') && (
                 <Link
                     href={route('jobs.create')}
                     className="fixed bottom-20 right-4 z-20 bg-green-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg text-2xl hover:bg-green-700"

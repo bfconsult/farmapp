@@ -275,6 +275,23 @@ function ChecklistsManager({ checklistTemplates }) {
                 Checklist templates get attached to a job - their items are copied onto a fresh checklist each time, so editing a template later doesn't change checklists already in progress.
             </p>
 
+            {adding ? (
+                <div className="bg-white rounded-lg shadow p-4 space-y-3">
+                    <ChecklistTemplateFields values={values} setValues={setValues} />
+                    <div className="flex gap-2">
+                        <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Template</button>
+                        <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
+                    </div>
+                </div>
+            ) : (
+                <button
+                    onClick={() => setAdding(true)}
+                    className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
+                >
+                    + Add Checklist Template
+                </button>
+            )}
+
             {checklistTemplates.length === 0 ? (
                 <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
                     No checklist templates set up yet.
@@ -302,23 +319,6 @@ function ChecklistsManager({ checklistTemplates }) {
                             </div>
                         ))}
                 </div>
-            )}
-
-            {adding ? (
-                <div className="bg-white rounded-lg shadow p-4 space-y-3">
-                    <ChecklistTemplateFields values={values} setValues={setValues} />
-                    <div className="flex gap-2">
-                        <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Template</button>
-                        <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
-                    </div>
-                </div>
-            ) : (
-                <button
-                    onClick={() => setAdding(true)}
-                    className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
-                >
-                    + Add Checklist Template
-                </button>
             )}
         </div>
     );
@@ -465,6 +465,25 @@ function AssetsManager({ assets, assetTypes, canManage }) {
                 Assets are property equipment, plant, and stock. Each can have maintenance items that turn into a job when due.
             </p>
 
+            {canManage && (
+                adding ? (
+                    <div className="bg-white rounded-lg shadow p-4 space-y-3">
+                        <AssetFields values={values} setValues={setValues} assetTypes={assetTypes} />
+                        <div className="flex gap-2">
+                            <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Asset</button>
+                            <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
+                        </div>
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => setAdding(true)}
+                        className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
+                    >
+                        + Add Asset
+                    </button>
+                )
+            )}
+
             {assets.length === 0 ? (
                 <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
                     No assets set up yet.
@@ -486,25 +505,6 @@ function AssetsManager({ assets, assetTypes, canManage }) {
                         </div>
                     ))}
                 </div>
-            )}
-
-            {canManage && (
-                adding ? (
-                    <div className="bg-white rounded-lg shadow p-4 space-y-3">
-                        <AssetFields values={values} setValues={setValues} assetTypes={assetTypes} />
-                        <div className="flex gap-2">
-                            <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Asset</button>
-                            <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
-                        </div>
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => setAdding(true)}
-                        className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
-                    >
-                        + Add Asset
-                    </button>
-                )
             )}
         </div>
     );

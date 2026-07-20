@@ -398,15 +398,16 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
                 )}
 
                 {/* Jobs list */}
+                <Link
+                    href={route('jobs.create')}
+                    className="block w-full py-2 mb-3 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
+                >
+                    + Add Job
+                </Link>
+
                 {jobs.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow p-8 text-center">
-                        <p className="text-gray-500 mb-4">No jobs match the current filters.</p>
-                        <Link
-                            href={route('jobs.create')}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm"
-                        >
-                            Add your first job
-                        </Link>
+                    <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                        No jobs match the current filters.
                     </div>
                 ) : (
                     <div className="space-y-3">

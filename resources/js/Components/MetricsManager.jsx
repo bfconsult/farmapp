@@ -235,6 +235,23 @@ export default function MetricsManager({ metrics }) {
                         Metrics track property-level figures over time - tractor hours, water storage, hay bales on hand. Each metric opens a new measurement automatically at the start of every period.
                     </p>
 
+                    {adding ? (
+                        <div className="bg-white rounded-lg shadow p-4 space-y-3">
+                            <MetricFields values={values} setValues={setValues} />
+                            <div className="flex gap-2">
+                                <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Metric</button>
+                                <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setAdding(true)}
+                            className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
+                        >
+                            + Add Metric
+                        </button>
+                    )}
+
                     {metrics.length === 0 ? (
                         <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
                             No metrics set up yet.
@@ -262,23 +279,6 @@ export default function MetricsManager({ metrics }) {
                                     </div>
                                 ))}
                         </div>
-                    )}
-
-                    {adding ? (
-                        <div className="bg-white rounded-lg shadow p-4 space-y-3">
-                            <MetricFields values={values} setValues={setValues} />
-                            <div className="flex gap-2">
-                                <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Metric</button>
-                                <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={() => setAdding(true)}
-                            className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
-                        >
-                            + Add Metric
-                        </button>
                     )}
                 </>
             )}
