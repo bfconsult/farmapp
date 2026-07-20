@@ -21,6 +21,8 @@ export default function Shape({ property, shape, zones }) {
     const [activeTab, setActiveTab] = useState('boundary');
     const activeTabRef = useRef(activeTab);
     const zonesRef = useRef(zones);
+    const [selectedZoneId, setSelectedZoneId] = useState(null);
+    const selectedZoneIdRef = useRef(null);
 
     useEffect(() => {
         activeTabRef.current = activeTab;
@@ -30,12 +32,43 @@ export default function Shape({ property, shape, zones }) {
         zonesRef.current = zones;
     }, [zones]);
 
+    // Adjacent zones commonly share a fence-line vertex, so Geoman's global
+    // Edit Mode (which enables vertex-dragging on every layer at once) can't
+    // tell which zone you mean to drag - it resolves to whichever layer's
+    // hit-test wins, which looks random. Instead, only ever one zone layer
+    // has Geoman's per-layer editing enabled at a time, toggled via the
+    // Edit/Done button on its row in the list - not by tapping the zone on
+    // the map, which could start an edit session without the user
+    // noticing (the map has no visual cue of its own that editing is on).
+    const selectZoneForEditing = (zoneId) => {
+        const previousId = selectedZoneIdRef.current;
+        if (previousId != null && zoneLayers.current[previousId]) {
+            const previousLayer = zoneLayers.current[previousId];
+            if (previousLayer.pm) previousLayer.pm.disable();
+            previousLayer.setStyle({ weight: 3, color: ZONE_COLOR });
+        }
+
+        const nextId = zoneId === previousId ? null : zoneId;
+        if (nextId != null && zoneLayers.current[nextId]) {
+            const nextLayer = zoneLayers.current[nextId];
+            nextLayer.pm.enable();
+            nextLayer.setStyle({ weight: 4, color: '#4c1d95' });
+        }
+
+        selectedZoneIdRef.current = nextId;
+        setSelectedZoneId(nextId);
+    };
+
     // Persists a zone's reshaping the moment the user finishes dragging a
     // vertex (pm:edit fires once per completed drag, not continuously) -
     // matches the existing "no separate Save step" convention for zones
     // (see pm:create below). Reads the name from zonesRef rather than
     // closing over it, since this listener is attached once per layer and
-    // must still see a later rename.
+    // must still see a later rename. Editing is only ever started via the
+    // list's Edit button (see selectZoneForEditing) - not by tapping the
+    // zone on the map, which risked starting an edit session unnoticed
+    // (the only way out, the Done button, lives in the list panel, not on
+    // the map itself).
     const attachZoneEditSave = (polygon, zoneId) => {
         polygon.on('pm:edit', (e) => {
             const latlngs = e.layer.getLatLngs()[0].map((ll) => [ll.lat, ll.lng]);
@@ -70,13 +103,26 @@ export default function Shape({ property, shape, zones }) {
                     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
             });
 
-            const map = L.map(mapRef.current).setView([-37.8136, 144.9631], 15);
+            const map = L.map(mapRef.current, { maxZoom: 22 }).setView([-37.8136, 144.9631], 15);
             mapInstance.current = map;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors',
-                maxZoom: 19,
+                // maxNativeZoom below maxZoom lets Leaflet keep zooming past
+                // the tile server's own resolution by upscaling the last
+                // available tile - blurrier, but gives enough room to place
+                // a vertex precisely without it snapping to an unrelated
+                // nearby line/vertex (see setGlobalOptions below).
+                maxZoom: 22,
+                maxNativeZoom: 19,
             }).addTo(map);
+
+            // Default snapDistance (20px) makes it easy to accidentally snap
+            // a dragged vertex onto an unrelated nearby line/vertex,
+            // especially before zooming all the way in - a tighter radius
+            // still snaps deliberately-close points but is far less prone to
+            // grabbing something unintended.
+            map.pm.setGlobalOptions({ snapDistance: 8 });
 
             // Load existing boundary
             if (shape?.coordinates) {
@@ -233,10 +279,13 @@ export default function Shape({ property, shape, zones }) {
 
     // Swap which geoman draw tools are offered per tab - circle only makes
     // sense for the non-working zone (Boundary tab); Zones only ever draws
-    // polygons. Edit Mode is available on both tabs (see attachZoneEditSave
-    // for how a reshaped zone gets persisted). Zone shapes themselves are
-    // also only shown on the map while the Zones tab is active, kept off
-    // the Boundary view entirely.
+    // polygons. The global Edit Mode button only makes sense on the
+    // Boundary tab (a single shape + circle, no ambiguity); on the Zones
+    // tab it's replaced entirely by per-zone selection (see
+    // selectZoneForEditing) since multiple overlapping zones can't share
+    // one global edit toggle. Zone shapes themselves are also only shown on
+    // the map while the Zones tab is active, kept off the Boundary view
+    // entirely.
     useEffect(() => {
         const map = mapInstance.current;
         if (!map) return;
@@ -251,11 +300,17 @@ export default function Shape({ property, shape, zones }) {
             drawText: false,
             drawPolygon: true,
             drawCircle: activeTab === 'boundary',
-            editMode: true,
+            editMode: activeTab === 'boundary',
             dragMode: false,
             cutPolygon: false,
             removalMode: false,
         });
+
+        if (activeTab !== 'zones') {
+            // Leaving the Zones tab: don't leave a layer's per-zone editing
+            // enabled (and its highlight styling on) once it's hidden.
+            selectZoneForEditing(null);
+        }
 
         Object.values(zoneLayers.current).forEach((layer) => {
             if (activeTab === 'zones') {
@@ -336,6 +391,11 @@ export default function Shape({ property, shape, zones }) {
 
     const deleteZoneItem = (zone) => {
         if (!confirm(`Delete the zone "${zone.name}"?`)) return;
+
+        if (selectedZoneIdRef.current === zone.id) {
+            selectedZoneIdRef.current = null;
+            setSelectedZoneId(null);
+        }
 
         router.delete(route('zones.destroy', [property.id, zone.id]), {
             preserveScroll: true,
@@ -448,37 +508,53 @@ export default function Shape({ property, shape, zones }) {
                             Use the polygon tool to draw a paddock or other named
                             area - you'll be asked to name it as soon as you finish
                             drawing. Each zone saves immediately. To reshape an
-                            existing zone, turn on Edit Mode (top-left) and drag
-                            its points - changes save as soon as you drop a point.
+                            existing zone, tap Edit below and drag its points -
+                            changes save as soon as you drop a point. Tap Done, or
+                            Edit on a different zone, to stop.
                         </p>
                         {(!zones || zones.length === 0) ? (
                             <p className="text-sm text-gray-500">No zones yet.</p>
                         ) : (
                             <div className="max-h-40 space-y-2 overflow-y-auto">
-                                {zones.map((zone) => (
-                                    <div
-                                        key={zone.id}
-                                        className="flex items-center justify-between gap-2"
-                                    >
-                                        <span className="text-sm text-gray-900 truncate">
-                                            {zone.name}
-                                        </span>
-                                        <div className="flex flex-shrink-0 items-center gap-3">
-                                            <button
-                                                onClick={() => renameZoneItem(zone)}
-                                                className="text-xs text-violet-600"
-                                            >
-                                                Rename
-                                            </button>
-                                            <button
-                                                onClick={() => deleteZoneItem(zone)}
-                                                className="text-xs text-red-600"
-                                            >
-                                                Delete
-                                            </button>
+                                {zones.map((zone) => {
+                                    const isEditing = selectedZoneId === zone.id;
+                                    return (
+                                        <div
+                                            key={zone.id}
+                                            className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 ${
+                                                isEditing ? 'bg-violet-50' : ''
+                                            }`}
+                                        >
+                                            <span className="text-sm text-gray-900 truncate">
+                                                {zone.name}
+                                            </span>
+                                            <div className="flex flex-shrink-0 items-center gap-3">
+                                                <button
+                                                    onClick={() => selectZoneForEditing(zone.id)}
+                                                    className={`rounded-md px-2 py-1 text-xs font-medium ${
+                                                        isEditing
+                                                            ? 'bg-violet-600 text-white'
+                                                            : 'text-violet-600'
+                                                    }`}
+                                                >
+                                                    {isEditing ? 'Done' : 'Edit'}
+                                                </button>
+                                                <button
+                                                    onClick={() => renameZoneItem(zone)}
+                                                    className="text-xs text-violet-600"
+                                                >
+                                                    Rename
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteZoneItem(zone)}
+                                                    className="text-xs text-red-600"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
