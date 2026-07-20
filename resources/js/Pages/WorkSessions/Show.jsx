@@ -153,7 +153,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                                 <span className="text-sm font-medium text-green-700">${billingAmount}</span>
                             </div>
                         )}
-                        {session.farm_job ? (
+                        {session.farm_job && (
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Planned Job</span>
                                 <Link
@@ -162,11 +162,6 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                                 >
                                     {session.farm_job.name}
                                 </Link>
-                            </div>
-                        ) : session.source === 'auto_tracked' && (
-                            <div className="flex justify-between">
-                                <span className="text-sm text-gray-500">Job</span>
-                                <span className="text-sm text-gray-900">Auto-tracked visit</span>
                             </div>
                         )}
                         {session.description && (
