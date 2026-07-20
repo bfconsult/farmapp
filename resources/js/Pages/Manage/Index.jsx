@@ -510,13 +510,28 @@ function AssetsManager({ assets, assetTypes, canManage }) {
     );
 }
 
+const ACTIVE_SECTION_STORAGE_KEY = 'manage-active-section';
+
 export default function Index({ metrics, checklistTemplates, assets, assetTypes, canManage }) {
     const sections = [
         { id: 'metrics', label: 'Metrics' },
         ...(canManage ? [{ id: 'checklists', label: 'Checklists' }] : []),
         { id: 'assets', label: 'Assets' },
     ];
-    const [activeSection, setActiveSection] = useState(sections[0].id);
+
+    // Remembered across full page navigations (e.g. drilling into an asset
+    // then returning via its "← Manage" link, or the main nav) - a fresh
+    // page visit always remounts this component, so plain useState alone
+    // would silently reset to Metrics every time.
+    const [activeSection, setActiveSection] = useState(() => {
+        const stored = window.localStorage.getItem(ACTIVE_SECTION_STORAGE_KEY);
+        return sections.some((section) => section.id === stored) ? stored : sections[0].id;
+    });
+
+    const selectSection = (id) => {
+        setActiveSection(id);
+        window.localStorage.setItem(ACTIVE_SECTION_STORAGE_KEY, id);
+    };
 
     return (
         <AuthenticatedLayout title="Manage">
@@ -528,7 +543,7 @@ export default function Index({ metrics, checklistTemplates, assets, assetTypes,
                         {sections.map((section) => (
                             <button
                                 key={section.id}
-                                onClick={() => setActiveSection(section.id)}
+                                onClick={() => selectSection(section.id)}
                                 className={`rounded-full px-3 py-1 text-sm font-medium ${
                                     activeSection === section.id ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'
                                 }`}
