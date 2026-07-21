@@ -35,6 +35,10 @@ export default function Index({ property, roles, pendingInvitations, currentUser
 
     const adminCount = roles.filter((r) => r.type === 'admin').length;
 
+    const canEditRate = (role) =>
+        currentUserRole === 'admin' ||
+        (currentUserRole === 'manager' && (role.type === 'worker' || role.user.id === auth.user.id));
+
     const availableRoles = currentUserRole === 'admin'
         ? ['manager', 'worker', 'approver']
         : ['worker'];
@@ -151,7 +155,8 @@ export default function Index({ property, roles, pendingInvitations, currentUser
                                             placeholder="Not set"
                                             defaultValue={role.user.hourly_rate ?? ''}
                                             onBlur={(e) => updateRate(role.id, e.target.value)}
-                                            className="w-24 text-sm border-gray-300 rounded-lg px-2 py-1"
+                                            disabled={!canEditRate(role)}
+                                            className="w-24 text-sm border-gray-300 rounded-lg px-2 py-1 disabled:bg-gray-50 disabled:text-gray-400"
                                         />
                                     </div>
                                 )}

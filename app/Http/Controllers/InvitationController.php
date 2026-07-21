@@ -138,7 +138,12 @@ class InvitationController extends Controller
     {
         $currentUserRole = Auth::user()->roleOn($role->property);
 
-        if (!in_array($currentUserRole, [Role::ADMIN, Role::MANAGER])) {
+        // A manager can set their own rate and a worker's, but not an
+        // admin's or another manager's - only an admin can do that.
+        $allowed = $currentUserRole === Role::ADMIN
+            || ($currentUserRole === Role::MANAGER && ($role->type === Role::WORKER || $role->user_id === Auth::id()));
+
+        if (!$allowed) {
             abort(403);
         }
 
