@@ -177,12 +177,20 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
 
                 {/* Finalise */}
                 {session.status === 'draft' && session.ended_at && (
-                    <button
-                        onClick={finalise}
-                        className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
-                    >
-                        Finalise Session
-                    </button>
+                    <>
+                        {session.has_conflict && (
+                            <p className="text-sm text-red-600 mb-2 font-medium text-center">
+                                Session time conflicts with an existing session - please resolve before finalising
+                            </p>
+                        )}
+                        <button
+                            onClick={finalise}
+                            disabled={session.has_conflict}
+                            className="w-full py-3 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:hover:bg-green-600 disabled:cursor-not-allowed"
+                        >
+                            Finalise Session
+                        </button>
+                    </>
                 )}
 
                 {/* Revert to draft */}

@@ -36,6 +36,11 @@ class WorkSessionController extends Controller
             ->map(function ($session) {
                 $session->duration_in_hours = $session->duration_in_hours;
                 $session->billing_amount = $session->billing_amount;
+                // Only a draft can still be finalised, so that's the only
+                // state where a conflict is actionable - skip the query for
+                // everything else.
+                $session->has_conflict = $session->status === WorkSession::DRAFT
+                    && $session->overlapsFinalisedSession();
                 return $session;
             });
 
@@ -126,6 +131,8 @@ class WorkSessionController extends Controller
         }
 
         $workSession->load(['farmJob', 'property', 'photos', 'user', 'waypoints']);
+        $workSession->has_conflict = $workSession->status === WorkSession::DRAFT
+            && $workSession->overlapsFinalisedSession();
 
         return Inertia::render('WorkSessions/Show', [
             'session' => $workSession,
@@ -205,6 +212,10 @@ class WorkSessionController extends Controller
             abort(403, 'Only draft work sessions can be finalised.');
         }
 
+        if ($workSession->overlapsFinalisedSession()) {
+            return back()->with('error', 'Session time conflicts with an existing session - please resolve before finalising.');
+        }
+
         $workSession->update(['status' => WorkSession::FINALISED]);
 
         return redirect()->route('work-sessions.show', $workSession);
@@ -239,6 +250,7 @@ class WorkSessionController extends Controller
             ->map(function ($session) {
                 $session->duration_in_hours = $session->duration_in_hours;
                 $session->billing_amount = $session->billing_amount;
+                $session->has_conflict = $session->overlapsFinalisedSession();
                 return $session;
             });
 
@@ -350,16 +362,39 @@ class WorkSessionController extends Controller
             'date_to' => 'nullable|date',
         ]);
 
-        $updated = WorkSession::whereIn('id', $validated['session_ids'] ?? [])
+        $eligibleSessions = WorkSession::whereIn('id', $validated['session_ids'] ?? [])
             ->where('user_id', Auth::id())
             ->where('status', WorkSession::DRAFT)
             ->whereNotNull('ended_at')
-            ->update(['status' => WorkSession::FINALISED]);
+            ->get();
+
+        $updated = 0;
+        $skipped = 0;
+
+        // One at a time rather than a single mass update, so each check sees
+        // the effect of the ones just finalised before it - if two selected
+        // sessions overlap each other, the first one through wins and the
+        // second gets caught by the same conflict check as any other.
+        foreach ($eligibleSessions as $session) {
+            if ($session->overlapsFinalisedSession()) {
+                $skipped++;
+                continue;
+            }
+            $session->update(['status' => WorkSession::FINALISED]);
+            $updated++;
+        }
+
+        $message = $updated === 1 ? '1 session finalised.' : "{$updated} sessions finalised.";
+        if ($skipped > 0) {
+            $message .= ' ' . ($skipped === 1
+                ? '1 session time conflicts with an existing session - please resolve before finalising.'
+                : "{$skipped} sessions time-conflict with an existing session - please resolve before finalising.");
+        }
 
         return redirect()->route('work-sessions.finalise-and-share', [
             'date_from' => $validated['date_from'] ?? null,
             'date_to' => $validated['date_to'] ?? null,
-        ])->with('success', $updated === 1 ? '1 session finalised.' : "{$updated} sessions finalised.");
+        ])->with($updated === 0 && $skipped > 0 ? 'error' : 'success', $message);
     }
 
     private function activeSession(): ?WorkSession

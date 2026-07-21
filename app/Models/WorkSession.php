@@ -126,4 +126,25 @@ class WorkSession extends Model
         if (!$this->duration_in_hours || !$this->hourly_rate) return null;
         return round($this->duration_in_hours * $this->hourly_rate, 2);
     }
+
+    /**
+     * Whether this session's time range overlaps another finalised/approved
+     * session belonging to the same user - a worker can't genuinely be doing
+     * two things at once, so finalising both would double-count hours and
+     * billing. Strict inequalities so two sessions that just touch end-to-
+     * end (one starts the instant the other ends) aren't flagged.
+     */
+    public function overlapsFinalisedSession(): bool
+    {
+        if (!$this->ended_at) {
+            return false;
+        }
+
+        return static::where('user_id', $this->user_id)
+            ->where('id', '!=', $this->id)
+            ->whereIn('status', [self::FINALISED, self::APPROVED])
+            ->where('started_at', '<', $this->ended_at)
+            ->where('ended_at', '>', $this->started_at)
+            ->exists();
+    }
 }

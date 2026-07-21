@@ -223,8 +223,9 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                                         <p className="font-medium text-gray-900">
                                             {sessionLabel(session)}
                                         </p>
-                                        <p className="text-sm text-gray-500 mt-1">
+                                        <p className={`text-sm mt-1 ${session.has_conflict ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                                             {formatDate(session.started_at)} · {formatTime(session.started_at)} — {formatTime(session.ended_at)}
+                                            {session.has_conflict && ' (conflict)'}
                                         </p>
                                         {session.description && (
                                             <p className="text-sm text-gray-500 mt-1 line-clamp-1">

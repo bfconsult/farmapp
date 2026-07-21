@@ -16,12 +16,16 @@ function currentMonthRange() {
 export default function FinaliseAndShare({ sessions, currentDateFrom, currentDateTo }) {
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
-    const [selectedIds, setSelectedIds] = useState(sessions.map((s) => s.id));
+    const selectableIds = (list) => list.filter((s) => !s.has_conflict).map((s) => s.id);
+    const [selectedIds, setSelectedIds] = useState(selectableIds(sessions));
 
     // Whenever the filtered list changes (date range edited, or after a submit
-    // reloads with fewer draft sessions), default back to everything checked.
+    // reloads with fewer draft sessions), default back to everything checked -
+    // except a session that overlaps an already-finalised one, which can't be
+    // finalised at all (see WorkSession::overlapsFinalisedSession()) so it's
+    // never auto-selected.
     useEffect(() => {
-        setSelectedIds(sessions.map((s) => s.id));
+        setSelectedIds(selectableIds(sessions));
     }, [sessions]);
 
     const goTo = (overrides = {}) => {
@@ -49,7 +53,7 @@ export default function FinaliseAndShare({ sessions, currentDateFrom, currentDat
         );
     };
 
-    const selectAll = () => setSelectedIds(sessions.map((s) => s.id));
+    const selectAll = () => setSelectedIds(selectableIds(sessions));
     const selectNone = () => setSelectedIds([]);
 
     const formatTime = (datetime) => {
@@ -140,13 +144,16 @@ export default function FinaliseAndShare({ sessions, currentDateFrom, currentDat
                             {sessions.map((session) => (
                                 <label
                                     key={session.id}
-                                    className="flex items-start gap-3 bg-white rounded-lg shadow p-4 cursor-pointer"
+                                    className={`flex items-start gap-3 rounded-lg shadow p-4 ${
+                                        session.has_conflict ? 'bg-red-50 cursor-not-allowed' : 'bg-white cursor-pointer'
+                                    }`}
                                 >
                                     <input
                                         type="checkbox"
                                         checked={selectedIds.includes(session.id)}
                                         onChange={() => toggleSession(session.id)}
-                                        className="mt-1 rounded text-green-600 focus:ring-green-500"
+                                        disabled={session.has_conflict}
+                                        className="mt-1 rounded text-green-600 focus:ring-green-500 disabled:opacity-50"
                                     />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-2">
@@ -163,6 +170,11 @@ export default function FinaliseAndShare({ sessions, currentDateFrom, currentDat
                                             {formatSessionDate(session.started_at)} · {formatTime(session.started_at)} — {formatTime(session.ended_at)}
                                             {session.duration_in_hours && ` · ${session.duration_in_hours}h`}
                                         </p>
+                                        {session.has_conflict && (
+                                            <p className="text-sm text-red-600 mt-1 font-medium">
+                                                Session time conflicts with an existing session - please resolve before finalising
+                                            </p>
+                                        )}
                                     </div>
                                 </label>
                             ))}
