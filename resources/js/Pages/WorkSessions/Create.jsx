@@ -1,15 +1,25 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
-import { fromLocalInputValue, billingBlockLabel, floorToBillingBlock } from '@/dateInput';
+import { useEffect, useMemo, useState } from 'react';
+import {
+    toLocalInputValue,
+    fromLocalInputValue,
+    splitLocalValue,
+    joinLocalValue,
+    billingBlockLabel,
+    timeOptionsForBlock,
+    floorToBillingBlock,
+} from '@/dateInput';
 
 export default function Create({ plannedJobs, billingBlockMinutes }) {
     const { currentProperty } = usePage().props;
     const { data, setData, post, processing, errors, transform } = useForm({
         description: '',
         farm_job_id: '',
-        started_at: '',
-        ended_at: '',
+        started_date: '',
+        started_time: '',
+        ended_date: '',
+        ended_time: '',
         latitude: '',
         longitude: '',
     });
@@ -17,6 +27,25 @@ export default function Create({ plannedJobs, billingBlockMinutes }) {
     const [locationStatus, setLocationStatus] = useState('getting');
     const [mode, setMode] = useState('now'); // 'now' or 'manual'
     const [now, setNow] = useState(() => new Date());
+
+    const baseTimeOptions = useMemo(() => timeOptionsForBlock(billingBlockMinutes), [billingBlockMinutes]);
+    const endedTimeOptions = data.ended_time
+        ? baseTimeOptions
+        : [{ value: '', label: '— Still active —' }, ...baseTimeOptions];
+
+    const switchToManual = () => {
+        setMode('manual');
+        // Seed the start with "now" (same value the 'now' mode was already
+        // showing) so the common case - adjusting just the date or nudging
+        // the time slightly - only needs a small tweak, not a fresh entry.
+        const floored = splitLocalValue(toLocalInputValue(floorToBillingBlock(new Date(), billingBlockMinutes).toISOString()));
+        setData((prev) => ({ ...prev, started_date: floored.date, started_time: floored.time }));
+    };
+
+    const switchToNow = () => {
+        setMode('now');
+        setData((prev) => ({ ...prev, started_date: '', started_time: '', ended_date: '', ended_time: '' }));
+    };
 
     useEffect(() => {
         if (mode !== 'now') return;
@@ -49,8 +78,8 @@ export default function Create({ plannedJobs, billingBlockMinutes }) {
         e.preventDefault();
         transform((data) => ({
             ...data,
-            started_at: fromLocalInputValue(data.started_at),
-            ended_at: fromLocalInputValue(data.ended_at),
+            started_at: fromLocalInputValue(joinLocalValue(data.started_date, data.started_time)),
+            ended_at: fromLocalInputValue(joinLocalValue(data.ended_date, data.ended_time)),
         }));
         post(route('work-sessions.store'));
     };
@@ -96,42 +125,73 @@ export default function Create({ plannedJobs, billingBlockMinutes }) {
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => setMode('manual')}
+                                    onClick={switchToManual}
                                     className="text-sm text-green-600 font-medium"
                                 >
                                     Change
                                 </button>
                             </div>
                         ) : (
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-xs text-gray-500">Start Time</label>
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-500">Manual times</span>
                                     <button
                                         type="button"
-                                        onClick={() => { setMode('now'); setData('started_at', ''); setData('ended_at', ''); }}
+                                        onClick={switchToNow}
                                         className="text-sm text-green-600 font-medium"
                                     >
                                         Use current time
                                     </button>
                                 </div>
-                                <input
-                                    type="datetime-local"
-                                    value={data.started_at}
-                                    onChange={(e) => setData('started_at', e.target.value)}
-                                    className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
-                                />
-                                {errors.started_at && <p className="mt-1 text-sm text-red-600">{errors.started_at}</p>}
 
                                 <div>
-                                    <label className="block text-xs text-gray-500 mb-1">
-                                        End Time <span className="text-gray-400">(optional — leave blank to start an active session)</span>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Start Time
+                                        {billingBlockMinutes && (
+                                            <span className="text-gray-400 font-normal"> (in steps of {billingBlockLabel(billingBlockMinutes)})</span>
+                                        )}
                                     </label>
-                                    <input
-                                        type="datetime-local"
-                                        value={data.ended_at}
-                                        onChange={(e) => setData('ended_at', e.target.value)}
-                                        className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
-                                    />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input
+                                            type="date"
+                                            value={data.started_date}
+                                            onChange={(e) => setData('started_date', e.target.value)}
+                                            className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                        />
+                                        <select
+                                            value={data.started_time}
+                                            onChange={(e) => setData('started_time', e.target.value)}
+                                            className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                        >
+                                            {baseTimeOptions.map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {errors.started_at && <p className="mt-1 text-sm text-red-600">{errors.started_at}</p>}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        End Time <span className="text-gray-400 font-normal">(optional — leave as "Still active" to start an active session)</span>
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input
+                                            type="date"
+                                            value={data.ended_date}
+                                            onChange={(e) => setData('ended_date', e.target.value)}
+                                            className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                        />
+                                        <select
+                                            value={data.ended_time}
+                                            onChange={(e) => setData('ended_time', e.target.value)}
+                                            className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                        >
+                                            {endedTimeOptions.map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     {errors.ended_at && <p className="mt-1 text-sm text-red-600">{errors.ended_at}</p>}
                                 </div>
                             </div>
@@ -181,7 +241,7 @@ export default function Create({ plannedJobs, billingBlockMinutes }) {
                             disabled={processing}
                             className="flex-1 py-4 bg-green-600 text-white rounded-lg text-base font-medium hover:bg-green-700 disabled:opacity-50"
                         >
-                            {data.ended_at ? 'Log Work' : 'Start Work'}
+                            {data.ended_date && data.ended_time ? 'Log Work' : 'Start Work'}
                         </button>
                     </div>
                 </form>
