@@ -32,6 +32,13 @@ class ChecklistController extends Controller
         return back()->with('success', 'Checklist attached.');
     }
 
+    public function destroy(Checklist $checklist)
+    {
+        $checklist->delete();
+
+        return back()->with('success', 'Checklist removed.');
+    }
+
     public function show(Checklist $checklist)
     {
         $checklist->load(['items.photos', 'farmJob']);

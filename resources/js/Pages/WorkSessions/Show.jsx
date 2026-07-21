@@ -218,7 +218,6 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                             ref={fileInput}
                             type="file"
                             accept="image/*"
-                            capture="environment"
                             multiple
                             onChange={uploadPhotos}
                             className="hidden"

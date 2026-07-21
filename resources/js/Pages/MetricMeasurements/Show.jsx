@@ -150,7 +150,6 @@ export default function Show({ measurement }) {
                             ref={fileInput}
                             type="file"
                             accept="image/*"
-                            capture="environment"
                             multiple
                             onChange={uploadPhotos}
                             className="hidden"

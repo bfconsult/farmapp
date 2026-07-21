@@ -1,8 +1,95 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Modal from '@/Components/Modal';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import { formatDate } from '@/dateInput';
+
+const PROPERTY_BOUNDARY_COLOR = '#ca8a04';
+const PROPERTY_BOUNDARY_FILL = '#fef08a';
+
+function loadLeaflet() {
+    return Promise.all([
+        import('leaflet'),
+        import('leaflet/dist/leaflet.css'),
+    ]).then(([L]) => {
+        delete L.Icon.Default.prototype._getIconUrl;
+        L.Icon.Default.mergeOptions({
+            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        });
+        return L;
+    });
+}
+
+/** Map shown in the Location popover: the job's pin in the context of the property's boundary. When `editable`, the pin can be dragged and reports its new position via `onDragEnd`. */
+function JobLocationMap({ job, propertyBoundary, editable, onDragEnd }) {
+    const mapRef = useRef(null);
+    const mapInstance = useRef(null);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        loadLeaflet().then((L) => {
+            if (cancelled || mapInstance.current) return;
+
+            const map = L.map(mapRef.current);
+            mapInstance.current = map;
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19,
+            }).addTo(map);
+
+            const bounds = L.latLngBounds([]);
+
+            if (propertyBoundary) {
+                const boundary = L.polygon(propertyBoundary, {
+                    color: PROPERTY_BOUNDARY_COLOR,
+                    weight: 2,
+                    dashArray: '6, 6',
+                    fillColor: PROPERTY_BOUNDARY_FILL,
+                    fillOpacity: 0.15,
+                    interactive: false,
+                }).addTo(map);
+                bounds.extend(boundary.getBounds());
+            }
+
+            const marker = L.marker([job.latitude, job.longitude], {
+                draggable: Boolean(editable),
+                icon: L.icon({
+                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                }),
+            }).addTo(map);
+            bounds.extend([job.latitude, job.longitude]);
+
+            if (editable) {
+                marker.on('dragend', () => {
+                    const { lat, lng } = marker.getLatLng();
+                    onDragEnd?.(lat, lng);
+                });
+            }
+
+            map.invalidateSize();
+            map.fitBounds(bounds, { padding: [40, 40] });
+        });
+
+        return () => {
+            cancelled = true;
+            if (mapInstance.current) {
+                mapInstance.current.remove();
+                mapInstance.current = null;
+            }
+        };
+    }, []);
+
+    return <div ref={mapRef} style={{ height: '300px' }} />;
+}
 
 const STATUS_COLORS = {
     'Pending': 'bg-yellow-100 text-yellow-800',
@@ -37,12 +124,16 @@ function formatViewedAt(datetime) {
     return `${formatDate(datetime, { year: false })}, ${time}`;
 }
 
-export default function Show({ job, seenBy }) {
+export default function Show({ job, seenBy, checklistTemplates }) {
     const fileInput = useRef(null);
     const { flash } = usePage().props;
     const [uploading, setUploading] = useState(false);
     const [showDeleteOptions, setShowDeleteOptions] = useState(false);
     const [showShare, setShowShare] = useState(false);
+    const [showChecklistPicker, setShowChecklistPicker] = useState(false);
+    const [showLocationModal, setShowLocationModal] = useState(false);
+    const [editingLocation, setEditingLocation] = useState(false);
+    const [pendingLocation, setPendingLocation] = useState(null);
     const [copied, setCopied] = useState(false);
 
     const hasIncompleteChecklists = (job.checklists ?? []).some((c) => c.status === 'incomplete');
@@ -84,6 +175,44 @@ export default function Show({ job, seenBy }) {
             setTimeout(() => setCopied(false), 2000);
         } catch {
             // Clipboard API unavailable; the link is still visible to copy manually.
+        }
+    };
+
+    const closeLocationModal = () => {
+        setShowLocationModal(false);
+        setEditingLocation(false);
+        setPendingLocation(null);
+    };
+
+    const cancelEditLocation = () => {
+        setEditingLocation(false);
+        setPendingLocation(null);
+    };
+
+    const saveLocation = () => {
+        const coords = pendingLocation ?? { lat: job.latitude, lng: job.longitude };
+        router.put(route('jobs.update-location', job.id), {
+            latitude: coords.lat,
+            longitude: coords.lng,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: closeLocationModal,
+        });
+    };
+
+    const attachedChecklistFor = (templateId) =>
+        (job.checklists ?? []).find((c) => c.checklist_template_id === templateId);
+
+    const toggleChecklistTemplate = (template) => {
+        const existing = attachedChecklistFor(template.id);
+        if (existing) {
+            router.delete(route('checklists.destroy', existing.id), { preserveScroll: true, preserveState: true });
+        } else {
+            router.post(route('checklists.store'), {
+                farm_job_id: job.id,
+                checklist_template_id: template.id,
+            }, { preserveScroll: true, preserveState: true });
         }
     };
 
@@ -204,16 +333,6 @@ export default function Show({ job, seenBy }) {
                 <div className="bg-white rounded-lg shadow p-4">
                     <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Details</h2>
                     <div className="space-y-3">
-                        <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Property</span>
-                            <span className="text-sm text-gray-900">{job.property?.name}</span>
-                        </div>
-                        {job.user && (
-                            <div className="flex justify-between">
-                                <span className="text-sm text-gray-500">Created by</span>
-                                <span className="text-sm text-gray-900">{job.user.name}</span>
-                            </div>
-                        )}
                         {job.maintenance_item && (
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Maintenance</span>
@@ -262,7 +381,14 @@ export default function Show({ job, seenBy }) {
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Location</span>
                                 <span className="text-sm text-gray-900">
-                                    {parseFloat(job.latitude).toFixed(5)}, {parseFloat(job.longitude).toFixed(5)}
+                                    {job.zone && `${job.zone.name} — `}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowLocationModal(true)}
+                                        className="text-green-600"
+                                    >
+                                        View on map
+                                    </button>
                                 </span>
                             </div>
                         )}
@@ -274,6 +400,41 @@ export default function Show({ job, seenBy }) {
                         )}
                     </div>
                 </div>
+
+                {job.latitude && (
+                    <Modal show={showLocationModal} onClose={closeLocationModal} maxWidth="lg">
+                        <div className="p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-sm font-medium text-gray-700">Location</h3>
+                                <div className="flex items-center gap-3">
+                                    {editingLocation ? (
+                                        <>
+                                            <button onClick={saveLocation} className="text-sm text-green-600 font-medium">Save</button>
+                                            <button onClick={cancelEditLocation} className="text-sm text-gray-500">Cancel</button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button onClick={() => setEditingLocation(true)} className="text-sm text-green-600">Edit</button>
+                                            <button onClick={closeLocationModal} className="text-sm text-gray-500">Close</button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                            {showLocationModal && (
+                                <JobLocationMap
+                                    key={editingLocation ? 'edit' : 'view'}
+                                    job={job}
+                                    propertyBoundary={job.property?.shape?.coordinates}
+                                    editable={editingLocation}
+                                    onDragEnd={(lat, lng) => setPendingLocation({ lat, lng })}
+                                />
+                            )}
+                            {editingLocation && (
+                                <p className="text-xs text-gray-400 mt-2">Drag the pin to move it.</p>
+                            )}
+                        </div>
+                    </Modal>
+                )}
 
                 {/* Photos */}
                 <div className="bg-white rounded-lg shadow p-4">
@@ -290,7 +451,6 @@ export default function Show({ job, seenBy }) {
                             ref={fileInput}
                             type="file"
                             accept="image/*"
-                            capture="environment"
                             multiple
                             onChange={uploadPhotos}
                             className="hidden"
@@ -298,19 +458,7 @@ export default function Show({ job, seenBy }) {
 
                     </div>
 
-                    {job.photos && job.photos.length === 0 ? (
-                        <button
-                            onClick={() => fileInput.current.click()}
-                            disabled={uploading}
-                            className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400 disabled:opacity-50"
-                        >
-                            <svg className="w-8 h-8 mx-auto mb-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <p className="text-sm">Tap to add a photo</p>
-                        </button>
-                    ) : (
+                    {job.photos && job.photos.length > 0 && (
                         <div className="grid grid-cols-3 gap-2">
                             {job.photos.map((photo) => (
                                 <div key={photo.id} className="relative">
@@ -332,10 +480,18 @@ export default function Show({ job, seenBy }) {
 
                 {/* Checklists */}
                 <div className="bg-white rounded-lg shadow p-4">
-                    <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Checklists</h2>
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Checklists</h2>
+                        <button
+                            onClick={() => setShowChecklistPicker(true)}
+                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
+                        >
+                            + Add Checklist
+                        </button>
+                    </div>
 
                     {job.checklists && job.checklists.length > 0 && (
-                        <div className="space-y-2 mb-3">
+                        <div className="space-y-2">
                             {job.checklists.map((checklist) => {
                                 const checkedCount = checklist.items.filter((item) => item.is_checked).length;
                                 return (
@@ -358,14 +514,42 @@ export default function Show({ job, seenBy }) {
                             })}
                         </div>
                     )}
-
-                    {(!job.checklists || job.checklists.length === 0) && (
-                        <p className="text-sm text-gray-400">
-                            No checklists attached. Add one from{' '}
-                            <Link href={route('jobs.edit', job.id)} className="text-green-600">Edit</Link>.
-                        </p>
-                    )}
                 </div>
+
+                <Modal show={showChecklistPicker} onClose={() => setShowChecklistPicker(false)} maxWidth="lg">
+                    <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-medium text-gray-700">Checklists</h3>
+                            <button onClick={() => setShowChecklistPicker(false)} className="text-sm text-gray-500">Close</button>
+                        </div>
+                        {checklistTemplates && checklistTemplates.length > 0 ? (
+                            <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                                {checklistTemplates.map((template) => {
+                                    const attached = attachedChecklistFor(template.id);
+                                    return (
+                                        <label key={template.id} className="flex items-center gap-3 px-3 py-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={Boolean(attached)}
+                                                onChange={() => toggleChecklistTemplate(template)}
+                                                className="rounded text-green-600 focus:ring-green-500"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm text-gray-900">{template.name}</p>
+                                                <p className="text-xs text-gray-500">{CHECKLIST_TYPE_LABELS[template.type]}</p>
+                                            </div>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-400">
+                                No checklist templates yet. Add one from{' '}
+                                <Link href={route('manage.index')} className="text-green-600">Manage</Link>.
+                            </p>
+                        )}
+                    </div>
+                </Modal>
 
                 {/* Finish job */}
                 {!job.job_status?.is_finished_default && (
@@ -385,17 +569,28 @@ export default function Show({ job, seenBy }) {
                     Delete Job
                 </button>
 
-                {/* Seen by */}
-                {seenBy && seenBy.length > 0 && (
+                {/* Activity: created by + seen by */}
+                {(job.user || (seenBy && seenBy.length > 0)) && (
                     <div className="bg-white rounded-lg shadow p-4">
-                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Seen by</h2>
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">Activity</h2>
                         <div className="space-y-2">
-                            {seenBy.map((view) => (
-                                <div key={view.user_id} className="flex justify-between">
-                                    <span className="text-sm text-gray-900">{view.user_name}</span>
-                                    <span className="text-xs text-gray-500">{formatViewedAt(view.viewed_at)}</span>
+                            {job.user && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-gray-500">Created by</span>
+                                    <span className="text-sm text-gray-900">{job.user.name}</span>
                                 </div>
-                            ))}
+                            )}
+                            {seenBy && seenBy.length > 0 && (
+                                <>
+                                    <p className="text-xs text-gray-400 pt-1">Viewed by</p>
+                                    {seenBy.map((view) => (
+                                        <div key={view.user_id} className="flex justify-between">
+                                            <span className="text-sm text-gray-900">{view.user_name}</span>
+                                            <span className="text-xs text-gray-500">{formatViewedAt(view.viewed_at)}</span>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
                         </div>
                     </div>
                 )}

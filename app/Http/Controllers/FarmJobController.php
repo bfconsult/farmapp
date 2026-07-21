@@ -225,7 +225,7 @@ class FarmJobController extends Controller
 
     public function show(FarmJob $farmJob)
     {
-        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset']);
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset']);
 
         // Logs (or refreshes) that the current user has seen this job - one
         // row per user, most recent view time only, not a full visit log.
@@ -241,6 +241,10 @@ class FarmJobController extends Controller
                 'user_name' => $view->user->name,
                 'viewed_at' => $view->viewed_at,
             ]),
+            'checklistTemplates' => ChecklistTemplate::where('property_id', $farmJob->property_id)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 
@@ -386,6 +390,23 @@ class FarmJobController extends Controller
             ->where('property_id', $farmJob->property_id)
             ->get()
             ->each(fn (ChecklistTemplate $template) => Checklist::attach($template, $farmJob, $user));
+    }
+
+    /**
+     * Moves a job's pin - split out from update() since that requires a
+     * full form's worth of validated fields (name, property_id, etc.) and
+     * this only ever fires from the Location popover's drag-to-edit.
+     */
+    public function updateLocation(Request $request, FarmJob $farmJob)
+    {
+        $validated = $request->validate([
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+        ]);
+
+        $farmJob->update($validated);
+
+        return back();
     }
 
     /**

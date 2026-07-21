@@ -123,7 +123,6 @@ function ChecklistItemRow({ item, canEdit }) {
                             ref={fileInput}
                             type="file"
                             accept="image/*"
-                            capture="environment"
                             multiple
                             onChange={uploadPhotos}
                             className="hidden"

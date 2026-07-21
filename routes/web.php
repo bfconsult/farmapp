@@ -175,6 +175,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker'])->group(functio
     Route::patch('metric-measurements/{metricMeasurement}', [MetricMeasurementController::class, 'update'])->name('metric-measurements.update');
     Route::post('metric-measurements/{metricMeasurement}/photos', [PhotoController::class, 'storeForMetricMeasurement'])->name('photos.store-metric-measurement');
     Route::post('checklists', [ChecklistController::class, 'store'])->name('checklists.store');
+    Route::delete('checklists/{checklist}', [ChecklistController::class, 'destroy'])->name('checklists.destroy');
     Route::get('checklists/{checklist}', [ChecklistController::class, 'show'])->name('checklists.show');
     Route::patch('checklist-items/{checklistItem}', [ChecklistItemController::class, 'update'])->name('checklist-items.update');
     Route::post('checklist-items/{checklistItem}/photos', [PhotoController::class, 'storeForChecklistItem'])->name('photos.store-checklist-item');
@@ -198,6 +199,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
     Route::post('properties', [PropertyController::class, 'store'])->name('properties.store');
     Route::get('properties/{property}', [PropertyController::class, 'show'])->name('properties.show');
     Route::resource('jobs', FarmJobController::class)->parameters(['jobs' => 'farmJob']);
+    Route::put('jobs/{farmJob}/location', [FarmJobController::class, 'updateLocation'])->name('jobs.update-location');
     Route::resource('work-sessions', WorkSessionController::class);
     Route::post('work-sessions/{workSession}/stop', [WorkSessionController::class, 'stop'])->name('work-sessions.stop');
     Route::post('work-sessions/{workSession}/finalise', [WorkSessionController::class, 'finalise'])->name('work-sessions.finalise');
