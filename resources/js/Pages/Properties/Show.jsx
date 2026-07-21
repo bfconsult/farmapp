@@ -3,13 +3,19 @@ import { Head, Link, router } from '@inertiajs/react';
 
 
 
-export default function Show({ property, currentRole }) {
+export default function Show({ property, currentRole, canLeave }) {
     const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
     const isAdmin = currentRole === 'admin';
 
     const destroy = () => {
         if (confirm('Are you sure you want to delete this property?')) {
             router.delete(route('properties.destroy', property.id));
+        }
+    };
+
+    const leave = () => {
+        if (confirm(`Leave the team for ${property.name}? You'll lose access to this property.`)) {
+            router.delete(route('properties.leave', property.id));
         }
     };
 
@@ -98,6 +104,22 @@ export default function Show({ property, currentRole }) {
                             </p>
                         </div>
                     )}
+
+                    <div className="bg-white rounded-lg shadow p-6">
+                        <h2 className="text-lg font-medium text-gray-900 mb-2">Leave Team</h2>
+                        <p className="text-sm text-gray-500 mb-4">
+                            {canLeave
+                                ? "You'll lose access to this property and its jobs, and will need a new invitation to rejoin."
+                                : 'You are the last admin on this property, so you can\'t leave. Promote another member to admin first, or delete the property instead.'}
+                        </p>
+                        <button
+                            onClick={leave}
+                            disabled={!canLeave}
+                            className="px-4 py-2 border border-red-300 text-red-600 rounded-md hover:bg-red-50 disabled:opacity-50 disabled:hover:bg-white disabled:cursor-not-allowed"
+                        >
+                            Leave Team
+                        </button>
+                    </div>
                 </div>
             </div>
         </AuthenticatedLayout>

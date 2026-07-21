@@ -50,7 +50,39 @@ class PropertyController extends Controller
         return Inertia::render('Properties/Show', [
             'property' => $property,
             'currentRole' => $currentRole,
+            'canLeave' => $currentRole ? $this->canLeave($property, $currentRole) : false,
         ]);
+    }
+
+    /**
+     * A member can leave freely unless doing so would strip the property of
+     * its last admin - they're pointed at deleting the property instead.
+     */
+    private function canLeave(Property $property, string $roleType): bool
+    {
+        if ($roleType !== Role::ADMIN) {
+            return true;
+        }
+
+        return $property->roles()->where('type', Role::ADMIN)->count() > 1;
+    }
+
+    public function leave(Property $property)
+    {
+        $user = Auth::user();
+        $role = Role::where('user_id', $user->id)->where('property_id', $property->id)->firstOrFail();
+
+        if (!$this->canLeave($property, $role->type)) {
+            return back()->with('error', 'You are the last admin on this property - delete the property instead of leaving.');
+        }
+
+        $role->delete();
+
+        if ((int) session('current_property_id') === $property->id) {
+            session()->forget('current_property_id');
+        }
+
+        return redirect()->route('properties.index')->with('success', "You have left {$property->name}.");
     }
 
     public function edit(Property $property)
