@@ -63,6 +63,7 @@ class ReportController extends Controller
                         'billing_amount' => $session->billing_amount,
                         'status' => $session->status,
                         'source' => $session->source,
+                        'reviewed_at' => $session->reviewed_at,
                     ])->values(),
                 ];
             })

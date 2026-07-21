@@ -39,6 +39,30 @@ export function billingBlockLabel(minutes) {
     return `${minutes} minutes`;
 }
 
+// Rounds a Date's time-of-day DOWN to the nearest billing-block boundary
+// (e.g. with a 15-minute block, 2:07 becomes 2:00) - a start time never
+// needs to show the exact recorded moment, just a block-aligned suggestion.
+export function floorToBillingBlock(date, blockMinutes) {
+    if (!blockMinutes) return date;
+    const floored = new Date(date);
+    floored.setMinutes(Math.floor(date.getMinutes() / blockMinutes) * blockMinutes, 0, 0);
+    return floored;
+}
+
+// Rounds a Date's time-of-day UP to the nearest billing-block boundary
+// (e.g. with a 15-minute block, 2:07 becomes 2:15) - the end-time
+// counterpart to floorToBillingBlock. Rolling past midnight is handled
+// correctly by Date's own overflow (setHours normalizes into the next
+// day if the minutes given exceed a single day).
+export function ceilToBillingBlock(date, blockMinutes) {
+    if (!blockMinutes) return date;
+    const totalMinutes = date.getHours() * 60 + date.getMinutes();
+    const ceiledMinutes = Math.ceil(totalMinutes / blockMinutes) * blockMinutes;
+    const ceiled = new Date(date);
+    ceiled.setHours(0, ceiledMinutes, 0, 0);
+    return ceiled;
+}
+
 // Every "HH:mm" time-of-day value at a billing_block_minutes granularity,
 // for a <select> that can only ever choose a block-aligned time - unlike
 // <input type="time" step>, whose step is only honoured by some browsers'

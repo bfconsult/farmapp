@@ -2,25 +2,30 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import WaypointTrail from '@/Components/WaypointTrail';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
-import { toLocalInputValue, fromLocalInputValue, splitLocalValue, joinLocalValue, billingBlockLabel, timeOptionsForBlock } from '@/dateInput';
-
-// A session's recorded time can fall off the billing-block grid (e.g. an
-// auto-tracked visit's exact GPS timestamp, or a block setting changed
-// after the fact) - insert it as its own option rather than silently
-// snapping the displayed value to the nearest block one when the form loads.
-function withCurrentTime(options, currentValue) {
-    if (!currentValue || options.some((option) => option.value === currentValue)) return options;
-
-    const [hour, minute] = currentValue.split(':').map(Number);
-    const label = new Date(2000, 0, 1, hour, minute).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-
-    return [...options, { value: currentValue, label: `${label} (current)` }]
-        .sort((a, b) => a.value.localeCompare(b.value));
-}
+import {
+    toLocalInputValue,
+    fromLocalInputValue,
+    splitLocalValue,
+    joinLocalValue,
+    billingBlockLabel,
+    timeOptionsForBlock,
+    floorToBillingBlock,
+    ceilToBillingBlock,
+} from '@/dateInput';
 
 export default function Edit({ session, plannedJobs, waypoints, billingBlockMinutes }) {
-    const startedLocal = splitLocalValue(toLocalInputValue(session.started_at));
-    const endedLocal = splitLocalValue(toLocalInputValue(session.ended_at));
+    // The exact recorded moment (e.g. an auto-tracked visit's GPS timestamp)
+    // never needs to be shown or selectable - the start suggests the block
+    // boundary before it, the end the one after, so the dropdown only ever
+    // offers clean block-aligned times either way.
+    const startedLocal = splitLocalValue(
+        toLocalInputValue(floorToBillingBlock(new Date(session.started_at), billingBlockMinutes).toISOString())
+    );
+    const endedLocal = session.ended_at
+        ? splitLocalValue(
+              toLocalInputValue(ceilToBillingBlock(new Date(session.ended_at), billingBlockMinutes).toISOString())
+          )
+        : { date: '', time: '' };
 
     const { data, setData, patch, processing, errors, transform } = useForm({
         description: session.description ?? '',
@@ -32,12 +37,11 @@ export default function Edit({ session, plannedJobs, waypoints, billingBlockMinu
     });
 
     const baseTimeOptions = useMemo(() => timeOptionsForBlock(billingBlockMinutes), [billingBlockMinutes]);
-    const startedTimeOptions = useMemo(() => withCurrentTime(baseTimeOptions, startedLocal.time), [baseTimeOptions, startedLocal.time]);
+    const startedTimeOptions = baseTimeOptions;
     const endedTimeOptions = useMemo(() => {
-        const options = withCurrentTime(baseTimeOptions, endedLocal.time);
         // An active session has no end time yet - keep that choice available
         // rather than forcing a real time onto it just by opening the form.
-        return endedLocal.time ? options : [{ value: '', label: '— Still active —' }, ...options];
+        return endedLocal.time ? baseTimeOptions : [{ value: '', label: '— Still active —' }, ...baseTimeOptions];
     }, [baseTimeOptions, endedLocal.time]);
 
     const submit = (e) => {
@@ -50,7 +54,11 @@ export default function Edit({ session, plannedJobs, waypoints, billingBlockMinu
         patch(route('work-sessions.update', session.id));
     };
 
-    const isAutoTracked = session.source === 'auto_tracked';
+    // Only the special "hasn't been reviewed yet" screen, not a permanent
+    // label - once reviewed_at is set (see WorkSessionController::update()),
+    // this is a normal edit screen even though source stays 'auto_tracked'
+    // forever as a historical fact about how the session was recorded.
+    const isAutoTracked = session.source === 'auto_tracked' && !session.reviewed_at;
 
     return (
         <AuthenticatedLayout>

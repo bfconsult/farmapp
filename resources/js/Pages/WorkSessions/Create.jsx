@@ -1,14 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
-import { fromLocalInputValue, billingBlockLabel } from '@/dateInput';
-
-function floorToBillingBlock(date, blockMinutes) {
-    if (!blockMinutes) return date;
-    const floored = new Date(date);
-    floored.setMinutes(Math.floor(date.getMinutes() / blockMinutes) * blockMinutes, 0, 0);
-    return floored;
-}
+import { fromLocalInputValue, billingBlockLabel, floorToBillingBlock } from '@/dateInput';
 
 export default function Create({ plannedJobs, billingBlockMinutes }) {
     const { currentProperty } = usePage().props;

@@ -6,7 +6,10 @@ import { formatDate } from '@/dateInput';
 
 function sessionLabel(session) {
     if (session.farm_job) return session.farm_job.name;
-    return session.source === 'auto_tracked' ? 'Auto-tracked visit' : 'Ad-hoc work';
+    // Only flagged as "Auto-tracked" until it's been reviewed once (see
+    // WorkSessionController::update()) - after that it's treated as a
+    // normal entry everywhere, same as Edit.jsx's isAutoTracked.
+    return session.source === 'auto_tracked' && !session.reviewed_at ? 'Auto-tracked visit' : 'Ad-hoc work';
 }
 
 function currentMonthRange() {
