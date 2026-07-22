@@ -7,6 +7,26 @@ import { compressImageFiles } from '@/imageCompression';
 
 const ASSET_COLOR = '#2563eb';
 const PROPERTY_BOUNDARY_COLOR = '#9ca3af';
+const ZONE_COLOR = '#7c3aed';
+
+/** Standard ray-casting point-in-polygon test - `coordinates` is a plain
+ * array of [lat, lng] pairs, the same shape Zone/Asset shapes already use
+ * everywhere else in this app (not GeoJSON). */
+function isPointInPolygon(lat, lng, coordinates) {
+    let inside = false;
+    for (let i = 0, j = coordinates.length - 1; i < coordinates.length; j = i++) {
+        const [latI, lngI] = coordinates[i];
+        const [latJ, lngJ] = coordinates[j];
+        const intersects = (lngI > lng) !== (lngJ > lng) &&
+            lat < (latJ - latI) * (lng - lngI) / (lngJ - lngI) + latI;
+        if (intersects) inside = !inside;
+    }
+    return inside;
+}
+
+function findZoneNameForPoint(lat, lng, zones) {
+    return (zones ?? []).find((zone) => isPointInPolygon(lat, lng, zone.coordinates))?.name;
+}
 
 function loadLeaflet() {
     return Promise.all([
@@ -96,10 +116,15 @@ function LocationThumbnail({ asset, propertyBoundary }) {
 }
 
 /** Full interactive map + Geoman drawing controls, shown inside the Location modal. */
-function LocationEditorMap({ asset, propertyBoundary, canManage, onSaved }) {
+function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
-    const locationLayer = useRef(null);
+    const originalLayer = useRef(null);
+    const pendingLayer = useRef(null);
+    const zoneLayerGroup = useRef(null);
+    const [showZones, setShowZones] = useState(false);
+    const [zonesReady, setZonesReady] = useState(false);
+    const [pendingPayload, setPendingPayload] = useState(null);
 
     useEffect(() => {
         Promise.all([
@@ -117,6 +142,19 @@ function LocationEditorMap({ asset, propertyBoundary, canManage, onSaved }) {
                 maxZoom: 19,
             }).addTo(map);
 
+            zoneLayerGroup.current = L.layerGroup(
+                (zones ?? []).map((zone) =>
+                    L.polygon(zone.coordinates, {
+                        color: ZONE_COLOR,
+                        weight: 2,
+                        fillColor: ZONE_COLOR,
+                        fillOpacity: 0.15,
+                        interactive: false,
+                    }).bindTooltip(zone.name, { permanent: true, direction: 'center' }),
+                ),
+            );
+            setZonesReady(true);
+
             let boundaryBounds = null;
             if (propertyBoundary) {
                 const boundary = L.polygon(propertyBoundary, {
@@ -130,13 +168,13 @@ function LocationEditorMap({ asset, propertyBoundary, canManage, onSaved }) {
 
             const location = asset.current_location;
             if (location?.shape) {
-                locationLayer.current = L.polygon(location.shape, {
+                originalLayer.current = L.polygon(location.shape, {
                     color: ASSET_COLOR,
                     fillColor: ASSET_COLOR,
                     fillOpacity: 0.15,
                 }).addTo(map);
             } else if (location?.latitude && location?.longitude) {
-                locationLayer.current = L.marker([location.latitude, location.longitude]).addTo(map);
+                originalLayer.current = L.marker([location.latitude, location.longitude]).addTo(map);
             }
 
             // Always open on the whole property's extents (plus the asset's
@@ -144,10 +182,10 @@ function LocationEditorMap({ asset, propertyBoundary, canManage, onSaved }) {
             // pin - gives context for where the asset sits on the property,
             // and room to place a new pin when there isn't one yet.
             if (boundaryBounds) {
-                if (locationLayer.current) boundaryBounds.extend(locationLayer.current.getBounds?.() ?? locationLayer.current.getLatLng());
+                if (originalLayer.current) boundaryBounds.extend(originalLayer.current.getBounds?.() ?? originalLayer.current.getLatLng());
                 map.fitBounds(boundaryBounds, { padding: [40, 40] });
-            } else if (locationLayer.current) {
-                map.fitBounds(locationLayer.current.getBounds?.() ?? L.latLngBounds([locationLayer.current.getLatLng()]), { padding: [40, 40] });
+            } else if (originalLayer.current) {
+                map.fitBounds(originalLayer.current.getBounds?.() ?? L.latLngBounds([originalLayer.current.getLatLng()]), { padding: [40, 40] });
             } else {
                 map.locate({ setView: true, maxZoom: 16 });
             }
@@ -167,20 +205,32 @@ function LocationEditorMap({ asset, propertyBoundary, canManage, onSaved }) {
                     removalMode: false,
                 });
 
+                // Drawing a new pin/shape no longer saves immediately - it
+                // becomes an adjustable draft (draggable marker, or an
+                // editable shape via Geoman's own edit mode) until the user
+                // explicitly confirms with the "Done" button, so a single
+                // tap-to-place doesn't lock in an imprecise location.
                 map.on('pm:create', (e) => {
-                    if (locationLayer.current) locationLayer.current.remove();
-                    locationLayer.current = e.layer;
+                    (pendingLayer.current ?? originalLayer.current)?.remove();
+                    pendingLayer.current = e.layer;
                     map.pm.disableDraw();
 
-                    const payload = e.shape === 'Marker'
-                        ? { latitude: e.layer.getLatLng().lat, longitude: e.layer.getLatLng().lng }
-                        : { shape: e.layer.getLatLngs()[0].map((ll) => [ll.lat, ll.lng]) };
+                    const updatePending = () => {
+                        setPendingPayload(
+                            e.shape === 'Marker'
+                                ? { latitude: e.layer.getLatLng().lat, longitude: e.layer.getLatLng().lng }
+                                : { shape: e.layer.getLatLngs()[0].map((ll) => [ll.lat, ll.lng]) }
+                        );
+                    };
 
-                    router.put(route('assets.update-location', asset.id), payload, {
-                        preserveScroll: true,
-                        preserveState: true,
-                        onSuccess: () => onSaved(),
-                    });
+                    if (e.shape === 'Marker') {
+                        e.layer.dragging.enable();
+                        e.layer.on('dragend', updatePending);
+                    } else {
+                        e.layer.on('pm:edit', updatePending);
+                    }
+
+                    updatePending();
                 });
             }
         });
@@ -193,7 +243,64 @@ function LocationEditorMap({ asset, propertyBoundary, canManage, onSaved }) {
         };
     }, []);
 
-    return <div ref={mapRef} style={{ height: '350px' }} />;
+    useEffect(() => {
+        if (!zonesReady) return;
+
+        if (showZones) zoneLayerGroup.current.addTo(mapInstance.current);
+        else zoneLayerGroup.current.remove();
+    }, [showZones, zonesReady]);
+
+    const saveDraft = () => {
+        router.put(route('assets.update-location', asset.id), pendingPayload, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => onSaved(),
+        });
+    };
+
+    const cancelDraft = () => {
+        pendingLayer.current?.remove();
+        pendingLayer.current = null;
+        originalLayer.current?.addTo(mapInstance.current);
+        setPendingPayload(null);
+    };
+
+    return (
+        <div>
+            {zones && zones.length > 0 && (
+                <div className="flex items-center justify-between mb-2 px-2 py-1.5 rounded-lg bg-gray-50 border border-gray-200">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                        </svg>
+                        Zones
+                    </span>
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={showZones}
+                        onClick={() => setShowZones((v) => !v)}
+                        className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+                            showZones ? 'bg-violet-600' : 'bg-gray-300'
+                        }`}
+                    >
+                        <span
+                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                                showZones ? 'translate-x-5' : 'translate-x-1'
+                            }`}
+                        />
+                    </button>
+                </div>
+            )}
+            <div ref={mapRef} style={{ height: '350px' }} />
+            {pendingPayload && (
+                <div className="flex gap-2 mt-3">
+                    <button onClick={saveDraft} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium">Done</button>
+                    <button onClick={cancelDraft} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
+                </div>
+            )}
+        </div>
+    );
 }
 
 function AssetFields({ values, setValues }) {
@@ -584,7 +691,11 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
     const describeLocation = (location) => {
         if (location.shape) return `Shape (${location.shape.length} points)`;
         if (location.latitude && location.longitude) {
-            return `Point (${Number(location.latitude).toFixed(5)}, ${Number(location.longitude).toFixed(5)})`;
+            const lat = Number(location.latitude);
+            const lng = Number(location.longitude);
+            const zoneName = findZoneNameForPoint(lat, lng, asset.property?.zones);
+            const pointText = `Point (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+            return zoneName ? `${zoneName} — ${pointText}` : pointText;
         }
         return 'Location cleared';
     };
@@ -655,7 +766,11 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
                     <div className="p-3">
                         {hasLocation ? (
                             <button onClick={() => setShowLocationModal(true)} className="block w-full">
-                                <LocationThumbnail asset={asset} propertyBoundary={asset.property?.shape?.coordinates} />
+                                {/* Keyed on the location record's own id so the thumbnail's
+                                    internal Leaflet map (built once per mount) remounts fresh
+                                    whenever a new location is saved, instead of continuing to
+                                    show whatever it first rendered. */}
+                                <LocationThumbnail key={asset.current_location.id} asset={asset} propertyBoundary={asset.property?.shape?.coordinates} />
                                 <p className="text-xs text-gray-400 mt-1">{canManage ? 'Tap to edit' : 'Tap to view'}</p>
                             </button>
                         ) : canManage ? (
@@ -701,6 +816,7 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
                             <LocationEditorMap
                                 asset={asset}
                                 propertyBoundary={asset.property?.shape?.coordinates}
+                                zones={asset.property?.zones}
                                 canManage={canManage}
                                 onSaved={() => setShowLocationModal(false)}
                             />

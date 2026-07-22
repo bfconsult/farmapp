@@ -79,7 +79,7 @@ class AssetController extends Controller
 
     public function show(Asset $asset)
     {
-        $asset->load(['assetType', 'maintenanceItems', 'property.shape', 'notes.photos', 'notes.createdBy', 'currentLocation', 'locations']);
+        $asset->load(['assetType', 'maintenanceItems', 'property.shape', 'property.zones', 'notes.photos', 'notes.createdBy', 'currentLocation', 'locations']);
 
         $jobIds = $asset->jobs()->pluck('farm_jobs.id');
 
