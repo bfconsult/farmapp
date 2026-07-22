@@ -27,7 +27,10 @@ function pinIcon(L, color) {
     });
 }
 
-export default function Map({ jobs, shape, zones, assets, notes, currentRole }) {
+export default function Map({
+    jobs, shape, zones, assets, notes, currentRole,
+    currentJobStatusActive, currentJobStatusCompleted, currentJobAge,
+}) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const leafletRef = useRef(null);
@@ -45,6 +48,10 @@ export default function Map({ jobs, shape, zones, assets, notes, currentRole }) 
     const [showZones, setShowZones] = useState(false);
     const [showAssets, setShowAssets] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
+    const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+    const [jobStatusActive, setJobStatusActive] = useState(currentJobStatusActive);
+    const [jobStatusCompleted, setJobStatusCompleted] = useState(currentJobStatusCompleted);
+    const [jobAge, setJobAge] = useState(currentJobAge);
     const [mapReady, setMapReady] = useState(false);
     const [activeNote, setActiveNote] = useState(null);
     const [editingNoteBody, setEditingNoteBody] = useState(false);
@@ -90,24 +97,6 @@ export default function Map({ jobs, shape, zones, assets, notes, currentRole }) 
                 attribution: '© OpenStreetMap contributors',
                 maxZoom: 19,
             }).addTo(map);
-
-            // Job markers - built up front but left off the map until the
-            // "Jobs" toggle says otherwise (see the visibility-sync effect
-            // below), same built-once/toggle-visibility pattern as zones/
-            // assets/notes.
-            jobLayerGroup.current = L.layerGroup(
-                jobsWithLocation.map((job) => {
-                    const marker = L.marker([job.latitude, job.longitude], { icon: pinIcon(L, 'red') });
-                    marker.bindPopup(`
-                        <div style="min-width:150px">
-                            <strong>${job.name}</strong><br/>
-                            ${job.job_status ? `<span>${job.job_status.name}</span><br/>` : ''}
-                            <a href="/jobs/${job.id}" style="color:#16a34a">View job →</a>
-                        </div>
-                    `);
-                    return marker;
-                }),
-            );
 
             // Draw property boundary and non-working zone, and fit to
             // whichever of them exist.
@@ -234,6 +223,31 @@ export default function Map({ jobs, shape, zones, assets, notes, currentRole }) 
         };
     }, []);
 
+    // Job status/age are filtered server-side and re-fetched via the
+    // Filters popout on this same page, so (like notes) this layer must
+    // rebuild whenever the `jobs` prop changes, not just once on mount.
+    useEffect(() => {
+        if (!mapReady || !leafletRef.current) return;
+        const L = leafletRef.current;
+
+        jobLayerGroup.current?.remove();
+        jobLayerGroup.current = L.layerGroup(
+            jobsWithLocation.map((job) => {
+                const marker = L.marker([job.latitude, job.longitude], { icon: pinIcon(L, 'red') });
+                marker.bindPopup(`
+                    <div style="min-width:150px">
+                        <strong>${job.name}</strong><br/>
+                        ${job.job_status ? `<span>${job.job_status.name}</span><br/>` : ''}
+                        <a href="/jobs/${job.id}" style="color:#16a34a">View job →</a>
+                    </div>
+                `);
+                return marker;
+            }),
+        );
+
+        if (showJobs) jobLayerGroup.current.addTo(mapInstance.current);
+    }, [jobs, mapReady]);
+
     useEffect(() => {
         if (!mapReady) return;
 
@@ -348,6 +362,41 @@ export default function Map({ jobs, shape, zones, assets, notes, currentRole }) 
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editingLocationNoteId, mapReady]);
+
+    // Job status/age are filtered server-side (unlike the other layers,
+    // which are just client-side show/hide over data already loaded) since
+    // the whole point is to stop ever-growing old job pins from being sent
+    // to the browser at all, not just hidden there.
+    const updateJobFilters = (overrides = {}) => {
+        router.get(route('map'), {
+            job_status_active: overrides.jobStatusActive ?? jobStatusActive,
+            job_status_completed: overrides.jobStatusCompleted ?? jobStatusCompleted,
+            job_age: overrides.jobAge ?? jobAge,
+        }, {
+            preserveState: true,
+            preserveScroll: true,
+            only: ['jobs', 'currentJobStatusActive', 'currentJobStatusCompleted', 'currentJobAge'],
+        });
+    };
+
+    const toggleJobStatusActive = () => {
+        const next = !jobStatusActive;
+        setJobStatusActive(next);
+        updateJobFilters({ jobStatusActive: next });
+    };
+
+    const toggleJobStatusCompleted = () => {
+        const next = !jobStatusCompleted;
+        setJobStatusCompleted(next);
+        updateJobFilters({ jobStatusCompleted: next });
+    };
+
+    const changeJobAge = (value) => {
+        setJobAge(value);
+        updateJobFilters({ jobAge: value });
+    };
+
+    const hasNonDefaultFilters = !jobStatusActive || jobStatusCompleted || jobAge !== 'all';
 
     const startAddingNote = () => {
         const place = (lat, lng) => {
@@ -488,98 +537,149 @@ export default function Map({ jobs, shape, zones, assets, notes, currentRole }) 
                     </div>
                 )}
                 <div className="relative">
-                    {(jobsWithLocation.length > 0 || (zones && zones.length > 0) || (assets && assets.length > 0) || (notes && notes.length > 0)) && (
-                        <div className="absolute right-4 top-4 z-[1000] flex flex-col gap-2">
-                            {jobsWithLocation.length > 0 && (
-                                <div className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md">
-                                    <span className="text-sm font-medium text-gray-700">
-                                        Jobs
-                                    </span>
+                    <div className="absolute right-4 top-4 z-[1000]">
+                        <button
+                            type="button"
+                            onClick={() => setShowFiltersPanel((v) => !v)}
+                            className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md text-sm font-medium text-gray-700"
+                        >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18l-7 8v6l-4 2v-8L3 4z" />
+                            </svg>
+                            Filters
+                            {hasNonDefaultFilters && <span className="w-1.5 h-1.5 rounded-full bg-green-600" />}
+                        </button>
+
+                        {showFiltersPanel && (
+                            <div className="mt-2 w-60 rounded-md bg-white shadow-md p-3 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-sm font-medium text-gray-700">Filters</h3>
                                     <button
                                         type="button"
-                                        role="switch"
-                                        aria-checked={showJobs}
-                                        onClick={() => setShowJobs((v) => !v)}
-                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                                            showJobs ? 'bg-red-600' : 'bg-gray-300'
-                                        }`}
+                                        onClick={() => setShowFiltersPanel(false)}
+                                        className="text-sm text-gray-500"
                                     >
-                                        <span
-                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                                showJobs ? 'translate-x-6' : 'translate-x-1'
-                                            }`}
-                                        />
+                                        Close
                                     </button>
                                 </div>
-                            )}
-                            {zones && zones.length > 0 && (
-                                <div className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md">
-                                    <span className="text-sm font-medium text-gray-700">
-                                        Zones
-                                    </span>
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={showZones}
-                                        onClick={() => setShowZones((v) => !v)}
-                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                                            showZones ? 'bg-violet-600' : 'bg-gray-300'
-                                        }`}
-                                    >
-                                        <span
-                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                                showZones ? 'translate-x-6' : 'translate-x-1'
-                                            }`}
-                                        />
-                                    </button>
+                                <div>
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Layers</p>
+                                    <div className="space-y-2">
+                                        {jobsWithLocation.length > 0 && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700">Jobs</span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={showJobs}
+                                                    onClick={() => setShowJobs((v) => !v)}
+                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                                        showJobs ? 'bg-red-600' : 'bg-gray-300'
+                                                    }`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showJobs ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {zones && zones.length > 0 && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700">Zones</span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={showZones}
+                                                    onClick={() => setShowZones((v) => !v)}
+                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                                        showZones ? 'bg-violet-600' : 'bg-gray-300'
+                                                    }`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showZones ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {assets && assets.length > 0 && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700">Assets</span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={showAssets}
+                                                    onClick={() => setShowAssets((v) => !v)}
+                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                                        showAssets ? 'bg-blue-600' : 'bg-gray-300'
+                                                    }`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showAssets ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {notes && notes.length > 0 && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700">Notes</span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={showNotes}
+                                                    onClick={() => setShowNotes((v) => !v)}
+                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                                        showNotes ? 'bg-teal-600' : 'bg-gray-300'
+                                                    }`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showNotes ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
-                            {assets && assets.length > 0 && (
-                                <div className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md">
-                                    <span className="text-sm font-medium text-gray-700">
-                                        Assets
-                                    </span>
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={showAssets}
-                                        onClick={() => setShowAssets((v) => !v)}
-                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                                            showAssets ? 'bg-blue-600' : 'bg-gray-300'
-                                        }`}
-                                    >
-                                        <span
-                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                                showAssets ? 'translate-x-6' : 'translate-x-1'
-                                            }`}
-                                        />
-                                    </button>
+
+                                <div className="border-t border-gray-100 pt-3">
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Job status</p>
+                                    <div className="space-y-1.5">
+                                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={jobStatusActive}
+                                                onChange={toggleJobStatusActive}
+                                                className="rounded text-green-600 focus:ring-green-500"
+                                            />
+                                            Active jobs
+                                        </label>
+                                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={jobStatusCompleted}
+                                                onChange={toggleJobStatusCompleted}
+                                                className="rounded text-green-600 focus:ring-green-500"
+                                            />
+                                            Completed / Cancelled
+                                        </label>
+                                    </div>
                                 </div>
-                            )}
-                            {notes && notes.length > 0 && (
-                                <div className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md">
-                                    <span className="text-sm font-medium text-gray-700">
-                                        Notes
-                                    </span>
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={showNotes}
-                                        onClick={() => setShowNotes((v) => !v)}
-                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-                                            showNotes ? 'bg-teal-600' : 'bg-gray-300'
-                                        }`}
-                                    >
-                                        <span
-                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                                showNotes ? 'translate-x-6' : 'translate-x-1'
-                                            }`}
-                                        />
-                                    </button>
+
+                                <div className="border-t border-gray-100 pt-3">
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Job age</p>
+                                    <div className="space-y-1.5">
+                                        {[
+                                            { value: 'all', label: 'All time' },
+                                            { value: '30', label: 'Last 30 days' },
+                                            { value: '7', label: 'Last 7 days' },
+                                        ].map((option) => (
+                                            <label key={option.value} className="flex items-center gap-2 text-sm text-gray-700">
+                                                <input
+                                                    type="radio"
+                                                    name="job_age"
+                                                    checked={jobAge === option.value}
+                                                    onChange={() => changeJobAge(option.value)}
+                                                    className="text-green-600 focus:ring-green-500"
+                                                />
+                                                {option.label}
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                    )}
+                            </div>
+                        )}
+                    </div>
 
                     {canCreateNote && !creatingNote && !editingLocationNoteId && (
                         <button

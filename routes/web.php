@@ -219,7 +219,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
         session(['current_property_id' => $request->property_id]);
         return back();
     })->name('property.select');
-    Route::get('map', function () {
+    Route::get('map', function (\Illuminate\Http\Request $request) {
         $user = \Illuminate\Support\Facades\Auth::user();
         $currentPropertyId = session('current_property_id');
 
@@ -231,6 +231,17 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             ? $user->roleOn($currentProperty)
             : null;
 
+        // Job status/age filters for the map's Filters popout - default to
+        // "active jobs, all time" so a fresh visit looks like it always did.
+        // Mirrors FarmJobController::index's can_book_time-based status split.
+        $showActiveJobs = $request->boolean('job_status_active', true);
+        $showCompletedJobs = $request->boolean('job_status_completed', false);
+        $jobAge = $request->input('job_age', 'all');
+
+        $jobStatusIds = collect()
+            ->when($showActiveJobs, fn ($ids) => $ids->merge(\App\Models\JobStatus::where('can_book_time', true)->pluck('id')))
+            ->when($showCompletedJobs, fn ($ids) => $ids->merge(\App\Models\JobStatus::where('can_book_time', false)->pluck('id')));
+
         // An approver reviews everyone's work without being added to the
         // team on individual jobs - see every job on the property instead of
         // only ones they're personally assigned to (mirrors the same
@@ -241,6 +252,8 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
                 fn ($q2) => $q2->where('users.id', $user->id)
             ))
             ->when($currentPropertyId, fn($q) => $q->where('property_id', $currentPropertyId))
+            ->whereIn('job_status_id', $jobStatusIds)
+            ->when(in_array($jobAge, ['7', '30'], true), fn ($q) => $q->where('created_at', '>=', now()->subDays((int) $jobAge)))
             ->with(['jobStatus'])
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
@@ -262,6 +275,9 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             'assets' => $assets,
             'notes' => $notes,
             'currentRole' => $currentRole,
+            'currentJobStatusActive' => $showActiveJobs,
+            'currentJobStatusCompleted' => $showCompletedJobs,
+            'currentJobAge' => $jobAge,
         ]);
     })->name('map');
 });
