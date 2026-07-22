@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ChecklistItem;
 use App\Models\FarmJob;
 use App\Models\MetricMeasurement;
+use App\Models\Note;
 use App\Models\Photo;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
@@ -96,6 +97,26 @@ class PhotoController extends Controller
             $path = $this->storeCompressed($file);
 
             $checklistItem->photos()->create([
+                'file' => $path,
+                'time_taken' => now(),
+                'location' => $request->location ?? null,
+            ]);
+        }
+
+        return back();
+    }
+
+    public function storeForNote(Request $request, Note $note)
+    {
+        $request->validate([
+            'photos' => 'required|array',
+            'photos.*' => 'image|max:10240',
+        ]);
+
+        foreach ($request->file('photos') as $file) {
+            $path = $this->storeCompressed($file);
+
+            $note->photos()->create([
                 'file' => $path,
                 'time_taken' => now(),
                 'location' => $request->location ?? null,

@@ -3,6 +3,7 @@ import Modal from '@/Components/Modal';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { compressImageFiles } from '@/imageCompression';
 
 const ASSET_COLOR = '#2563eb';
 const PROPERTY_BOUNDARY_COLOR = '#9ca3af';
@@ -26,6 +27,7 @@ function loadLeaflet() {
 function LocationThumbnail({ asset, propertyBoundary }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
+    const location = asset.current_location;
 
     useEffect(() => {
         let cancelled = false;
@@ -59,17 +61,17 @@ function LocationThumbnail({ asset, propertyBoundary }) {
                 bounds.extend(boundary.getBounds());
             }
 
-            if (asset.shape) {
-                const shape = L.polygon(asset.shape, {
+            if (location.shape) {
+                const shape = L.polygon(location.shape, {
                     color: ASSET_COLOR,
                     fillColor: ASSET_COLOR,
                     fillOpacity: 0.2,
                     interactive: false,
                 }).addTo(map);
                 bounds.extend(shape.getBounds());
-            } else if (asset.latitude && asset.longitude) {
-                L.marker([asset.latitude, asset.longitude], { interactive: false }).addTo(map);
-                bounds.extend([asset.latitude, asset.longitude]);
+            } else if (location.latitude && location.longitude) {
+                L.marker([location.latitude, location.longitude], { interactive: false }).addTo(map);
+                bounds.extend([location.latitude, location.longitude]);
             }
 
             map.fitBounds(bounds, { padding: [16, 16] });
@@ -126,14 +128,15 @@ function LocationEditorMap({ asset, propertyBoundary, canManage, onSaved }) {
                 boundaryBounds = boundary.getBounds();
             }
 
-            if (asset.shape) {
-                locationLayer.current = L.polygon(asset.shape, {
+            const location = asset.current_location;
+            if (location?.shape) {
+                locationLayer.current = L.polygon(location.shape, {
                     color: ASSET_COLOR,
                     fillColor: ASSET_COLOR,
                     fillOpacity: 0.15,
                 }).addTo(map);
-            } else if (asset.latitude && asset.longitude) {
-                locationLayer.current = L.marker([asset.latitude, asset.longitude]).addTo(map);
+            } else if (location?.latitude && location?.longitude) {
+                locationLayer.current = L.marker([location.latitude, location.longitude]).addTo(map);
             }
 
             // Always open on the whole property's extents (plus the asset's
@@ -412,10 +415,153 @@ function AddMaintenanceItemForm({ asset, onClose }) {
     );
 }
 
+function NoteRow({ note, canManage, canCreate }) {
+    const fileInput = useRef(null);
+    const [uploading, setUploading] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [body, setBody] = useState(note.body);
+
+    const save = () => {
+        router.patch(route('notes.update', note.id), { body }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setEditing(false),
+        });
+    };
+
+    const destroy = () => {
+        if (confirm('Delete this note?')) {
+            router.delete(route('notes.destroy', note.id), { preserveScroll: true, preserveState: true });
+        }
+    };
+
+    const destroyPhoto = (photoId) => {
+        if (confirm('Delete this photo?')) {
+            router.delete(route('photos.destroy', photoId), { preserveScroll: true, preserveState: true });
+        }
+    };
+
+    const uploadPhotos = async (e) => {
+        const files = e.target.files;
+        if (!files.length) return;
+
+        setUploading(true);
+        const compressed = await compressImageFiles(files);
+
+        const formData = new FormData();
+        compressed.forEach(file => formData.append('photos[]', file));
+
+        router.post(route('photos.store-note', note.id), formData, {
+            forceFormData: true,
+            preserveScroll: true,
+            onFinish: () => setUploading(false),
+            onError: () => alert('Photo upload failed. Please try again with a smaller photo.'),
+        });
+    };
+
+    if (editing) {
+        return (
+            <div className="p-3 bg-green-50 space-y-2">
+                <textarea
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                    rows={3}
+                />
+                <div className="flex gap-2">
+                    <button onClick={save} className="flex-1 py-1.5 bg-green-600 text-white rounded-lg text-xs">Save</button>
+                    <button onClick={() => { setEditing(false); setBody(note.body); }} className="flex-1 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs">Cancel</button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="px-3 py-3">
+            <p className="text-sm text-gray-900 whitespace-pre-wrap">{note.body}</p>
+            <p className="text-xs text-gray-400 mt-1">
+                {note.created_by?.name} · {formatDate(note.created_at)}
+            </p>
+
+            {note.photos && note.photos.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                    {note.photos.map((photo) => (
+                        <div key={photo.id} className="relative">
+                            <img src={photo.url} className="w-full h-20 object-cover rounded-lg" />
+                            {canManage && (
+                                <button
+                                    onClick={() => destroyPhoto(photo.id)}
+                                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <div className="flex gap-3 mt-2 text-xs">
+                {canCreate && (
+                    <button onClick={() => fileInput.current.click()} disabled={uploading} className="text-green-600 font-medium disabled:opacity-50">
+                        {uploading ? 'Uploading…' : '+ Add Photo'}
+                    </button>
+                )}
+                {canManage && (
+                    <>
+                        <button onClick={() => setEditing(true)} className="text-green-600">Edit</button>
+                        <button onClick={destroy} className="text-red-500">Delete</button>
+                    </>
+                )}
+            </div>
+            <input
+                ref={fileInput}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={uploadPhotos}
+                className="hidden"
+            />
+        </div>
+    );
+}
+
+function AddNoteForm({ asset, onClose }) {
+    const [body, setBody] = useState('');
+
+    const create = () => {
+        router.post(route('notes.store'), { asset_id: asset.id, body }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                onClose();
+                setBody('');
+            },
+        });
+    };
+
+    return (
+        <div className="p-4 space-y-3 border-t border-gray-100">
+            <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                placeholder="Note..."
+                rows={3}
+            />
+            <div className="flex gap-2">
+                <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Note</button>
+                <button onClick={onClose} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
+            </div>
+        </div>
+    );
+}
+
 export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canConvert = canManage || currentUserRole === 'worker';
+    const canCreateNote = canManage || currentUserRole === 'worker';
 
     const [editing, setEditing] = useState(false);
     const [values, setValues] = useState({
@@ -425,9 +571,23 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
     });
 
     const [showLocationModal, setShowLocationModal] = useState(false);
-    const hasLocation = Boolean(asset.shape || (asset.latitude && asset.longitude));
+    const hasLocation = Boolean(
+        asset.current_location?.shape ||
+        (asset.current_location?.latitude && asset.current_location?.longitude)
+    );
 
     const [addingMaintenanceItem, setAddingMaintenanceItem] = useState(false);
+    const [addingNote, setAddingNote] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
+    const pastLocations = (asset.locations ?? []).slice(1); // [0] is current_location itself
+
+    const describeLocation = (location) => {
+        if (location.shape) return `Shape (${location.shape.length} points)`;
+        if (location.latitude && location.longitude) {
+            return `Point (${Number(location.latitude).toFixed(5)}, ${Number(location.longitude).toFixed(5)})`;
+        }
+        return 'Location cleared';
+    };
 
     const save = () => {
         router.patch(route('assets.update', asset.id), values, {
@@ -508,6 +668,29 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
                     </div>
                 </div>
 
+                {pastLocations.length > 0 && (
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                        <button
+                            onClick={() => setShowHistory((v) => !v)}
+                            className="w-full flex items-center justify-between px-4 py-2 border-b border-gray-100"
+                        >
+                            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+                                {showHistory ? '▾' : '▸'} History ({pastLocations.length})
+                            </h2>
+                        </button>
+                        {showHistory && (
+                            <div className="divide-y divide-gray-100">
+                                {pastLocations.map((location) => (
+                                    <div key={location.id} className="px-4 py-2 text-sm text-gray-700 flex justify-between">
+                                        <span>{describeLocation(location)}</span>
+                                        <span className="text-xs text-gray-400">{formatDate(location.created_at)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <Modal show={showLocationModal} onClose={() => setShowLocationModal(false)} maxWidth="lg">
                     <div className="p-4">
                         <div className="flex items-center justify-between mb-3">
@@ -545,6 +728,29 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
                     )}
                     {addingMaintenanceItem && (
                         <AddMaintenanceItemForm asset={asset} onClose={() => setAddingMaintenanceItem(false)} />
+                    )}
+                </div>
+
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
+                        {canCreateNote && !addingNote && (
+                            <button onClick={() => setAddingNote(true)} className="text-xs text-green-600 font-medium">
+                                + Add
+                            </button>
+                        )}
+                    </div>
+                    {asset.notes.length === 0 ? (
+                        <p className="text-sm text-gray-400 p-4">No notes yet.</p>
+                    ) : (
+                        <div className="divide-y divide-gray-100">
+                            {asset.notes.map((note) => (
+                                <NoteRow key={note.id} note={note} canManage={canManage} canCreate={canCreateNote} />
+                            ))}
+                        </div>
+                    )}
+                    {addingNote && (
+                        <AddNoteForm asset={asset} onClose={() => setAddingNote(false)} />
                     )}
                 </div>
 

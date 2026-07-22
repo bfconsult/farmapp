@@ -52,8 +52,8 @@ class MaintenanceItem extends Model
         $job = FarmJob::create([
             'name' => "{$this->asset->name} - {$this->name}",
             'description' => $this->description,
-            'latitude' => $this->asset->latitude,
-            'longitude' => $this->asset->longitude,
+            'latitude' => $this->asset->currentLocation?->latitude,
+            'longitude' => $this->asset->currentLocation?->longitude,
             'job_status_id' => JobStatus::where('is_default', true)->value('id'),
             'user_id' => $user->id ?? $this->created_by,
             'property_id' => $this->asset->property_id,

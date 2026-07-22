@@ -1,6 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
+import { compressImageFiles } from '@/imageCompression';
+import Modal from '@/Components/Modal';
+import { formatDate } from '@/dateInput';
 
 const ZONE_COLOR = '#7c3aed';
 const ASSET_COLOR = '#2563eb';
@@ -9,24 +12,60 @@ const ASSET_COLOR = '#2563eb';
 // each other and obscure the shapes they're meant to label.
 const ZONE_LABEL_MIN_ZOOM = 16;
 
-export default function Map({ jobs, shape, zones, assets, currentRole }) {
+/** Same pin shape/size everywhere (the default Leaflet marker), just
+ * recolored per layer - a same-dimension swap of the stock icon, not a
+ * different marker style. */
+function pinIcon(L, color) {
+    return L.icon({
+        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
+        iconRetinaUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41],
+    });
+}
+
+export default function Map({ jobs, shape, zones, assets, notes, currentRole }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
+    const leafletRef = useRef(null);
+    const jobLayerGroup = useRef(null);
     const zoneLayerGroup = useRef(null);
     const assetLayerGroup = useRef(null);
+    const noteLayerGroup = useRef(null);
+    const noteMarkersById = useRef({});
+    const noteFileInput = useRef(null);
     const updateZoneLabels = useRef(null);
     const updateAssetLabels = useRef(null);
+    // Jobs default to visible (this page's original, only content before the
+    // other layers existed) - the rest default off since they're additions.
+    const [showJobs, setShowJobs] = useState(true);
     const [showZones, setShowZones] = useState(false);
     const [showAssets, setShowAssets] = useState(false);
+    const [showNotes, setShowNotes] = useState(false);
     const [mapReady, setMapReady] = useState(false);
+    const [activeNote, setActiveNote] = useState(null);
+    const [editingNoteBody, setEditingNoteBody] = useState(false);
+    const [noteBodyDraft, setNoteBodyDraft] = useState('');
+    const [uploadingNotePhoto, setUploadingNotePhoto] = useState(false);
+    const [editingLocationNoteId, setEditingLocationNoteId] = useState(null);
+    const [pendingNoteLatLng, setPendingNoteLatLng] = useState(null);
+    const [creatingNote, setCreatingNote] = useState(false);
+    const [draftNoteLatLng, setDraftNoteLatLng] = useState(null);
+    const [draftNoteBody, setDraftNoteBody] = useState('');
     const { currentProperty } = usePage().props;
     const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
+    const canCreateNote = isAdminOrManager || currentRole === 'worker';
+    const jobsWithLocation = jobs.filter(j => j.latitude && j.longitude);
 
     useEffect(() => {
         if (mapInstance.current) return;
 
         import('leaflet').then(async (L) => {
             await import('leaflet/dist/leaflet.css');
+            leafletRef.current = L;
             // Fix default marker icons
             delete L.Icon.Default.prototype._getIconUrl;
             L.Icon.Default.mergeOptions({
@@ -40,7 +79,6 @@ export default function Map({ jobs, shape, zones, assets, currentRole }) {
             let zoom = 13;
 
             // If we have jobs with locations, center on them
-            const jobsWithLocation = jobs.filter(j => j.latitude && j.longitude);
             if (jobsWithLocation.length > 0) {
                 center = [jobsWithLocation[0].latitude, jobsWithLocation[0].longitude];
             }
@@ -53,17 +91,23 @@ export default function Map({ jobs, shape, zones, assets, currentRole }) {
                 maxZoom: 19,
             }).addTo(map);
 
-            // Add job markers
-            jobsWithLocation.forEach((job) => {
-                const marker = L.marker([job.latitude, job.longitude]).addTo(map);
-                marker.bindPopup(`
-                    <div style="min-width:150px">
-                        <strong>${job.name}</strong><br/>
-                        ${job.job_status ? `<span>${job.job_status.name}</span><br/>` : ''}
-                        <a href="/jobs/${job.id}" style="color:#16a34a">View job →</a>
-                    </div>
-                `);
-            });
+            // Job markers - built up front but left off the map until the
+            // "Jobs" toggle says otherwise (see the visibility-sync effect
+            // below), same built-once/toggle-visibility pattern as zones/
+            // assets/notes.
+            jobLayerGroup.current = L.layerGroup(
+                jobsWithLocation.map((job) => {
+                    const marker = L.marker([job.latitude, job.longitude], { icon: pinIcon(L, 'red') });
+                    marker.bindPopup(`
+                        <div style="min-width:150px">
+                            <strong>${job.name}</strong><br/>
+                            ${job.job_status ? `<span>${job.job_status.name}</span><br/>` : ''}
+                            <a href="/jobs/${job.id}" style="color:#16a34a">View job →</a>
+                        </div>
+                    `);
+                    return marker;
+                }),
+            );
 
             // Draw property boundary and non-working zone, and fit to
             // whichever of them exist.
@@ -128,17 +172,18 @@ export default function Map({ jobs, shape, zones, assets, currentRole }) {
             // with neither set (location is optional) are left off entirely.
             assetLayerGroup.current = L.layerGroup(
                 (assets ?? [])
-                    .filter((asset) => asset.shape || (asset.latitude && asset.longitude))
+                    .filter((asset) => asset.current_location?.shape || (asset.current_location?.latitude && asset.current_location?.longitude))
                     .map((asset) => {
-                    if (asset.shape) {
-                        return L.polygon(asset.shape, {
+                    const location = asset.current_location;
+                    if (location.shape) {
+                        return L.polygon(location.shape, {
                             color: ASSET_COLOR,
                             weight: 2,
                             fillColor: ASSET_COLOR,
                             fillOpacity: 0.15,
                         }).bindTooltip(asset.name, { permanent: true, direction: 'center' });
                     }
-                    return L.marker([asset.latitude, asset.longitude]).bindPopup(`
+                    return L.marker([location.latitude, location.longitude]).bindPopup(`
                         <div style="min-width:150px">
                             <strong>${asset.name}</strong><br/>
                             ${asset.asset_type ? `<span>${asset.asset_type.name}</span><br/>` : ''}
@@ -192,6 +237,13 @@ export default function Map({ jobs, shape, zones, assets, currentRole }) {
     useEffect(() => {
         if (!mapReady) return;
 
+        if (showJobs) jobLayerGroup.current?.addTo(mapInstance.current);
+        else jobLayerGroup.current?.remove();
+    }, [showJobs, mapReady]);
+
+    useEffect(() => {
+        if (!mapReady) return;
+
         if (showZones) {
             zoneLayerGroup.current.addTo(mapInstance.current);
             updateZoneLabels.current?.();
@@ -211,6 +263,209 @@ export default function Map({ jobs, shape, zones, assets, currentRole }) {
         }
     }, [showAssets, mapReady]);
 
+    // Notes are created/edited/deleted from this same page - an Inertia
+    // back() redirect re-renders this same mounted component rather than
+    // remounting it, so (unlike zones/assets, which only ever change from a
+    // different page) this layer must rebuild from scratch whenever the
+    // `notes` prop changes, not just once on mount.
+    useEffect(() => {
+        if (!mapReady || !leafletRef.current) return;
+        const L = leafletRef.current;
+
+        noteLayerGroup.current?.remove();
+        noteMarkersById.current = {};
+
+        noteLayerGroup.current = L.layerGroup(
+            (notes ?? []).map((note) => {
+                const marker = L.marker([note.latitude, note.longitude], { icon: pinIcon(L, 'green') });
+                // Opens a read-only view only - editing/dragging never starts
+                // from tapping the map itself, only from an explicit button.
+                marker.on('click', () => setActiveNote(note));
+                noteMarkersById.current[note.id] = marker;
+                return marker;
+            }),
+        );
+
+        if (showNotes) noteLayerGroup.current.addTo(mapInstance.current);
+    }, [notes, mapReady]);
+
+    useEffect(() => {
+        if (!mapReady) return;
+
+        if (showNotes) noteLayerGroup.current?.addTo(mapInstance.current);
+        else noteLayerGroup.current?.remove();
+    }, [showNotes, mapReady]);
+
+    // Keeps the open view modal in sync after a photo upload / body edit
+    // triggers a partial reload of the `notes` prop.
+    useEffect(() => {
+        if (!activeNote) return;
+        setActiveNote((notes ?? []).find((n) => n.id === activeNote.id) ?? null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [notes]);
+
+    // "+ Add Note" draft marker - a single draggable pin shown while creating.
+    useEffect(() => {
+        if (!mapReady || !leafletRef.current || !creatingNote || !draftNoteLatLng) return;
+        const L = leafletRef.current;
+
+        const marker = L.marker([draftNoteLatLng.lat, draftNoteLatLng.lng], { draggable: true, icon: pinIcon(L, 'green') })
+            .addTo(mapInstance.current);
+
+        marker.on('dragend', () => {
+            const { lat, lng } = marker.getLatLng();
+            setDraftNoteLatLng({ lat, lng });
+        });
+
+        return () => marker.remove();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [creatingNote, mapReady]);
+
+    // "Edit location" draft marker - swaps a note's static marker for a
+    // single draggable overlay while repositioning it.
+    useEffect(() => {
+        if (!mapReady || !leafletRef.current || !editingLocationNoteId || !pendingNoteLatLng) return;
+        const L = leafletRef.current;
+        const group = noteLayerGroup.current;
+        const staticMarker = noteMarkersById.current[editingLocationNoteId];
+
+        if (staticMarker && group) group.removeLayer(staticMarker);
+
+        const overlay = L.marker([pendingNoteLatLng.lat, pendingNoteLatLng.lng], { draggable: true, icon: pinIcon(L, 'green') })
+            .addTo(mapInstance.current);
+
+        overlay.on('dragend', () => {
+            const { lat, lng } = overlay.getLatLng();
+            setPendingNoteLatLng({ lat, lng });
+        });
+
+        return () => {
+            overlay.remove();
+            // If this edit was cancelled (not saved), put the static marker
+            // back. A save instead refreshes `notes`, which rebuilds the
+            // whole layer group fresh, superseding this.
+            if (staticMarker && group) group.addLayer(staticMarker);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editingLocationNoteId, mapReady]);
+
+    const startAddingNote = () => {
+        const place = (lat, lng) => {
+            setDraftNoteLatLng({ lat, lng });
+            setCreatingNote(true);
+        };
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => place(position.coords.latitude, position.coords.longitude),
+                () => {
+                    const center = mapInstance.current.getCenter();
+                    place(center.lat, center.lng);
+                },
+                { timeout: 10000, enableHighAccuracy: true },
+            );
+        } else {
+            const center = mapInstance.current.getCenter();
+            place(center.lat, center.lng);
+        }
+    };
+
+    const saveNewNote = () => {
+        router.post(route('notes.store'), {
+            body: draftNoteBody,
+            latitude: draftNoteLatLng.lat,
+            longitude: draftNoteLatLng.lng,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                setCreatingNote(false);
+                setDraftNoteLatLng(null);
+                setDraftNoteBody('');
+                setShowNotes(true);
+            },
+        });
+    };
+
+    const cancelNewNote = () => {
+        setCreatingNote(false);
+        setDraftNoteLatLng(null);
+        setDraftNoteBody('');
+    };
+
+    const openNoteEdit = () => {
+        setNoteBodyDraft(activeNote.body);
+        setEditingNoteBody(true);
+    };
+
+    const saveNoteBody = () => {
+        router.patch(route('notes.update', activeNote.id), { body: noteBodyDraft }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setEditingNoteBody(false),
+        });
+    };
+
+    const deleteNote = () => {
+        if (confirm('Delete this note?')) {
+            router.delete(route('notes.destroy', activeNote.id), {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setActiveNote(null),
+            });
+        }
+    };
+
+    const startEditNoteLocation = () => {
+        setPendingNoteLatLng({ lat: activeNote.latitude, lng: activeNote.longitude });
+        setEditingLocationNoteId(activeNote.id);
+        setActiveNote(null);
+    };
+
+    const saveNoteLocation = () => {
+        router.put(route('notes.update-location', editingLocationNoteId), {
+            latitude: pendingNoteLatLng.lat,
+            longitude: pendingNoteLatLng.lng,
+        }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                setEditingLocationNoteId(null);
+                setPendingNoteLatLng(null);
+            },
+        });
+    };
+
+    const cancelNoteLocationEdit = () => {
+        setEditingLocationNoteId(null);
+        setPendingNoteLatLng(null);
+    };
+
+    const uploadNotePhotos = async (e) => {
+        const files = e.target.files;
+        if (!files.length) return;
+
+        setUploadingNotePhoto(true);
+        const compressed = await compressImageFiles(files);
+
+        const formData = new FormData();
+        compressed.forEach(file => formData.append('photos[]', file));
+
+        router.post(route('photos.store-note', activeNote.id), formData, {
+            forceFormData: true,
+            preserveScroll: true,
+            preserveState: true,
+            onFinish: () => setUploadingNotePhoto(false),
+            onError: () => alert('Photo upload failed. Please try again with a smaller photo.'),
+        });
+    };
+
+    const destroyNotePhoto = (photoId) => {
+        if (confirm('Delete this photo?')) {
+            router.delete(route('photos.destroy', photoId), { preserveScroll: true, preserveState: true });
+        }
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title="Map" />
@@ -227,14 +482,36 @@ export default function Map({ jobs, shape, zones, assets, currentRole }) {
                         </Link>
                     </div>
                 )}
-                {jobs.filter(j => j.latitude && j.longitude).length === 0 && (
+                {jobsWithLocation.length === 0 && (
                     <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800">
                         No jobs with location data yet. Add jobs in the field to see them on the map.
                     </div>
                 )}
                 <div className="relative">
-                    {((zones && zones.length > 0) || (assets && assets.length > 0)) && (
+                    {(jobsWithLocation.length > 0 || (zones && zones.length > 0) || (assets && assets.length > 0) || (notes && notes.length > 0)) && (
                         <div className="absolute right-4 top-4 z-[1000] flex flex-col gap-2">
+                            {jobsWithLocation.length > 0 && (
+                                <div className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md">
+                                    <span className="text-sm font-medium text-gray-700">
+                                        Jobs
+                                    </span>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={showJobs}
+                                        onClick={() => setShowJobs((v) => !v)}
+                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                            showJobs ? 'bg-red-600' : 'bg-gray-300'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                showJobs ? 'translate-x-6' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            )}
                             {zones && zones.length > 0 && (
                                 <div className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md">
                                     <span className="text-sm font-medium text-gray-700">
@@ -279,14 +556,164 @@ export default function Map({ jobs, shape, zones, assets, currentRole }) {
                                     </button>
                                 </div>
                             )}
+                            {notes && notes.length > 0 && (
+                                <div className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md">
+                                    <span className="text-sm font-medium text-gray-700">
+                                        Notes
+                                    </span>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={showNotes}
+                                        onClick={() => setShowNotes((v) => !v)}
+                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                            showNotes ? 'bg-teal-600' : 'bg-gray-300'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                showNotes ? 'translate-x-6' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
+
+                    {canCreateNote && !creatingNote && !editingLocationNoteId && (
+                        <button
+                            type="button"
+                            onClick={startAddingNote}
+                            className="absolute left-4 bottom-4 z-[1000] px-4 py-2 bg-teal-600 text-white rounded-md shadow-md text-sm font-medium"
+                        >
+                            + Add Note
+                        </button>
+                    )}
+
+                    {creatingNote && (
+                        <div className="absolute inset-x-4 bottom-4 z-[1000] bg-white rounded-lg shadow-md p-3 space-y-2">
+                            <p className="text-xs text-gray-500">Drag the pin to adjust the location.</p>
+                            <textarea
+                                value={draftNoteBody}
+                                onChange={(e) => setDraftNoteBody(e.target.value)}
+                                placeholder="Note..."
+                                rows={2}
+                                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={saveNewNote}
+                                    disabled={!draftNoteBody}
+                                    className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm disabled:opacity-50"
+                                >
+                                    Save
+                                </button>
+                                <button onClick={cancelNewNote} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {editingLocationNoteId && (
+                        <div className="absolute inset-x-4 bottom-4 z-[1000] bg-white rounded-lg shadow-md p-3 space-y-2">
+                            <p className="text-xs text-gray-500">Drag the pin to move it.</p>
+                            <div className="flex gap-2">
+                                <button onClick={saveNoteLocation} className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm">
+                                    Save
+                                </button>
+                                <button onClick={cancelNoteLocationEdit} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div
                         ref={mapRef}
                         style={{ height: 'calc(100dvh - 8.5rem)' }}
                     />
                 </div>
             </div>
+
+            <Modal show={Boolean(activeNote)} onClose={() => { setActiveNote(null); setEditingNoteBody(false); }} maxWidth="lg">
+                {activeNote && (
+                    <div className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-medium text-gray-700">Note</h3>
+                            <button onClick={() => { setActiveNote(null); setEditingNoteBody(false); }} className="text-sm text-gray-500">
+                                Close
+                            </button>
+                        </div>
+
+                        {editingNoteBody ? (
+                            <>
+                                <textarea
+                                    value={noteBodyDraft}
+                                    onChange={(e) => setNoteBodyDraft(e.target.value)}
+                                    rows={3}
+                                    className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                />
+                                <div className="flex gap-2">
+                                    <button onClick={saveNoteBody} className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm">Save</button>
+                                    <button onClick={() => setEditingNoteBody(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm text-gray-900 whitespace-pre-wrap">{activeNote.body}</p>
+                                <p className="text-xs text-gray-400">
+                                    {activeNote.created_by?.name} · {formatDate(activeNote.created_at)}
+                                </p>
+                            </>
+                        )}
+
+                        {activeNote.photos && activeNote.photos.length > 0 && (
+                            <div className="grid grid-cols-3 gap-2">
+                                {activeNote.photos.map((photo) => (
+                                    <div key={photo.id} className="relative">
+                                        <img src={photo.url} className="w-full h-20 object-cover rounded-lg" />
+                                        {isAdminOrManager && (
+                                            <button
+                                                onClick={() => destroyNotePhoto(photo.id)}
+                                                className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {!editingNoteBody && (
+                            <div className="flex flex-wrap gap-3 text-xs pt-1">
+                                {canCreateNote && (
+                                    <button onClick={() => noteFileInput.current.click()} disabled={uploadingNotePhoto} className="text-teal-600 font-medium disabled:opacity-50">
+                                        {uploadingNotePhoto ? 'Uploading…' : '+ Add Photo'}
+                                    </button>
+                                )}
+                                {isAdminOrManager && (
+                                    <>
+                                        <button onClick={openNoteEdit} className="text-teal-600 font-medium">Edit</button>
+                                        <button onClick={startEditNoteLocation} className="text-teal-600 font-medium">Edit location</button>
+                                        <button onClick={deleteNote} className="text-red-500 font-medium">Delete</button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                        <input
+                            ref={noteFileInput}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={uploadNotePhotos}
+                            className="hidden"
+                        />
+                    </div>
+                )}
+            </Modal>
         </AuthenticatedLayout>
     );
 }

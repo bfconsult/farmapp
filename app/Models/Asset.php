@@ -13,14 +13,10 @@ class Asset extends Model
         'name',
         'description',
         'value',
-        'latitude',
-        'longitude',
-        'shape',
     ];
 
     protected $casts = [
         'value' => 'decimal:2',
-        'shape' => 'array',
     ];
 
     public function property()
@@ -41,6 +37,26 @@ class Asset extends Model
     public function maintenanceItems()
     {
         return $this->hasMany(MaintenanceItem::class)->orderBy('next_due_date');
+    }
+
+    public function notes()
+    {
+        return $this->hasMany(Note::class)->latest();
+    }
+
+    public function locations()
+    {
+        return $this->hasMany(AssetLocation::class)->latest();
+    }
+
+    /**
+     * The most recently recorded location - the single "current" location
+     * everywhere the app used to read asset.latitude/longitude/shape
+     * directly. Mirrors Metric::latestMeasurement().
+     */
+    public function currentLocation()
+    {
+        return $this->hasOne(AssetLocation::class)->latestOfMany();
     }
 
     /**

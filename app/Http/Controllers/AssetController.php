@@ -31,9 +31,13 @@ class AssetController extends Controller
     }
 
     /**
-     * An asset has at most one of a point location or a shape at a time -
-     * saving one clears the other, mirroring how Properties/Shape.jsx saves
-     * a zone's polygon immediately on draw, no separate Save step.
+     * Records a new current location for this asset - every call inserts a
+     * fresh AssetLocation row (including "clear", which inserts an all-null
+     * row) rather than overwriting one, so location history accumulates. An
+     * asset has at most one of a point location or a shape at a time within
+     * a single row - saving one clears the other, mirroring how
+     * Properties/Shape.jsx saves a zone's polygon immediately on draw, no
+     * separate Save step.
      */
     public function updateLocation(Request $request, Asset $asset)
     {
@@ -42,10 +46,9 @@ class AssetController extends Controller
                 'shape' => 'required|array|min:3',
             ]);
 
-            $asset->update([
+            $asset->locations()->create([
                 'shape' => $validated['shape'],
-                'latitude' => null,
-                'longitude' => null,
+                'created_by' => $request->user()->id,
             ]);
         } elseif ($request->has('latitude')) {
             $validated = $request->validate([
@@ -53,13 +56,15 @@ class AssetController extends Controller
                 'longitude' => 'required|numeric|between:-180,180',
             ]);
 
-            $asset->update([
+            $asset->locations()->create([
                 'latitude' => $validated['latitude'],
                 'longitude' => $validated['longitude'],
-                'shape' => null,
+                'created_by' => $request->user()->id,
             ]);
         } else {
-            $asset->update(['latitude' => null, 'longitude' => null, 'shape' => null]);
+            $asset->locations()->create([
+                'created_by' => $request->user()->id,
+            ]);
         }
 
         return back()->with('success', 'Location updated.');
@@ -74,7 +79,7 @@ class AssetController extends Controller
 
     public function show(Asset $asset)
     {
-        $asset->load(['assetType', 'maintenanceItems', 'property.shape']);
+        $asset->load(['assetType', 'maintenanceItems', 'property.shape', 'notes.photos', 'notes.createdBy', 'currentLocation', 'locations']);
 
         $jobIds = $asset->jobs()->pluck('farm_jobs.id');
 

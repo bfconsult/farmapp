@@ -25,6 +25,7 @@ use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\MaintenanceItemController;
+use App\Http\Controllers\NoteController;
 
 
 
@@ -166,6 +167,9 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('assets/{asset}/maintenance-items', [MaintenanceItemController::class, 'store'])->name('maintenance-items.store');
     Route::patch('maintenance-items/{maintenanceItem}', [MaintenanceItemController::class, 'update'])->name('maintenance-items.update');
     Route::delete('maintenance-items/{maintenanceItem}', [MaintenanceItemController::class, 'destroy'])->name('maintenance-items.destroy');
+    Route::patch('notes/{note}', [NoteController::class, 'update'])->name('notes.update');
+    Route::put('notes/{note}/location', [NoteController::class, 'updateLocation'])->name('notes.update-location');
+    Route::delete('notes/{note}', [NoteController::class, 'destroy'])->name('notes.destroy');
 });
 
 // Admin, Manager, and Worker can log measurements - approvers stay
@@ -180,6 +184,8 @@ Route::middleware(['auth', 'property.role:admin,manager,worker'])->group(functio
     Route::patch('checklist-items/{checklistItem}', [ChecklistItemController::class, 'update'])->name('checklist-items.update');
     Route::post('checklist-items/{checklistItem}/photos', [PhotoController::class, 'storeForChecklistItem'])->name('photos.store-checklist-item');
     Route::post('maintenance-items/{maintenanceItem}/convert', [MaintenanceItemController::class, 'convertToJob'])->name('maintenance-items.convert');
+    Route::post('notes', [NoteController::class, 'store'])->name('notes.store');
+    Route::post('notes/{note}/photos', [PhotoController::class, 'storeForNote'])->name('photos.store-note');
 });
 
 // All four roles can reach the Metrics index - it self-adjusts which tabs
@@ -221,19 +227,32 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             ? \App\Models\Property::with(['shape', 'zones'])->find($currentPropertyId)
             : null;
 
-        $jobs = $user->farmJobs()
+        $currentRole = $currentProperty
+            ? $user->roleOn($currentProperty)
+            : null;
+
+        // An approver reviews everyone's work without being added to the
+        // team on individual jobs - see every job on the property instead of
+        // only ones they're personally assigned to (mirrors the same
+        // approver carve-out in FarmJobController::index).
+        $jobs = \App\Models\FarmJob::query()
+            ->when($currentRole !== \App\Models\Role::APPROVER, fn ($q) => $q->whereHas(
+                'assignees',
+                fn ($q2) => $q2->where('users.id', $user->id)
+            ))
             ->when($currentPropertyId, fn($q) => $q->where('property_id', $currentPropertyId))
             ->with(['jobStatus'])
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->get();
 
-        $currentRole = $currentProperty
-            ? $user->roleOn($currentProperty)
-            : null;
-
         $assets = \App\Models\Asset::where('property_id', $currentPropertyId)
-            ->with('assetType')
+            ->with(['assetType', 'currentLocation'])
+            ->get();
+
+        $notes = \App\Models\Note::where('property_id', $currentPropertyId)
+            ->whereNotNull('latitude')
+            ->with(['createdBy', 'photos'])
             ->get();
 
         return Inertia::render('Map', [
@@ -241,6 +260,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             'shape' => $currentProperty?->shape,
             'zones' => $currentProperty?->zones ?? [],
             'assets' => $assets,
+            'notes' => $notes,
             'currentRole' => $currentRole,
         ]);
     })->name('map');
