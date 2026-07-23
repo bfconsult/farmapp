@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
 import { formatDate } from '@/dateInput';
+import { pillBadgeClass } from '@/Utils/pillColors';
 
 export default function JobHistory({ asset, jobs }) {
     return (
@@ -27,7 +28,7 @@ export default function JobHistory({ asset, jobs }) {
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className="text-xs text-gray-400">{formatDate(job.created_at.slice(0, 10))}</span>
                                         {job.job_status && (
-                                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600">
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${pillBadgeClass(job.job_status.color)}`}>
                                                 {job.job_status.name}
                                             </span>
                                         )}

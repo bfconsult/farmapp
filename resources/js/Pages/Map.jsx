@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import Modal from '@/Components/Modal';
 import { formatDate } from '@/dateInput';
+import { pillBadgeClass } from '@/Utils/pillColors';
 
 const ZONE_COLOR = '#7c3aed';
 const ASSET_COLOR = '#2563eb';
@@ -237,7 +238,7 @@ export default function Map({
                 marker.bindPopup(`
                     <div style="min-width:150px">
                         <strong>${job.name}</strong><br/>
-                        ${job.job_status ? `<span>${job.job_status.name}</span><br/>` : ''}
+                        ${job.job_status ? `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${pillBadgeClass(job.job_status.color)}" style="display:inline-block;margin:4px 0">${job.job_status.name}</span><br/>` : ''}
                         <a href="/jobs/${job.id}" style="color:#16a34a">View job →</a>
                     </div>
                 `);

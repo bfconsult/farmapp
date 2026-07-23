@@ -13,6 +13,13 @@ use Inertia\Inertia;
 
 class SettingsController extends Controller
 {
+    // Fixed 16-color palette offered for job status/priority/type pills.
+    // Keys must match resources/js/Utils/pillColors.js exactly.
+    public const PILL_COLORS = [
+        'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal',
+        'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'pink', 'rose',
+    ];
+
     public function index()
     {
         return Inertia::render('Settings/Index', [
@@ -42,6 +49,7 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'order' => 'required|integer',
+            'color' => 'nullable|string|in:'.implode(',', self::PILL_COLORS),
         ]);
         Priority::create($validated);
         return back();
@@ -52,6 +60,7 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'order' => 'required|integer',
+            'color' => 'nullable|string|in:'.implode(',', self::PILL_COLORS),
         ]);
         $priority->update($validated);
         return back();
@@ -68,6 +77,7 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'color' => 'nullable|string|in:'.implode(',', self::PILL_COLORS),
         ]);
         JobType::create($validated);
         return back();
@@ -77,6 +87,7 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'color' => 'nullable|string|in:'.implode(',', self::PILL_COLORS),
         ]);
         $jobType->update($validated);
         return back();
@@ -119,6 +130,7 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'order' => 'required|integer',
+            'color' => 'nullable|string|in:'.implode(',', self::PILL_COLORS),
             'can_book_time' => 'boolean',
             'is_in_progress_default' => 'boolean',
             'is_recurring_closed_default' => 'boolean',
@@ -150,6 +162,7 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'order' => 'required|integer',
+            'color' => 'nullable|string|in:'.implode(',', self::PILL_COLORS),
             'can_book_time' => 'boolean',
             'is_in_progress_default' => 'boolean',
             'is_recurring_closed_default' => 'boolean',

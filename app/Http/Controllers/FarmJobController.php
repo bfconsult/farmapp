@@ -271,9 +271,9 @@ class FarmJobController extends Controller
                 'name' => $farmJob->name,
                 'description' => $farmJob->description,
                 'scheduled_date' => $farmJob->scheduled_date,
-                'priority' => $farmJob->priority?->only(['name']),
-                'job_type' => $farmJob->jobType?->only(['name']),
-                'job_status' => $farmJob->jobStatus?->only(['name']),
+                'priority' => $farmJob->priority?->only(['name', 'color']),
+                'job_type' => $farmJob->jobType?->only(['name', 'color']),
+                'job_status' => $farmJob->jobStatus?->only(['name', 'color']),
                 'property' => $farmJob->property?->only(['name']),
                 'photos' => $farmJob->photos->map(fn ($photo) => [
                     'id' => $photo->id,

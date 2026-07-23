@@ -4,6 +4,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
 import { compressImageFiles } from '@/imageCompression';
+import { pillBadgeClass } from '@/Utils/pillColors';
 
 const ASSET_COLOR = '#2563eb';
 const PROPERTY_BOUNDARY_COLOR = '#9ca3af';
@@ -894,7 +895,7 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className="text-xs text-gray-400">{formatDate(job.created_at.slice(0, 10))}</span>
                                         {job.job_status && (
-                                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600">
+                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${pillBadgeClass(job.job_status.color)}`}>
                                                 {job.job_status.name}
                                             </span>
                                         )}

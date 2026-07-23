@@ -3,20 +3,7 @@ import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { formatDate } from '@/dateInput';
-
-const STATUS_COLORS = {
-    'Pending': 'bg-yellow-100 text-yellow-800',
-    'In Progress': 'bg-blue-100 text-blue-800',
-    'Completed': 'bg-green-100 text-green-800',
-    'Cancelled': 'bg-gray-100 text-gray-800',
-};
-
-const PRIORITY_COLORS = {
-    'Low': 'bg-gray-100 text-gray-600',
-    'Medium': 'bg-yellow-100 text-yellow-700',
-    'High': 'bg-orange-100 text-orange-700',
-    'Critical': 'bg-red-100 text-red-700',
-};
+import { pillBadgeClass } from '@/Utils/pillColors';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
@@ -49,17 +36,17 @@ function JobCard({ job }) {
 
             <div className="flex flex-wrap gap-2 mt-2">
                 {job.job_status && (
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[job.job_status.name] ?? 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${pillBadgeClass(job.job_status.color)}`}>
                         {job.job_status.name}
                     </span>
                 )}
                 {job.priority && (
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${PRIORITY_COLORS[job.priority.name] ?? 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${pillBadgeClass(job.priority.color)}`}>
                         {job.priority.name}
                     </span>
                 )}
                 {job.job_type && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${pillBadgeClass(job.job_type.color)}`}>
                         {job.job_type.name}
                     </span>
                 )}

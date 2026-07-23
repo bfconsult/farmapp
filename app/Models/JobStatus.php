@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class JobStatus extends Model
 {
-    protected $fillable = ['name', 'order', 'can_book_time', 'is_in_progress_default', 'is_recurring_closed_default', 'is_finished_default'];
+    protected $fillable = ['name', 'color', 'order', 'can_book_time', 'is_in_progress_default', 'is_recurring_closed_default', 'is_finished_default'];
 
     protected $casts = [
         'can_book_time' => 'boolean',

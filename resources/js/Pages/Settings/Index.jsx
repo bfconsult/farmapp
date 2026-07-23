@@ -1,6 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import ColorPicker from '@/Components/ColorPicker';
+import { pillBadgeClass } from '@/Utils/pillColors';
 
 function LookupRow({ item, onSave, onDelete, extraFields }) {
     const [editing, setEditing] = useState(false);
@@ -43,7 +45,7 @@ function LookupRow({ item, onSave, onDelete, extraFields }) {
     return (
         <div className="flex items-center justify-between py-3 px-1 border-b border-gray-100 last:border-0">
             <div>
-                <span className="text-sm text-gray-900">{item.name}</span>
+                <span className={`text-sm px-2 py-0.5 rounded-full ${pillBadgeClass(item.color)}`}>{item.name}</span>
                 {item.order !== undefined && (
                     <span className="text-xs text-gray-400 ml-2">#{item.order}</span>
                 )}
@@ -92,11 +94,11 @@ function LookupRow({ item, onSave, onDelete, extraFields }) {
 
 function AddRow({ onAdd, extraFields }) {
     const [adding, setAdding] = useState(false);
-    const [values, setValues] = useState({ name: '', order: 0, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false });
+    const [values, setValues] = useState({ name: '', order: 0, color: null, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false });
 
     const save = () => {
         onAdd(values);
-        setValues({ name: '', order: 0, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false });
+        setValues({ name: '', order: 0, color: null, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false });
         setAdding(false);
     };
 
@@ -171,8 +173,8 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
     };
 
     // Job Types
-    const addJobType = (values) => router.post(route('settings.job-types.store'), { name: values.name }, preserve);
-    const saveJobType = (id, values) => router.patch(route('settings.job-types.update', id), { name: values.name }, preserve);
+    const addJobType = (values) => router.post(route('settings.job-types.store'), { name: values.name, color: values.color }, preserve);
+    const saveJobType = (id, values) => router.patch(route('settings.job-types.update', id), { name: values.name, color: values.color }, preserve);
     const deleteJobType = (id) => {
         if (confirm('Delete this job type?')) router.delete(route('settings.job-types.destroy', id), preserve);
     };
@@ -196,14 +198,21 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
         router.patch(route('settings.billing-block.update'), { billing_block_minutes: minutes }, preserve);
     };
 
+    const colorField = (values, setValues) => (
+        <ColorPicker value={values.color} onChange={(color) => setValues({ ...values, color })} />
+    );
+
     const orderField = (values, setValues) => (
-        <input
-            type="number"
-            value={values.order}
-            onChange={(e) => setValues({ ...values, order: parseInt(e.target.value) })}
-            className="w-full border-gray-300 rounded-lg p-2 text-sm"
-            placeholder="Order"
-        />
+        <>
+            <input
+                type="number"
+                value={values.order}
+                onChange={(e) => setValues({ ...values, order: parseInt(e.target.value) })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                placeholder="Order"
+            />
+            {colorField(values, setValues)}
+        </>
     );
 
     const statusFields = (values, setValues) => (
@@ -215,6 +224,7 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
                 className="w-full border-gray-300 rounded-lg p-2 text-sm"
                 placeholder="Order"
             />
+            {colorField(values, setValues)}
             <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                     type="checkbox"
@@ -300,9 +310,10 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
                                     item={item}
                                     onSave={saveJobType}
                                     onDelete={deleteJobType}
+                                    extraFields={colorField}
                                 />
                             ))}
-                            <AddRow onAdd={addJobType} />
+                            <AddRow onAdd={addJobType} extraFields={colorField} />
                         </>
                     )}
 
