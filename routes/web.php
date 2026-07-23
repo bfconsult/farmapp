@@ -34,6 +34,14 @@ Route::get('/', function () {
     return Inertia::render('Welcome');
 });
 
+Route::get('/privacy-policy', function () {
+    return Inertia::render('Legal');
+})->name('privacy-policy');
+
+Route::get('/contact', function () {
+    return Inertia::render('Contact');
+})->name('contact');
+
 // Served via a route (not a static public/ file) so the icon URLs below can
 // resolve through asset(), which points at the CDN on Vapor — a plain public/
 // file would 404 there, since Vapor only auto-redirects favicon.ico/robots.txt.

@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
+import SiteNotice from '@/Components/SiteNotice';
 
 const features = [
     {
@@ -53,7 +54,7 @@ export default function Welcome({ auth }) {
                         <div className="flex items-center gap-2">
                             <ApplicationLogo className="h-8 w-8" />
                             <span className="text-lg font-black tracking-tight text-gray-800">
-                                Farm<span className="text-[#1A5C38]">Task</span>
+                                Field<span className="text-[#1A5C38]">Werkz</span>
                             </span>
                         </div>
 
@@ -84,6 +85,8 @@ export default function Welcome({ auth }) {
                         </nav>
                     </div>
                 </header>
+
+                <SiteNotice />
 
                 <main>
                     <section className="mx-auto max-w-6xl px-6 py-20 text-center">
@@ -142,7 +145,12 @@ export default function Welcome({ auth }) {
                 </main>
 
                 <footer className="border-t border-gray-200 py-8 text-center text-sm text-gray-500">
-                    &copy; {new Date().getFullYear()} FieldWerkz
+                    <p>&copy; {new Date().getFullYear()} FieldWerkz</p>
+                    <p className="mt-2 space-x-3">
+                        <Link href={route('privacy-policy')} className="hover:text-green-700 hover:underline">Privacy Policy</Link>
+                        <span className="text-gray-300">·</span>
+                        <Link href={route('contact')} className="hover:text-green-700 hover:underline">Contact</Link>
+                    </p>
                 </footer>
             </div>
         </>
