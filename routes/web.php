@@ -239,16 +239,24 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             ? $user->roleOn($currentProperty)
             : null;
 
-        // Job status/age filters for the map's Filters popout - default to
-        // "active jobs, all time" so a fresh visit looks like it always did.
-        // Mirrors FarmJobController::index's can_book_time-based status split.
-        $showActiveJobs = $request->boolean('job_status_active', true);
-        $showCompletedJobs = $request->boolean('job_status_completed', false);
-        $jobAge = $request->input('job_age', 'all');
+        // Job status/age filters for the map's Filters popout. Statuses are a
+        // user-editable list with no fixed meaning, so the filter lets you
+        // tick the actual statuses you want to see rather than deriving an
+        // Active/Completed split from the can_book_time flag - that flag is
+        // about billing eligibility, not "is this status done", and the two
+        // don't always agree (e.g. a custom "complete" status someone forgot
+        // to also flag as not-bookable).
+        $jobStatuses = \App\Models\JobStatus::orderBy('order')->get(['id', 'name', 'color']);
+        $defaultJobStatusIds = \App\Models\JobStatus::where('can_book_time', true)->pluck('id');
 
-        $jobStatusIds = collect()
-            ->when($showActiveJobs, fn ($ids) => $ids->merge(\App\Models\JobStatus::where('can_book_time', true)->pluck('id')))
-            ->when($showCompletedJobs, fn ($ids) => $ids->merge(\App\Models\JobStatus::where('can_book_time', false)->pluck('id')));
+        // job_status_ids_set distinguishes "the user explicitly chose zero
+        // statuses" from "no selection has been made yet" - an empty array
+        // and an absent param are otherwise indistinguishable over HTTP.
+        $jobStatusIds = $request->boolean('job_status_ids_set')
+            ? collect($request->input('job_status_ids', []))->map(fn ($id) => (int) $id)
+            : $defaultJobStatusIds;
+
+        $jobAge = $request->input('job_age', 'all');
 
         // An approver reviews everyone's work without being added to the
         // team on individual jobs - see every job on the property instead of
@@ -283,8 +291,9 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             'assets' => $assets,
             'notes' => $notes,
             'currentRole' => $currentRole,
-            'currentJobStatusActive' => $showActiveJobs,
-            'currentJobStatusCompleted' => $showCompletedJobs,
+            'jobStatuses' => $jobStatuses,
+            'defaultJobStatusIds' => $defaultJobStatusIds,
+            'currentJobStatusIds' => $jobStatusIds->values(),
             'currentJobAge' => $jobAge,
         ]);
     })->name('map');

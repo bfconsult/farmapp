@@ -30,7 +30,7 @@ function pinIcon(L, color) {
 
 export default function Map({
     jobs, shape, zones, assets, notes, currentRole,
-    currentJobStatusActive, currentJobStatusCompleted, currentJobAge,
+    jobStatuses, defaultJobStatusIds, currentJobStatusIds, currentJobAge,
 }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
@@ -50,8 +50,7 @@ export default function Map({
     const [showAssets, setShowAssets] = useState(false);
     const [showNotes, setShowNotes] = useState(false);
     const [showFiltersPanel, setShowFiltersPanel] = useState(false);
-    const [jobStatusActive, setJobStatusActive] = useState(currentJobStatusActive);
-    const [jobStatusCompleted, setJobStatusCompleted] = useState(currentJobStatusCompleted);
+    const [jobStatusIds, setJobStatusIds] = useState(currentJobStatusIds);
     const [jobAge, setJobAge] = useState(currentJobAge);
     const [mapReady, setMapReady] = useState(false);
     const [activeNote, setActiveNote] = useState(null);
@@ -369,27 +368,28 @@ export default function Map({
     // the whole point is to stop ever-growing old job pins from being sent
     // to the browser at all, not just hidden there.
     const updateJobFilters = (overrides = {}) => {
+        const ids = overrides.jobStatusIds ?? jobStatusIds;
         router.get(route('map'), {
-            job_status_active: overrides.jobStatusActive ?? jobStatusActive,
-            job_status_completed: overrides.jobStatusCompleted ?? jobStatusCompleted,
+            job_status_ids: ids,
+            // Distinguishes "explicitly chose zero statuses" from "no
+            // selection made yet" - an empty array otherwise looks the same
+            // as an absent param over HTTP, which would wrongly fall back to
+            // the server's default selection.
+            job_status_ids_set: true,
             job_age: overrides.jobAge ?? jobAge,
         }, {
             preserveState: true,
             preserveScroll: true,
-            only: ['jobs', 'currentJobStatusActive', 'currentJobStatusCompleted', 'currentJobAge'],
+            only: ['jobs', 'currentJobStatusIds', 'currentJobAge'],
         });
     };
 
-    const toggleJobStatusActive = () => {
-        const next = !jobStatusActive;
-        setJobStatusActive(next);
-        updateJobFilters({ jobStatusActive: next });
-    };
-
-    const toggleJobStatusCompleted = () => {
-        const next = !jobStatusCompleted;
-        setJobStatusCompleted(next);
-        updateJobFilters({ jobStatusCompleted: next });
+    const toggleJobStatusId = (statusId) => {
+        const next = jobStatusIds.includes(statusId)
+            ? jobStatusIds.filter((id) => id !== statusId)
+            : [...jobStatusIds, statusId];
+        setJobStatusIds(next);
+        updateJobFilters({ jobStatusIds: next });
     };
 
     const changeJobAge = (value) => {
@@ -397,7 +397,8 @@ export default function Map({
         updateJobFilters({ jobAge: value });
     };
 
-    const hasNonDefaultFilters = !jobStatusActive || jobStatusCompleted || jobAge !== 'all';
+    const sameIdSet = (a, b) => a.length === b.length && [...a].sort().join(',') === [...b].sort().join(',');
+    const hasNonDefaultFilters = jobAge !== 'all' || !sameIdSet(jobStatusIds, defaultJobStatusIds);
 
     const startAddingNote = () => {
         const place = (lat, lng) => {
@@ -636,24 +637,19 @@ export default function Map({
                                 <div className="border-t border-gray-100 pt-3">
                                     <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Job status</p>
                                     <div className="space-y-1.5">
-                                        <label className="flex items-center gap-2 text-sm text-gray-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={jobStatusActive}
-                                                onChange={toggleJobStatusActive}
-                                                className="rounded text-green-600 focus:ring-green-500"
-                                            />
-                                            Active jobs
-                                        </label>
-                                        <label className="flex items-center gap-2 text-sm text-gray-700">
-                                            <input
-                                                type="checkbox"
-                                                checked={jobStatusCompleted}
-                                                onChange={toggleJobStatusCompleted}
-                                                className="rounded text-green-600 focus:ring-green-500"
-                                            />
-                                            Completed / Cancelled
-                                        </label>
+                                        {jobStatuses.map((status) => (
+                                            <label key={status.id} className="flex items-center gap-2 text-sm text-gray-700">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={jobStatusIds.includes(status.id)}
+                                                    onChange={() => toggleJobStatusId(status.id)}
+                                                    className="rounded text-green-600 focus:ring-green-500"
+                                                />
+                                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${pillBadgeClass(status.color)}`}>
+                                                    {status.name}
+                                                </span>
+                                            </label>
+                                        ))}
                                     </div>
                                 </div>
 

@@ -37,23 +37,36 @@ class FarmJobController extends Controller
             ? $query
             : $query->whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()));
 
-        $dateFrom = $request->date_from
-            ? \Carbon\Carbon::parse($request->date_from)->startOfDay()
-            : now()->startOfMonth();
-        $dateTo = $request->date_to
-            ? \Carbon\Carbon::parse($request->date_to)->endOfDay()
-            : now()->endOfMonth();
-
-        // Status ids: explicit selection from the Filters panel, or (on first
-        // load, when nothing has been chosen yet) the statuses flagged as active.
-        // Note: an empty `statuses` array is dropped entirely by query-string
-        // serialization, so it can't be distinguished from "absent" on its own —
-        // `date_from` is always sent by the Filters panel and never empty, so we
-        // use its presence as the "the user has touched the filters" signal.
+        // Filters persist across visits (in session), not just within one
+        // browser history via query string - otherwise navigating away and
+        // back via the main nav (a plain link, no query params) silently
+        // reset the date range/status/order back to the hard defaults every
+        // time. `date_from` is always sent together with the rest by the
+        // Filters panel and never empty, so its presence is the "the user
+        // has touched the filters this visit" signal (an empty `statuses`
+        // array on its own can't be told apart from "absent" over HTTP).
         if ($request->has('date_from')) {
+            $dateFrom = \Carbon\Carbon::parse($request->date_from)->startOfDay();
+            $dateTo = \Carbon\Carbon::parse($request->date_to)->endOfDay();
             $statusIds = collect($request->input('statuses', []))->map(fn ($id) => (int) $id)->all();
+            $order = $request->input('order', 'latest');
+
+            session(['jobs_index_filters' => [
+                'date_from' => $request->date_from,
+                'date_to' => $request->date_to,
+                'statuses' => $statusIds,
+                'order' => $order,
+            ]]);
+        } elseif ($persisted = session('jobs_index_filters')) {
+            $dateFrom = \Carbon\Carbon::parse($persisted['date_from'])->startOfDay();
+            $dateTo = \Carbon\Carbon::parse($persisted['date_to'])->endOfDay();
+            $statusIds = $persisted['statuses'];
+            $order = $persisted['order'];
         } else {
+            $dateFrom = now()->startOfMonth();
+            $dateTo = now()->endOfMonth();
             $statusIds = JobStatus::where('can_book_time', true)->pluck('id')->all();
+            $order = 'latest';
         }
 
         $query = $scopeToAssignee(FarmJob::query())
@@ -77,8 +90,7 @@ class FarmJobController extends Controller
 
         $counts = $countableJobs->groupBy('job_status_id')->map->count();
 
-        // Ordering
-        $order = $request->order ?? 'latest';
+        // Ordering ($order was already resolved above, alongside the other persisted filters)
         match($order) {
             'priority' => $query->join('priorities', 'farm_jobs.priority_id', '=', 'priorities.id')
                                ->orderBy('priorities.order', 'desc')
