@@ -57,6 +57,12 @@ function JobCard({ job }) {
                 )}
             </div>
 
+            {job.recurring_job_id && job.period_start && job.period_end && (
+                <p className="text-xs text-gray-400 mt-2">
+                    {formatDate(job.period_start)} – {formatDate(job.period_end)}
+                </p>
+            )}
+
             {job.description && (
                 <p className="text-sm text-gray-500 mt-2 line-clamp-1">
                     {job.description}
