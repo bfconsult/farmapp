@@ -139,6 +139,11 @@ class FarmJob extends Model
         return $this->belongsToMany(User::class, 'farm_job_user', 'farm_job_id', 'user_id')->withTimestamps();
     }
 
+    public function reminders()
+    {
+        return $this->hasMany(JobReminder::class);
+    }
+
     public function checklists()
     {
         return $this->hasMany(Checklist::class);
