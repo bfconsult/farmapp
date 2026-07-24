@@ -229,7 +229,7 @@ class FarmJobController extends Controller
         $farmJob->assignees()->attach($teamUserIds);
 
         if ($intent === 'plan') {
-            return redirect()->route('jobs.edit', $farmJob);
+            return redirect()->route('jobs.index');
         }
 
         return redirect()->route('jobs.show', $farmJob)->with('addPhoto', true);
