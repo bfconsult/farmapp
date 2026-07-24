@@ -112,7 +112,8 @@ function formatViewedAt(datetime) {
 }
 
 export default function Show({ job, seenBy, checklistTemplates }) {
-    const fileInput = useRef(null);
+    const cameraInput = useRef(null);
+    const galleryInput = useRef(null);
     const { flash } = usePage().props;
     const [uploading, setUploading] = useState(false);
     const [showDeleteOptions, setShowDeleteOptions] = useState(false);
@@ -126,8 +127,8 @@ export default function Show({ job, seenBy, checklistTemplates }) {
     const hasIncompleteChecklists = (job.checklists ?? []).some((c) => c.status === 'incomplete');
 
     useEffect(() => {
-        if (flash?.addPhoto && fileInput.current) {
-            fileInput.current.click();
+        if (flash?.addPhoto && cameraInput.current) {
+            cameraInput.current.click();
         }
     }, [flash]);
 
@@ -427,22 +428,38 @@ export default function Show({ job, seenBy, checklistTemplates }) {
                 <div className="bg-white rounded-lg shadow p-4">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Photos</h2>
-                        <button
-                            onClick={() => fileInput.current.click()}
-                            disabled={uploading}
-                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg disabled:opacity-50"
-                        >
-                            + Add Photo
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => cameraInput.current.click()}
+                                disabled={uploading}
+                                className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg disabled:opacity-50"
+                            >
+                                Take Photo
+                            </button>
+                            <button
+                                onClick={() => galleryInput.current.click()}
+                                disabled={uploading}
+                                className="text-sm px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded-lg disabled:opacity-50"
+                            >
+                                Gallery
+                            </button>
+                        </div>
                         <input
-                            ref={fileInput}
+                            ref={cameraInput}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={uploadPhotos}
+                            className="hidden"
+                        />
+                        <input
+                            ref={galleryInput}
                             type="file"
                             accept="image/*"
                             multiple
                             onChange={uploadPhotos}
                             className="hidden"
                         />
-
                     </div>
 
                     {job.photos && job.photos.length > 0 && (

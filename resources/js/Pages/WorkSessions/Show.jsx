@@ -18,13 +18,14 @@ const STATUS_COLORS = {
 };
 
 export default function Show({ session, durationInHours, billingAmount, waypoints }) {
-    const fileInput = useRef(null);
+    const cameraInput = useRef(null);
+    const galleryInput = useRef(null);
     const { flash } = usePage().props;
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
-        if (flash?.addPhoto && fileInput.current) {
-            fileInput.current.click();
+        if (flash?.addPhoto && cameraInput.current) {
+            cameraInput.current.click();
         }
     }, [flash]);
 
@@ -207,15 +208,32 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                 <div className="bg-white rounded-lg shadow p-4">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Photos</h2>
-                        <button
-                            onClick={() => fileInput.current.click()}
-                            disabled={uploading}
-                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg disabled:opacity-50"
-                        >
-                            {uploading ? 'Uploading…' : '+ Add Photo'}
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => cameraInput.current.click()}
+                                disabled={uploading}
+                                className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg disabled:opacity-50"
+                            >
+                                {uploading ? 'Uploading…' : 'Take Photo'}
+                            </button>
+                            <button
+                                onClick={() => galleryInput.current.click()}
+                                disabled={uploading}
+                                className="text-sm px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded-lg disabled:opacity-50"
+                            >
+                                Gallery
+                            </button>
+                        </div>
                         <input
-                            ref={fileInput}
+                            ref={cameraInput}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={uploadPhotos}
+                            className="hidden"
+                        />
+                        <input
+                            ref={galleryInput}
                             type="file"
                             accept="image/*"
                             multiple
@@ -226,7 +244,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
 
                     {session.photos && session.photos.length === 0 ? (
                         <button
-                            onClick={() => fileInput.current.click()}
+                            onClick={() => cameraInput.current.click()}
                             className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400"
                         >
                             <svg className="w-8 h-8 mx-auto mb-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

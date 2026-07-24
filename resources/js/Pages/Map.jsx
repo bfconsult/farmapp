@@ -40,7 +40,8 @@ export default function Map({
     const assetLayerGroup = useRef(null);
     const noteLayerGroup = useRef(null);
     const noteMarkersById = useRef({});
-    const noteFileInput = useRef(null);
+    const noteCameraInput = useRef(null);
+    const noteGalleryInput = useRef(null);
     const updateZoneLabels = useRef(null);
     const updateAssetLabels = useRef(null);
     // Jobs default to visible (this page's original, only content before the
@@ -787,9 +788,14 @@ export default function Map({
                         {!editingNoteBody && (
                             <div className="flex flex-wrap gap-3 text-xs pt-1">
                                 {canCreateNote && (
-                                    <button onClick={() => noteFileInput.current.click()} disabled={uploadingNotePhoto} className="text-teal-600 font-medium disabled:opacity-50">
-                                        {uploadingNotePhoto ? 'Uploading…' : '+ Add Photo'}
-                                    </button>
+                                    <>
+                                        <button onClick={() => noteCameraInput.current.click()} disabled={uploadingNotePhoto} className="text-teal-600 font-medium disabled:opacity-50">
+                                            {uploadingNotePhoto ? 'Uploading…' : 'Take Photo'}
+                                        </button>
+                                        <button onClick={() => noteGalleryInput.current.click()} disabled={uploadingNotePhoto} className="text-teal-600 font-medium disabled:opacity-50">
+                                            Gallery
+                                        </button>
+                                    </>
                                 )}
                                 {isAdminOrManager && (
                                     <>
@@ -801,7 +807,15 @@ export default function Map({
                             </div>
                         )}
                         <input
-                            ref={noteFileInput}
+                            ref={noteCameraInput}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={uploadNotePhotos}
+                            className="hidden"
+                        />
+                        <input
+                            ref={noteGalleryInput}
                             type="file"
                             accept="image/*"
                             multiple

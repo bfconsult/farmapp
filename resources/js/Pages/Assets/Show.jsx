@@ -524,7 +524,8 @@ function AddMaintenanceItemForm({ asset, onClose }) {
 }
 
 function NoteRow({ note, canManage, canCreate }) {
-    const fileInput = useRef(null);
+    const cameraInput = useRef(null);
+    const galleryInput = useRef(null);
     const [uploading, setUploading] = useState(false);
     const [editing, setEditing] = useState(false);
     const [body, setBody] = useState(note.body);
@@ -611,9 +612,14 @@ function NoteRow({ note, canManage, canCreate }) {
 
             <div className="flex gap-3 mt-2 text-xs">
                 {canCreate && (
-                    <button onClick={() => fileInput.current.click()} disabled={uploading} className="text-green-600 font-medium disabled:opacity-50">
-                        {uploading ? 'Uploading…' : '+ Add Photo'}
-                    </button>
+                    <>
+                        <button onClick={() => cameraInput.current.click()} disabled={uploading} className="text-green-600 font-medium disabled:opacity-50">
+                            {uploading ? 'Uploading…' : 'Take Photo'}
+                        </button>
+                        <button onClick={() => galleryInput.current.click()} disabled={uploading} className="text-green-600 font-medium disabled:opacity-50">
+                            Gallery
+                        </button>
+                    </>
                 )}
                 {canManage && (
                     <>
@@ -623,7 +629,15 @@ function NoteRow({ note, canManage, canCreate }) {
                 )}
             </div>
             <input
-                ref={fileInput}
+                ref={cameraInput}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={uploadPhotos}
+                className="hidden"
+            />
+            <input
+                ref={galleryInput}
                 type="file"
                 accept="image/*"
                 multiple
