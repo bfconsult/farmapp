@@ -13,6 +13,7 @@ use App\Models\JobStatus;
 use App\Models\Property;
 use App\Models\RecurringJob;
 use App\Models\Role;
+use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -237,7 +238,7 @@ class FarmJobController extends Controller
 
     public function show(FarmJob $farmJob)
     {
-        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset']);
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset', 'expenses.supplier', 'expenses.photos', 'expenses.createdBy']);
 
         // Logs (or refreshes) that the current user has seen this job - one
         // row per user, most recent view time only, not a full visit log.
@@ -257,6 +258,7 @@ class FarmJobController extends Controller
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(),
+            'suppliers' => Supplier::orderBy('name')->get(),
         ]);
     }
 

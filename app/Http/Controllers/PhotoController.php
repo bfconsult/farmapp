@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ChecklistItem;
+use App\Models\Expense;
 use App\Models\FarmJob;
 use App\Models\MetricMeasurement;
 use App\Models\Note;
@@ -117,6 +118,26 @@ class PhotoController extends Controller
             $path = $this->storeCompressed($file);
 
             $note->photos()->create([
+                'file' => $path,
+                'time_taken' => now(),
+                'location' => $request->location ?? null,
+            ]);
+        }
+
+        return back();
+    }
+
+    public function storeForExpense(Request $request, Expense $expense)
+    {
+        $request->validate([
+            'photos' => 'required|array',
+            'photos.*' => 'image|max:10240',
+        ]);
+
+        foreach ($request->file('photos') as $file) {
+            $path = $this->storeCompressed($file);
+
+            $expense->photos()->create([
                 'file' => $path,
                 'time_taken' => now(),
                 'location' => $request->location ?? null,

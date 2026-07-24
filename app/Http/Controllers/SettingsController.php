@@ -6,6 +6,7 @@ use App\Models\Priority;
 use App\Models\JobType;
 use App\Models\JobStatus;
 use App\Models\AssetType;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +28,7 @@ class SettingsController extends Controller
             'jobTypes' => JobType::orderBy('name')->get(),
             'jobStatuses' => JobStatus::orderBy('order')->get(),
             'assetTypes' => AssetType::orderBy('name')->get(),
+            'suppliers' => Supplier::orderBy('name')->get(),
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
             'billingBlockOptions' => User::BILLING_BLOCK_OPTIONS,
         ]);
@@ -121,6 +123,39 @@ class SettingsController extends Controller
     public function destroyAssetType(AssetType $assetType)
     {
         $assetType->delete();
+        return back();
+    }
+
+    // Suppliers
+    public function storeSupplier(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'street_address' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+        ]);
+        Supplier::create($validated);
+        return back();
+    }
+
+    public function updateSupplier(Request $request, Supplier $supplier)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'street_address' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:255',
+            'email' => 'nullable|email|max:255',
+        ]);
+        $supplier->update($validated);
+        return back();
+    }
+
+    public function destroySupplier(Supplier $supplier)
+    {
+        $supplier->delete();
         return back();
     }
 

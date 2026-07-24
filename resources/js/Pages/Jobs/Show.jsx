@@ -111,7 +111,124 @@ function formatViewedAt(datetime) {
     return `${formatDate(datetime, { year: false })}, ${time}`;
 }
 
-export default function Show({ job, seenBy, checklistTemplates }) {
+/**
+ * A single expense card. Owns its own photo-upload inputs (rather than
+ * sharing one pair at the page level) since each expense can independently
+ * be mid-upload - same pattern as Assets/Show.jsx's per-note NoteRow.
+ * Expenses only ever have one photo, so the Add Photo buttons disappear
+ * once one exists instead of the multi-photo grid used elsewhere.
+ */
+function ExpenseRow({ expense, onEdit }) {
+    const cameraInput = useRef(null);
+    const galleryInput = useRef(null);
+    const [uploading, setUploading] = useState(false);
+
+    const uploadPhotos = async (e) => {
+        const files = e.target.files;
+        if (!files.length) return;
+
+        setUploading(true);
+        const compressed = await compressImageFiles(files);
+
+        const formData = new FormData();
+        compressed.forEach(file => formData.append('photos[]', file));
+
+        router.post(route('photos.store-expense', expense.id), formData, {
+            forceFormData: true,
+            preserveScroll: true,
+            onFinish: () => setUploading(false),
+            onError: () => alert('Photo upload failed. Please try again with a smaller photo.'),
+        });
+    };
+
+    const destroyPhoto = (photoId) => {
+        if (confirm('Delete this photo?')) {
+            router.delete(route('photos.destroy', photoId), { preserveScroll: true });
+        }
+    };
+
+    const destroyExpense = () => {
+        if (confirm('Delete this expense?')) {
+            router.delete(route('expenses.destroy', expense.id), { preserveScroll: true });
+        }
+    };
+
+    const photo = expense.photos?.[0];
+
+    return (
+        <div className="border border-gray-200 rounded-lg p-3">
+            <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                    <p className="text-sm text-gray-900">{expense.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                        ${Number(expense.amount).toFixed(2)} ({expense.gst_inclusive ? 'GST inc' : 'GST ex'})
+                        {expense.supplier && ` · ${expense.supplier.name}`}
+                    </p>
+                </div>
+                {expense.reimburse && (
+                    <span className="text-xs px-2 py-1 rounded-full font-medium bg-amber-100 text-amber-700 flex-shrink-0">
+                        Reimburse
+                    </span>
+                )}
+            </div>
+
+            {expense.description && (
+                <p className="text-sm text-gray-500 mt-2">{expense.description}</p>
+            )}
+
+            {photo && (
+                <div className="relative w-20 h-20 mt-2">
+                    <img src={photo.url} className="w-full h-full object-cover rounded-lg" />
+                    <button
+                        onClick={() => destroyPhoto(photo.id)}
+                        className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                    >
+                        ×
+                    </button>
+                </div>
+            )}
+
+            <div className="flex gap-3 mt-2 text-xs items-center">
+                {!photo && (
+                    <>
+                        <button onClick={() => cameraInput.current.click()} disabled={uploading} aria-label="Take photo" className="text-green-600 disabled:opacity-50">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
+                        <button onClick={() => galleryInput.current.click()} disabled={uploading} aria-label="Choose from gallery" className="text-green-600 disabled:opacity-50">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
+                            </svg>
+                        </button>
+                    </>
+                )}
+                <button onClick={() => onEdit(expense)} className="text-green-600 font-medium">Edit</button>
+                <button onClick={destroyExpense} className="text-red-500 font-medium">Delete</button>
+            </div>
+
+            <input
+                ref={cameraInput}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={uploadPhotos}
+                className="hidden"
+            />
+            <input
+                ref={galleryInput}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={uploadPhotos}
+                className="hidden"
+            />
+        </div>
+    );
+}
+
+export default function Show({ job, seenBy, checklistTemplates, suppliers }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
     const { flash } = usePage().props;
@@ -119,6 +236,11 @@ export default function Show({ job, seenBy, checklistTemplates }) {
     const [showDeleteOptions, setShowDeleteOptions] = useState(false);
     const [showShare, setShowShare] = useState(false);
     const [showChecklistPicker, setShowChecklistPicker] = useState(false);
+    const [showExpenseModal, setShowExpenseModal] = useState(false);
+    const [editingExpense, setEditingExpense] = useState(null);
+    const [expenseForm, setExpenseForm] = useState({ name: '', description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
+    const [creatingSupplier, setCreatingSupplier] = useState(false);
+    const [newSupplierName, setNewSupplierName] = useState('');
     const [showLocationModal, setShowLocationModal] = useState(false);
     const [editingLocation, setEditingLocation] = useState(false);
     const [pendingLocation, setPendingLocation] = useState(null);
@@ -202,6 +324,74 @@ export default function Show({ job, seenBy, checklistTemplates }) {
                 checklist_template_id: template.id,
             }, { preserveScroll: true, preserveState: true });
         }
+    };
+
+    const openAddExpense = () => {
+        setEditingExpense(null);
+        setExpenseForm({ name: '', description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
+        setShowExpenseModal(true);
+    };
+
+    const openEditExpense = (expense) => {
+        setEditingExpense(expense);
+        setExpenseForm({
+            name: expense.name,
+            description: expense.description ?? '',
+            amount: expense.amount,
+            gst_inclusive: expense.gst_inclusive,
+            reimburse: expense.reimburse,
+            supplier_id: expense.supplier_id ? String(expense.supplier_id) : '',
+        });
+        setShowExpenseModal(true);
+    };
+
+    const closeExpenseModal = () => {
+        setShowExpenseModal(false);
+        setEditingExpense(null);
+        setCreatingSupplier(false);
+        setNewSupplierName('');
+    };
+
+    const saveExpense = () => {
+        const payload = {
+            name: expenseForm.name,
+            description: expenseForm.description,
+            amount: expenseForm.amount,
+            gst_inclusive: expenseForm.gst_inclusive,
+            reimburse: expenseForm.reimburse,
+            supplier_id: expenseForm.supplier_id || null,
+        };
+
+        if (editingExpense) {
+            router.patch(route('expenses.update', editingExpense.id), payload, {
+                preserveScroll: true,
+                onSuccess: closeExpenseModal,
+            });
+        } else {
+            router.post(route('expenses.store', job.id), payload, {
+                preserveScroll: true,
+                onSuccess: closeExpenseModal,
+            });
+        }
+    };
+
+    // Lets a supplier be created without leaving the expense form - posts to
+    // the same Settings endpoint, then matches the newly-created row back out
+    // of the refreshed `suppliers` prop by name to auto-select it.
+    const createSupplierInline = () => {
+        if (!newSupplierName.trim()) return;
+
+        router.post(route('settings.suppliers.store'), { name: newSupplierName }, {
+            preserveScroll: true,
+            preserveState: true,
+            only: ['suppliers'],
+            onSuccess: (page) => {
+                const created = page.props.suppliers.find((s) => s.name === newSupplierName);
+                if (created) setExpenseForm((f) => ({ ...f, supplier_id: String(created.id) }));
+                setCreatingSupplier(false);
+                setNewSupplierName('');
+            },
+        });
     };
 
     const destroyPhoto = (photoId) => {
@@ -559,6 +749,153 @@ export default function Show({ job, seenBy, checklistTemplates }) {
                                 <Link href={route('manage.index')} className="text-green-600">Manage</Link>.
                             </p>
                         )}
+                    </div>
+                </Modal>
+
+                {/* Expenses */}
+                <div className="bg-white rounded-lg shadow p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Expenses</h2>
+                        <button
+                            onClick={openAddExpense}
+                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
+                        >
+                            + Add Expense
+                        </button>
+                    </div>
+
+                    {job.expenses && job.expenses.length > 0 && (
+                        <div className="space-y-2">
+                            {job.expenses.map((expense) => (
+                                <ExpenseRow key={expense.id} expense={expense} onEdit={openEditExpense} />
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <Modal show={showExpenseModal} onClose={closeExpenseModal} maxWidth="lg">
+                    <div className="p-4 space-y-3">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-sm font-medium text-gray-700">{editingExpense ? 'Edit Expense' : 'Add Expense'}</h3>
+                            <button onClick={closeExpenseModal} className="text-sm text-gray-500">Close</button>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Name</label>
+                            <input
+                                type="text"
+                                value={expenseForm.name}
+                                onChange={(e) => setExpenseForm({ ...expenseForm, name: e.target.value })}
+                                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Description</label>
+                            <textarea
+                                value={expenseForm.description}
+                                onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
+                                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                rows={2}
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Amount</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={expenseForm.amount}
+                                onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                            />
+                        </div>
+
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                                <input
+                                    type="radio"
+                                    name="gst_inclusive"
+                                    checked={expenseForm.gst_inclusive}
+                                    onChange={() => setExpenseForm({ ...expenseForm, gst_inclusive: true })}
+                                    className="text-green-600 focus:ring-green-500"
+                                />
+                                GST inclusive
+                            </label>
+                            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                                <input
+                                    type="radio"
+                                    name="gst_inclusive"
+                                    checked={!expenseForm.gst_inclusive}
+                                    onChange={() => setExpenseForm({ ...expenseForm, gst_inclusive: false })}
+                                    className="text-green-600 focus:ring-green-500"
+                                />
+                                GST exclusive
+                            </label>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Supplier</label>
+                            {!creatingSupplier ? (
+                                <select
+                                    value={expenseForm.supplier_id}
+                                    onChange={(e) => {
+                                        if (e.target.value === '__new__') {
+                                            setCreatingSupplier(true);
+                                            return;
+                                        }
+                                        setExpenseForm({ ...expenseForm, supplier_id: e.target.value });
+                                    }}
+                                    className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                >
+                                    <option value="">None</option>
+                                    {suppliers.map((supplier) => (
+                                        <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                                    ))}
+                                    <option value="__new__">+ Add new supplier</option>
+                                </select>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newSupplierName}
+                                        onChange={(e) => setNewSupplierName(e.target.value)}
+                                        placeholder="Supplier name"
+                                        className="flex-1 border-gray-300 rounded-lg p-2 text-sm"
+                                        autoFocus
+                                    />
+                                    <button onClick={createSupplierInline} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm">
+                                        Create
+                                    </button>
+                                    <button
+                                        onClick={() => { setCreatingSupplier(false); setNewSupplierName(''); }}
+                                        className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                                type="checkbox"
+                                checked={expenseForm.reimburse}
+                                onChange={(e) => setExpenseForm({ ...expenseForm, reimburse: e.target.checked })}
+                                className="rounded text-green-600 focus:ring-green-500"
+                            />
+                            Reimburse this expense
+                        </label>
+
+                        <div className="flex gap-2 pt-2">
+                            <button onClick={saveExpense} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium">
+                                {editingExpense ? 'Save' : 'Add'}
+                            </button>
+                            <button onClick={closeExpenseModal} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </Modal>
 

@@ -153,4 +153,9 @@ class FarmJob extends Model
     {
         return $this->hasMany(Checklist::class)->where('status', Checklist::INCOMPLETE);
     }
+
+    public function expenses()
+    {
+        return $this->hasMany(Expense::class);
+    }
 }

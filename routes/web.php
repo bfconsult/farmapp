@@ -26,6 +26,7 @@ use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\AssetController;
 use App\Http\Controllers\MaintenanceItemController;
 use App\Http\Controllers\NoteController;
+use App\Http\Controllers\ExpenseController;
 
 
 
@@ -168,6 +169,9 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('settings/asset-types', [SettingsController::class, 'storeAssetType'])->name('settings.asset-types.store');
     Route::patch('settings/asset-types/{assetType}', [SettingsController::class, 'updateAssetType'])->name('settings.asset-types.update');
     Route::delete('settings/asset-types/{assetType}', [SettingsController::class, 'destroyAssetType'])->name('settings.asset-types.destroy');
+    Route::post('settings/suppliers', [SettingsController::class, 'storeSupplier'])->name('settings.suppliers.store');
+    Route::patch('settings/suppliers/{supplier}', [SettingsController::class, 'updateSupplier'])->name('settings.suppliers.update');
+    Route::delete('settings/suppliers/{supplier}', [SettingsController::class, 'destroySupplier'])->name('settings.suppliers.destroy');
     Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
     Route::patch('assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
@@ -194,6 +198,10 @@ Route::middleware(['auth', 'property.role:admin,manager,worker'])->group(functio
     Route::post('maintenance-items/{maintenanceItem}/convert', [MaintenanceItemController::class, 'convertToJob'])->name('maintenance-items.convert');
     Route::post('notes', [NoteController::class, 'store'])->name('notes.store');
     Route::post('notes/{note}/photos', [PhotoController::class, 'storeForNote'])->name('photos.store-note');
+    Route::post('jobs/{farmJob}/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+    Route::patch('expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update');
+    Route::delete('expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');
+    Route::post('expenses/{expense}/photos', [PhotoController::class, 'storeForExpense'])->name('photos.store-expense');
 });
 
 // All four roles can reach the Metrics index - it self-adjusts which tabs

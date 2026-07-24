@@ -69,6 +69,11 @@ function LookupRow({ item, onSave, onDelete, extraFields }) {
                         finished default
                     </span>
                 )}
+                {(item.street_address || item.phone || item.email) && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                        {[item.street_address, item.phone, item.email].filter(Boolean).join(' · ')}
+                    </p>
+                )}
             </div>
             {item.is_protected ? (
                 <span className="text-xs text-gray-400">Default</span>
@@ -94,11 +99,17 @@ function LookupRow({ item, onSave, onDelete, extraFields }) {
 
 function AddRow({ onAdd, extraFields }) {
     const [adding, setAdding] = useState(false);
-    const [values, setValues] = useState({ name: '', order: 0, color: null, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false });
+    const [values, setValues] = useState({
+        name: '', order: 0, color: null, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false,
+        description: '', street_address: '', phone: '', email: '',
+    });
 
     const save = () => {
         onAdd(values);
-        setValues({ name: '', order: 0, color: null, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false });
+        setValues({
+            name: '', order: 0, color: null, can_book_time: true, is_in_progress_default: false, is_recurring_closed_default: false, is_finished_default: false,
+            description: '', street_address: '', phone: '', email: '',
+        });
         setAdding(false);
     };
 
@@ -149,7 +160,7 @@ const BILLING_BLOCK_LABELS = {
     60: '1 hour',
 };
 
-export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, billingBlockMinutes, billingBlockOptions }) {
+export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, suppliers, billingBlockMinutes, billingBlockOptions }) {
     const [activeTab, setActiveTab] = useState('priorities');
 
     const tabs = [
@@ -157,6 +168,7 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
         { key: 'jobTypes', label: 'Types' },
         { key: 'jobStatuses', label: 'Statuses' },
         { key: 'assetTypes', label: 'Asset Types' },
+        { key: 'suppliers', label: 'Suppliers' },
         { key: 'billing', label: 'Billing' },
     ];
 
@@ -186,6 +198,20 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
         if (confirm('Delete this asset type?')) router.delete(route('settings.asset-types.destroy', id), preserve);
     };
 
+    // Suppliers
+    const supplierPayload = (values) => ({
+        name: values.name,
+        description: values.description,
+        street_address: values.street_address,
+        phone: values.phone,
+        email: values.email,
+    });
+    const addSupplier = (values) => router.post(route('settings.suppliers.store'), supplierPayload(values), preserve);
+    const saveSupplier = (id, values) => router.patch(route('settings.suppliers.update', id), supplierPayload(values), preserve);
+    const deleteSupplier = (id) => {
+        if (confirm('Delete this supplier?')) router.delete(route('settings.suppliers.destroy', id), preserve);
+    };
+
     // Job Statuses
     const addJobStatus = (values) => router.post(route('settings.job-statuses.store'), values, preserve);
     const saveJobStatus = (id, values) => router.patch(route('settings.job-statuses.update', id), values, preserve);
@@ -212,6 +238,39 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
                 placeholder="Order"
             />
             {colorField(values, setValues)}
+        </>
+    );
+
+    const supplierFields = (values, setValues) => (
+        <>
+            <textarea
+                value={values.description ?? ''}
+                onChange={(e) => setValues({ ...values, description: e.target.value })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                placeholder="Description"
+                rows={2}
+            />
+            <input
+                type="text"
+                value={values.street_address ?? ''}
+                onChange={(e) => setValues({ ...values, street_address: e.target.value })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                placeholder="Street address"
+            />
+            <input
+                type="text"
+                value={values.phone ?? ''}
+                onChange={(e) => setValues({ ...values, phone: e.target.value })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                placeholder="Phone"
+            />
+            <input
+                type="email"
+                value={values.email ?? ''}
+                onChange={(e) => setValues({ ...values, email: e.target.value })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                placeholder="Email"
+            />
         </>
     );
 
@@ -328,6 +387,21 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
                                 />
                             ))}
                             <AddRow onAdd={addAssetType} />
+                        </>
+                    )}
+
+                    {activeTab === 'suppliers' && (
+                        <>
+                            {suppliers.map((item) => (
+                                <LookupRow
+                                    key={item.id}
+                                    item={item}
+                                    onSave={saveSupplier}
+                                    onDelete={deleteSupplier}
+                                    extraFields={supplierFields}
+                                />
+                            ))}
+                            <AddRow onAdd={addSupplier} extraFields={supplierFields} />
                         </>
                     )}
 
