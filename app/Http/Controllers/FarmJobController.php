@@ -238,7 +238,7 @@ class FarmJobController extends Controller
 
     public function show(FarmJob $farmJob)
     {
-        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset', 'expenses.supplier', 'expenses.photos', 'expenses.createdBy']);
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset', 'expenses.supplier', 'expenses.photos', 'expenses.createdBy', 'notes.photos', 'notes.createdBy']);
 
         // Logs (or refreshes) that the current user has seen this job - one
         // row per user, most recent view time only, not a full visit log.

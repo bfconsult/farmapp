@@ -15,18 +15,21 @@ class NoteController extends Controller
         $validated = $request->validate([
             'body' => 'required|string',
             'asset_id' => ['nullable', Rule::exists('assets', 'id')->where('property_id', $currentPropertyId)],
+            'job_id' => ['nullable', Rule::exists('farm_jobs', 'id')->where('property_id', $currentPropertyId)],
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
         $hasAsset = filled($validated['asset_id'] ?? null);
+        $hasJob = filled($validated['job_id'] ?? null);
         $hasLocation = filled($validated['latitude'] ?? null) && filled($validated['longitude'] ?? null);
 
-        abort_unless($hasAsset xor $hasLocation, 422, 'A note must be linked to exactly one of an asset or a map location.');
+        abort_unless(($hasAsset + $hasJob + $hasLocation) === 1, 422, 'A note must be linked to exactly one of an asset, a job, or a map location.');
 
         Note::create([
             'property_id' => $currentPropertyId,
             'asset_id' => $validated['asset_id'] ?? null,
+            'job_id' => $validated['job_id'] ?? null,
             'latitude' => $validated['latitude'] ?? null,
             'longitude' => $validated['longitude'] ?? null,
             'body' => $validated['body'],
@@ -44,12 +47,12 @@ class NoteController extends Controller
     }
 
     /**
-     * Asset-notes inherit the asset's own location - only location-notes can
-     * be repositioned here.
+     * Asset-notes and job-notes inherit their parent's own location - only
+     * location-notes can be repositioned here.
      */
     public function updateLocation(Request $request, Note $note)
     {
-        abort_if($note->asset_id !== null, 422, "Asset notes don't have their own map location.");
+        abort_if($note->asset_id !== null || $note->job_id !== null, 422, "This note doesn't have its own map location.");
 
         $note->update($request->validate([
             'latitude' => 'required|numeric|between:-90,90',

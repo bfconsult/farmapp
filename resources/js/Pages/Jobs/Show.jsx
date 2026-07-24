@@ -1,5 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
+import NoteRow from '@/Components/NoteRow';
+import AddNoteForm from '@/Components/AddNoteForm';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
@@ -231,10 +233,13 @@ function ExpenseRow({ expense, onEdit }) {
 export default function Show({ job, seenBy, checklistTemplates, suppliers }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
-    const { flash } = usePage().props;
+    const { flash, currentUserRole } = usePage().props;
+    const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
+    const canCreateNote = canManage || currentUserRole === 'worker';
     const [uploading, setUploading] = useState(false);
     const [showDeleteOptions, setShowDeleteOptions] = useState(false);
     const [showShare, setShowShare] = useState(false);
+    const [addingNote, setAddingNote] = useState(false);
     const [showChecklistPicker, setShowChecklistPicker] = useState(false);
     const [showExpenseModal, setShowExpenseModal] = useState(false);
     const [editingExpense, setEditingExpense] = useState(null);
@@ -898,6 +903,30 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers }) {
                         </div>
                     </div>
                 </Modal>
+
+                {/* Notes */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
+                        {canCreateNote && !addingNote && (
+                            <button onClick={() => setAddingNote(true)} className="text-xs text-green-600 font-medium">
+                                + Add
+                            </button>
+                        )}
+                    </div>
+                    {job.notes && job.notes.length > 0 ? (
+                        <div className="divide-y divide-gray-100">
+                            {job.notes.map((note) => (
+                                <NoteRow key={note.id} note={note} canManage={canManage} canCreate={canCreateNote} />
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-gray-400 p-4">No notes yet.</p>
+                    )}
+                    {addingNote && (
+                        <AddNoteForm parentField="job_id" parentId={job.id} onClose={() => setAddingNote(false)} />
+                    )}
+                </div>
 
                 {/* Finish job */}
                 {!job.job_status?.is_finished_default && (

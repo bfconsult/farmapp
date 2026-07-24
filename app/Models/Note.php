@@ -9,6 +9,7 @@ class Note extends Model
     protected $fillable = [
         'property_id',
         'asset_id',
+        'job_id',
         'created_by',
         'body',
         'latitude',
@@ -23,6 +24,11 @@ class Note extends Model
     public function asset()
     {
         return $this->belongsTo(Asset::class);
+    }
+
+    public function job()
+    {
+        return $this->belongsTo(FarmJob::class);
     }
 
     public function createdBy()

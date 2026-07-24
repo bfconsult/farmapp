@@ -1,9 +1,10 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
+import NoteRow from '@/Components/NoteRow';
+import AddNoteForm from '@/Components/AddNoteForm';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
-import { compressImageFiles } from '@/imageCompression';
 import { pillBadgeClass } from '@/Utils/pillColors';
 
 const ASSET_COLOR = '#2563eb';
@@ -523,167 +524,6 @@ function AddMaintenanceItemForm({ asset, onClose }) {
     );
 }
 
-function NoteRow({ note, canManage, canCreate }) {
-    const cameraInput = useRef(null);
-    const galleryInput = useRef(null);
-    const [uploading, setUploading] = useState(false);
-    const [editing, setEditing] = useState(false);
-    const [body, setBody] = useState(note.body);
-
-    const save = () => {
-        router.patch(route('notes.update', note.id), { body }, {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => setEditing(false),
-        });
-    };
-
-    const destroy = () => {
-        if (confirm('Delete this note?')) {
-            router.delete(route('notes.destroy', note.id), { preserveScroll: true, preserveState: true });
-        }
-    };
-
-    const destroyPhoto = (photoId) => {
-        if (confirm('Delete this photo?')) {
-            router.delete(route('photos.destroy', photoId), { preserveScroll: true, preserveState: true });
-        }
-    };
-
-    const uploadPhotos = async (e) => {
-        const files = e.target.files;
-        if (!files.length) return;
-
-        setUploading(true);
-        const compressed = await compressImageFiles(files);
-
-        const formData = new FormData();
-        compressed.forEach(file => formData.append('photos[]', file));
-
-        router.post(route('photos.store-note', note.id), formData, {
-            forceFormData: true,
-            preserveScroll: true,
-            onFinish: () => setUploading(false),
-            onError: () => alert('Photo upload failed. Please try again with a smaller photo.'),
-        });
-    };
-
-    if (editing) {
-        return (
-            <div className="p-3 bg-green-50 space-y-2">
-                <textarea
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                    rows={3}
-                />
-                <div className="flex gap-2">
-                    <button onClick={save} className="flex-1 py-1.5 bg-green-600 text-white rounded-lg text-xs">Save</button>
-                    <button onClick={() => { setEditing(false); setBody(note.body); }} className="flex-1 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs">Cancel</button>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="px-3 py-3">
-            <p className="text-sm text-gray-900 whitespace-pre-wrap">{note.body}</p>
-            <p className="text-xs text-gray-400 mt-1">
-                {note.created_by?.name} · {formatDate(note.created_at)}
-            </p>
-
-            {note.photos && note.photos.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                    {note.photos.map((photo) => (
-                        <div key={photo.id} className="relative">
-                            <img src={photo.url} className="w-full h-20 object-cover rounded-lg" />
-                            {canManage && (
-                                <button
-                                    onClick={() => destroyPhoto(photo.id)}
-                                    className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                                >
-                                    ×
-                                </button>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            <div className="flex gap-3 mt-2 text-xs">
-                {canCreate && (
-                    <>
-                        <button onClick={() => cameraInput.current.click()} disabled={uploading} aria-label="Take photo" className="text-green-600 disabled:opacity-50">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </button>
-                        <button onClick={() => galleryInput.current.click()} disabled={uploading} aria-label="Choose from gallery" className="text-green-600 disabled:opacity-50">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
-                            </svg>
-                        </button>
-                    </>
-                )}
-                {canManage && (
-                    <>
-                        <button onClick={() => setEditing(true)} className="text-green-600">Edit</button>
-                        <button onClick={destroy} className="text-red-500">Delete</button>
-                    </>
-                )}
-            </div>
-            <input
-                ref={cameraInput}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={uploadPhotos}
-                className="hidden"
-            />
-            <input
-                ref={galleryInput}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={uploadPhotos}
-                className="hidden"
-            />
-        </div>
-    );
-}
-
-function AddNoteForm({ asset, onClose }) {
-    const [body, setBody] = useState('');
-
-    const create = () => {
-        router.post(route('notes.store'), { asset_id: asset.id, body }, {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: () => {
-                onClose();
-                setBody('');
-            },
-        });
-    };
-
-    return (
-        <div className="p-4 space-y-3 border-t border-gray-100">
-            <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                placeholder="Note..."
-                rows={3}
-            />
-            <div className="flex gap-2">
-                <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Note</button>
-                <button onClick={onClose} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
-            </div>
-        </div>
-    );
-}
-
 export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
@@ -886,7 +726,7 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
                         </div>
                     )}
                     {addingNote && (
-                        <AddNoteForm asset={asset} onClose={() => setAddingNote(false)} />
+                        <AddNoteForm parentField="asset_id" parentId={asset.id} onClose={() => setAddingNote(false)} />
                     )}
                 </div>
 
