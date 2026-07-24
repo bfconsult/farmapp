@@ -14,6 +14,7 @@ use App\Models\Property;
 use App\Models\RecurringJob;
 use App\Models\Role;
 use App\Models\Supplier;
+use App\Models\WorkSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -75,7 +76,7 @@ class FarmJobController extends Controller
                 $query->where('property_id', $currentPropertyId);
             })
             ->whereBetween('created_at', [$dateFrom, $dateTo])
-            ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zone'])
+            ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zone', 'workSessions.user', 'expenses'])
             ->withCount('incompleteChecklists')
             ->whereIn('job_status_id', $statusIds);
 
@@ -103,6 +104,21 @@ class FarmJobController extends Controller
         };
 
         $jobs = $query->get();
+
+        // Card totals: hours/cost only count finalised/approved sessions (not
+        // draft, matching the same "real, counted work" convention used by
+        // the diary/reports and reminder emails elsewhere). setRelation short-
+        // circuits WorkSession::hourly_rate's own farmJob lookup so it reuses
+        // the job already in memory instead of an extra query per session.
+        $jobs->each(function (FarmJob $job) {
+            $bookedSessions = $job->workSessions
+                ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
+                ->each(fn (WorkSession $session) => $session->setRelation('farmJob', $job));
+
+            $job->total_hours = round($bookedSessions->sum('duration_in_hours'), 2);
+            $job->total_cost = round($bookedSessions->sum('billing_amount'), 2);
+            $job->total_expenses = round($job->expenses->sum('amount'), 2);
+        });
 
         // Calendar view - independent of the list's filters/date range, since
         // it's a month-by-month browse rather than a filtered list. A job
