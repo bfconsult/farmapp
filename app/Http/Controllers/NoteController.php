@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Note;
+use App\Models\NoteView;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 class NoteController extends Controller
@@ -67,5 +69,19 @@ class NoteController extends Controller
         $note->delete();
 
         return back()->with('success', 'Note deleted.');
+    }
+
+    /**
+     * One row per (note, user) - marks a note read for whoever just opened
+     * it (clicked a map pin, or tapped an inline note), not a full view log.
+     */
+    public function markSeen(Note $note)
+    {
+        NoteView::updateOrCreate(
+            ['note_id' => $note->id, 'user_id' => Auth::id()],
+            ['viewed_at' => now()],
+        );
+
+        return back();
     }
 }

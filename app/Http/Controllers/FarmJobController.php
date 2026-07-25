@@ -76,7 +76,7 @@ class FarmJobController extends Controller
                 $query->where('property_id', $currentPropertyId);
             })
             ->whereBetween('created_at', [$dateFrom, $dateTo])
-            ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zone', 'workSessions.user', 'expenses'])
+            ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zone', 'workSessions.user', 'expenses', 'notes.views'])
             ->withCount('incompleteChecklists')
             ->whereIn('job_status_id', $statusIds);
 
@@ -118,6 +118,7 @@ class FarmJobController extends Controller
             $job->total_hours = round($bookedSessions->sum('duration_in_hours'), 2);
             $job->total_cost = round($bookedSessions->sum('billing_amount'), 2);
             $job->total_expenses = round($job->expenses->sum('amount'), 2);
+            $job->has_unread_notes = $job->notes->contains(fn ($note) => $note->isUnreadBy(Auth::id()));
         });
 
         // Calendar view - independent of the list's filters/date range, since
@@ -254,7 +255,8 @@ class FarmJobController extends Controller
 
     public function show(FarmJob $farmJob)
     {
-        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset', 'expenses.supplier', 'expenses.photos', 'expenses.createdBy', 'notes.photos', 'notes.createdBy']);
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset', 'expenses.supplier', 'expenses.photos', 'expenses.createdBy', 'notes.photos', 'notes.createdBy', 'notes.views']);
+        $farmJob->notes->each(fn ($note) => $note->is_unread = $note->isUnreadBy(Auth::id()));
 
         // Logs (or refreshes) that the current user has seen this job - one
         // row per user, most recent view time only, not a full visit log.

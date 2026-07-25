@@ -6,6 +6,7 @@ use App\Models\Asset;
 use App\Models\FarmJob;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 
 class AssetController extends Controller
@@ -79,7 +80,8 @@ class AssetController extends Controller
 
     public function show(Asset $asset)
     {
-        $asset->load(['assetType', 'maintenanceItems', 'property.shape', 'property.zones', 'notes.photos', 'notes.createdBy', 'currentLocation', 'locations']);
+        $asset->load(['assetType', 'maintenanceItems', 'property.shape', 'property.zones', 'notes.photos', 'notes.createdBy', 'notes.views', 'currentLocation', 'locations']);
+        $asset->notes->each(fn ($note) => $note->is_unread = $note->isUnreadBy(Auth::id()));
 
         $jobIds = $asset->jobs()->pluck('farm_jobs.id');
 

@@ -9,6 +9,15 @@ export default function NoteRow({ note, canManage, canCreate }) {
     const [uploading, setUploading] = useState(false);
     const [editing, setEditing] = useState(false);
     const [body, setBody] = useState(note.body);
+    const [seen, setSeen] = useState(!note.is_unread);
+
+    // Marked seen only on an explicit open (tapping the note itself), not
+    // just because the page it's on happened to load.
+    const markSeen = () => {
+        if (seen) return;
+        setSeen(true);
+        router.post(route('notes.mark-seen', note.id), {}, { preserveScroll: true, preserveState: true });
+    };
 
     const save = () => {
         router.patch(route('notes.update', note.id), { body }, {
@@ -67,10 +76,17 @@ export default function NoteRow({ note, canManage, canCreate }) {
 
     return (
         <div className="px-3 py-3">
-            <p className="text-sm text-gray-900 whitespace-pre-wrap">{note.body}</p>
-            <p className="text-xs text-gray-400 mt-1">
-                {note.created_by?.name} · {formatDate(note.created_at)}
-            </p>
+            <div onClick={markSeen} className="cursor-pointer">
+                <p className="text-sm text-gray-900 whitespace-pre-wrap flex items-start gap-1.5">
+                    {!seen && (
+                        <span className="mt-1.5 w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-label="Unread" />
+                    )}
+                    <span>{note.body}</span>
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                    {note.created_by?.name} · {formatDate(note.created_at)}
+                </p>
+            </div>
 
             {note.photos && note.photos.length > 0 && (
                 <div className="grid grid-cols-3 gap-2 mt-2">

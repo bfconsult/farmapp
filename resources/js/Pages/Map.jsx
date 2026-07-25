@@ -292,10 +292,20 @@ export default function Map({
 
         noteLayerGroup.current = L.layerGroup(
             (notes ?? []).map((note) => {
-                const marker = L.marker([note.latitude, note.longitude], { icon: pinIcon(L, 'green') });
+                const marker = L.marker([note.latitude, note.longitude], { icon: pinIcon(L, note.is_unread ? 'orange' : 'green') });
                 // Opens a read-only view only - editing/dragging never starts
                 // from tapping the map itself, only from an explicit button.
-                marker.on('click', () => setActiveNote(note));
+                // Marking seen only on this click (not just page load) is why
+                // pins recolor once opened rather than as soon as the map
+                // loads - the recolor itself happens once the mark-seen
+                // request's back() redirect refreshes `notes` and this layer
+                // rebuilds, not via any local state here.
+                marker.on('click', () => {
+                    setActiveNote(note);
+                    if (note.is_unread) {
+                        router.post(route('notes.mark-seen', note.id), {}, { preserveScroll: true, preserveState: true });
+                    }
+                });
                 noteMarkersById.current[note.id] = marker;
                 return marker;
             }),

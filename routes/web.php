@@ -212,6 +212,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
     Route::get('manage', [ManageController::class, 'index'])->name('manage.index');
     Route::get('assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
     Route::get('assets/{asset}/jobs', [AssetController::class, 'jobHistory'])->name('assets.jobs');
+    Route::post('notes/{note}/seen', [NoteController::class, 'markSeen'])->name('notes.mark-seen');
 });
 
     // All authenticated users with a property
@@ -289,8 +290,9 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
 
         $notes = \App\Models\Note::where('property_id', $currentPropertyId)
             ->whereNotNull('latitude')
-            ->with(['createdBy', 'photos'])
-            ->get();
+            ->with(['createdBy', 'photos', 'views'])
+            ->get()
+            ->each(fn ($note) => $note->is_unread = $note->isUnreadBy($user->id));
 
         return Inertia::render('Map', [
             'jobs' => $jobs,

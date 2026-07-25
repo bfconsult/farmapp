@@ -30,6 +30,9 @@ function JobCard({ job }) {
                         </svg>
                     )}
                     {job.name}
+                    {job.has_unread_notes && (
+                        <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-label="Unread notes" />
+                    )}
                 </h2>
                 <span className="text-gray-400 text-lg flex-shrink-0">›</span>
             </div>

@@ -40,4 +40,26 @@ class Note extends Model
     {
         return $this->hasMany(Photo::class);
     }
+
+    public function views()
+    {
+        return $this->hasMany(NoteView::class)->orderByDesc('viewed_at');
+    }
+
+    /**
+     * Never unread for the note's own author. Otherwise unread if this user
+     * has never viewed it, or last viewed it before the note's most recent
+     * edit - so editing a note re-flags it for everyone else.
+     * Requires `views` to be eager-loaded to avoid an N+1 per note.
+     */
+    public function isUnreadBy(int $userId): bool
+    {
+        if ($this->created_by === $userId) {
+            return false;
+        }
+
+        $viewedAt = $this->views->firstWhere('user_id', $userId)?->viewed_at;
+
+        return $viewedAt === null || $viewedAt->lt($this->updated_at);
+    }
 }
