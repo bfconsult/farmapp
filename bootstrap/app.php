@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->alias([
             'property.role' => \App\Http\Middleware\EnsurePropertyRole::class,
+            'app.admin' => \App\Http\Middleware\EnsureAppAdmin::class,
         ]);
         $middleware->throttleApi();
     })

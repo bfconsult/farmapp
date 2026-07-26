@@ -27,6 +27,7 @@ use App\Http\Controllers\AssetController;
 use App\Http\Controllers\MaintenanceItemController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\AppAdminController;
 
 
 
@@ -108,6 +109,12 @@ Route::middleware('auth')->group(function () {
     Route::post('work-sessions/{workSession}/stop', [WorkSessionController::class, 'stop'])->name('work-sessions.stop');
     Route::post('work-sessions/{workSession}/photos', [PhotoController::class, 'storeForSession'])->name('photos.store-session');
     Route::delete('work-sessions/{workSession}/waypoints', [WorkSessionController::class, 'destroyWaypoints'])->name('work-sessions.waypoints.destroy');
+});
+
+// App-admin: a whole-app view, not scoped to the current property like
+// everything else - gated on the app_admin flag, not a per-property role.
+Route::middleware(['auth', 'app.admin'])->group(function () {
+    Route::get('app-admin/report', [AppAdminController::class, 'index'])->name('app-admin.report');
 });
 
 // added JMB

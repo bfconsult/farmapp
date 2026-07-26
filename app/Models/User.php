@@ -55,6 +55,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'deleted' => 'boolean',
+            'app_admin' => 'boolean',
         ];
     }
 
@@ -81,6 +82,33 @@ class User extends Authenticatable
     public function workSessions()
     {
         return $this->hasMany(WorkSession::class);
+    }
+
+    public function assets()
+    {
+        return $this->hasMany(Asset::class, 'created_by');
+    }
+
+    public function checklists()
+    {
+        return $this->hasMany(Checklist::class, 'created_by');
+    }
+
+    public function metrics()
+    {
+        return $this->hasMany(Metric::class, 'created_by');
+    }
+
+    /**
+     * Properties this user has ever created - approximated as "properties
+     * they currently hold the admin role on", since PropertyController::store()
+     * makes the creator an admin immediately and there's no dedicated
+     * creator column on properties. Not exact if admin access is later
+     * granted to/revoked from someone else.
+     */
+    public function adminProperties()
+    {
+        return $this->belongsToMany(Property::class, 'roles')->wherePivot('type', Role::ADMIN);
     }
 
     public function roleOn(Property $property): ?string

@@ -1,10 +1,11 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
 
 export default function Edit({ mustVerifyEmail, status, currentRole }) {
+    const { auth } = usePage().props;
     const isAdmin = currentRole === 'admin';
     const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
     const logout = () => {
@@ -60,6 +61,21 @@ export default function Edit({ mustVerifyEmail, status, currentRole }) {
                         )}
                     </div>
                 </div>
+
+                {auth.user.app_admin && (
+                    <div className="bg-white rounded-lg shadow">
+                        <div className="px-4 py-3 border-b border-gray-100">
+                            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">App Admin</h2>
+                        </div>
+                        <Link
+                            href={route('app-admin.report')}
+                            className="flex items-center justify-between px-4 py-4 hover:bg-gray-50"
+                        >
+                            <span className="text-gray-900">User Activity Report</span>
+                            <span className="text-gray-400">›</span>
+                        </Link>
+                    </div>
+                )}
 
                 {/* Account section */}
                 <div className="bg-white rounded-lg shadow">
