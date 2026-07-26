@@ -14,7 +14,7 @@ import {
     ceilToBillingBlock,
 } from '@/dateInput';
 
-export default function Edit({ session, plannedJobs, waypoints, billingBlockMinutes }) {
+export default function Edit({ session, plannedJobs, waypoints, zones, billingBlockMinutes }) {
     // The exact recorded moment (e.g. an auto-tracked visit's GPS timestamp)
     // never needs to be shown or selectable - the start suggests the block
     // boundary before it, the end the one after, so the dropdown only ever
@@ -61,19 +61,26 @@ export default function Edit({ session, plannedJobs, waypoints, billingBlockMinu
     // forever as a historical fact about how the session was recorded.
     const isAutoTracked = session.source === 'auto_tracked' && !session.reviewed_at;
 
+    // An unreviewed auto-tracked session has no Show page of its own yet -
+    // visiting work-sessions.show for it just redirects straight back here
+    // (see WorkSessionController::show()), so "Back" has to go to the list
+    // instead or it would look like the button does nothing.
+    const backHref = isAutoTracked ? route('work-sessions.index') : route('work-sessions.show', session.id);
+    const backLabel = isAutoTracked ? 'Work' : 'Back';
+
     return (
         <AuthenticatedLayout>
             <Head title={isAutoTracked ? 'Auto Tracked Visit' : 'Edit Work Session'} />
 
             <div className="max-w-lg mx-auto">
                 <div className="flex items-center justify-between mb-6">
-                    <BackLink href={route('work-sessions.show', session.id)}>Back</BackLink>
+                    <BackLink href={backHref}>{backLabel}</BackLink>
                     <h1 className="text-xl font-semibold text-gray-900">
                         {isAutoTracked ? 'Auto Tracked Visit' : 'Edit Session'}
                     </h1>
                 </div>
 
-                <WaypointTrail waypoints={waypoints} />
+                <WaypointTrail waypoints={waypoints} zones={zones} />
 
                 <form onSubmit={submit} className="space-y-4">
                     <div className="bg-white rounded-lg shadow p-4 space-y-4">
@@ -158,7 +165,7 @@ export default function Edit({ session, plannedJobs, waypoints, billingBlockMinu
 
                     <div className="flex gap-3">
                         <Link
-                            href={route('work-sessions.show', session.id)}
+                            href={backHref}
                             className="flex-1 py-4 border border-gray-300 text-gray-700 rounded-lg text-base text-center"
                         >
                             Cancel

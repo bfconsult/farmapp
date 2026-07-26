@@ -158,6 +158,7 @@ class WorkSessionController extends Controller
             'session' => $workSession,
             'plannedJobs' => $plannedJobs,
             'waypoints' => $workSession->waypoints,
+            'zones' => $workSession->property->zones,
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
         ]);
     }
