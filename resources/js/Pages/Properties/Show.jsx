@@ -1,4 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import BackLink from '@/Components/BackLink';
 import { Head, Link, router } from '@inertiajs/react';
 
 
@@ -47,12 +48,7 @@ export default function Show({ property, currentRole, canLeave }) {
                             >
                             Delete
                             </button>
-                            <Link
-                                href={route('properties.index')}
-                                className="px-4 py-2 text-gray-700 hover:text-gray-900"
-                            >
-                                ← Back
-                            </Link>
+                            <BackLink href={route('properties.index')}>Back</BackLink>
    
                         </div>
                     </div>

@@ -170,7 +170,12 @@ export default function MetricsManager({ metrics }) {
         ...(canMeasure ? [{ id: 'measure', label: 'Measure' }] : []),
         ...(canManage ? [{ id: 'manage', label: 'Manage' }] : []),
     ];
-    const [activeTab, setActiveTab] = useState(tabs[0].id);
+    // Lets a caller (e.g. submitting a measurement) land back on a specific
+    // tab via ?tab=measure, rather than always resetting to View.
+    const [activeTab, setActiveTab] = useState(() => {
+        const requested = new URLSearchParams(window.location.search).get('tab');
+        return tabs.some((tab) => tab.id === requested) ? requested : tabs[0].id;
+    });
 
     const [adding, setAdding] = useState(false);
     const [values, setValues] = useState({
@@ -194,13 +199,15 @@ export default function MetricsManager({ metrics }) {
     return (
         <div className="space-y-4">
             {tabs.length > 1 && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-6 border-b border-gray-200">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`rounded-full px-3 py-1 text-sm font-medium ${
-                                activeTab === tab.id ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+                            className={`pb-2 text-[13px] border-b-2 -mb-px ${
+                                activeTab === tab.id
+                                    ? 'text-green-700 font-semibold border-green-600'
+                                    : 'text-gray-400 font-medium border-transparent'
                             }`}
                         >
                             {tab.label}

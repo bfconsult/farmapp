@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
+import BackLink from '@/Components/BackLink';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
@@ -435,12 +436,10 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers }) {
                 </div>
             )}
 
-            <div className="max-w-lg mx-auto space-y-4">
+            <div className="max-w-lg mx-auto mt-2 space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                    <Link href={route('jobs.index')} className="text-green-600 text-sm">
-                        ← Jobs
-                    </Link>
+                    <BackLink href={route('jobs.index')}>Jobs</BackLink>
                     <div className="flex items-center gap-2">
                         <button
                             type="button"

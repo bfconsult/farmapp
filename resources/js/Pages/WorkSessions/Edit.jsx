@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import WaypointTrail from '@/Components/WaypointTrail';
+import BackLink from '@/Components/BackLink';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
 import {
@@ -66,9 +67,7 @@ export default function Edit({ session, plannedJobs, waypoints, billingBlockMinu
 
             <div className="max-w-lg mx-auto">
                 <div className="flex items-center justify-between mb-6">
-                    <Link href={route('work-sessions.show', session.id)} className="text-green-600 text-sm">
-                        ← Back
-                    </Link>
+                    <BackLink href={route('work-sessions.show', session.id)}>Back</BackLink>
                     <h1 className="text-xl font-semibold text-gray-900">
                         {isAutoTracked ? 'Auto Tracked Visit' : 'Edit Session'}
                     </h1>

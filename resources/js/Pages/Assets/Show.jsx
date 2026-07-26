@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
+import BackLink from '@/Components/BackLink';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
@@ -577,11 +578,9 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
         <AuthenticatedLayout>
             <Head title={asset.name} />
 
-            <div className="max-w-lg mx-auto space-y-4">
+            <div className="max-w-lg mx-auto mt-2 space-y-4">
                 <div className="flex items-center justify-between">
-                    <Link href={route('manage.index')} className="text-green-600 text-sm">
-                        ← Manage
-                    </Link>
+                    <BackLink href={route('manage.index')}>Manage</BackLink>
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-4">

@@ -4,9 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\ChecklistTemplate;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class ChecklistTemplateController extends Controller
 {
+    public function index()
+    {
+        $checklistTemplates = ChecklistTemplate::where('property_id', session('current_property_id'))
+            ->with('items')
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('Manage/Checklists', [
+            'checklistTemplates' => $checklistTemplates,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $this->validated($request);

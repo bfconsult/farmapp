@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
-import { Head, Link, router } from '@inertiajs/react';
+import BackLink from '@/Components/BackLink';
+import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
 
@@ -50,9 +51,7 @@ export default function Export({ currentDateFrom, currentDateTo, draftCount, exp
 
             <div className="max-w-lg mx-auto pb-24">
                 <div className="flex items-center justify-between mb-4">
-                    <Link href={route('work-sessions.index')} className="text-green-600 text-sm">
-                        ← Work
-                    </Link>
+                    <BackLink href={route('work-sessions.index')}>Work</BackLink>
                 </div>
 
                 {/* Filters toggle */}

@@ -1,8 +1,9 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import { formatDate } from '@/dateInput';
+import BackLink from '@/Components/BackLink';
 
 const STATUS_LABELS = {
     incomplete: 'Incomplete',
@@ -32,7 +33,13 @@ export default function Show({ measurement }) {
         router.patch(route('metric-measurements.update', measurement.id), {
             [valueField]: value === '' ? null : value,
             status: 'complete',
-        }, { preserveScroll: true, onFinish: () => setSubmitting(false) });
+        }, {
+            preserveScroll: true,
+            onFinish: () => setSubmitting(false),
+            // Land back on the Measure list (not this measurement's own
+            // page) so submitting one flows straight into the next.
+            onSuccess: () => router.visit(route('metrics.index', { tab: 'measure' })),
+        });
     };
 
     // Reopens the period for editing without touching the recorded value -
@@ -70,12 +77,10 @@ export default function Show({ measurement }) {
         <AuthenticatedLayout>
             <Head title={measurement.name} />
 
-            <div className="max-w-lg mx-auto space-y-4">
+            <div className="max-w-lg mx-auto mt-2 space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                    <Link href={route('metrics.index')} className="text-green-600 text-sm">
-                        ← Metrics
-                    </Link>
+                    <BackLink href={route('metrics.index')}>Metrics</BackLink>
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-4">

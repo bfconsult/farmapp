@@ -130,7 +130,7 @@ class WorkSessionController extends Controller
             return redirect()->route('work-sessions.edit', $workSession);
         }
 
-        $workSession->load(['farmJob', 'property', 'photos', 'user', 'waypoints']);
+        $workSession->load(['farmJob', 'property.zones', 'photos', 'user', 'waypoints']);
         $workSession->has_conflict = $workSession->status === WorkSession::DRAFT
             && $workSession->overlapsFinalisedSession();
 
@@ -139,6 +139,7 @@ class WorkSessionController extends Controller
             'durationInHours' => $workSession->duration_in_hours,
             'billingAmount' => $workSession->billing_amount,
             'waypoints' => $workSession->waypoints,
+            'zones' => $workSession->property->zones,
         ]);
     }
 
@@ -200,6 +201,18 @@ class WorkSessionController extends Controller
         $workSession->update(['ended_at' => now()]);
 
         return redirect()->route('work-sessions.show', $workSession);
+    }
+
+    /**
+     * Drops the recorded location trail once the user's done referring to it
+     * - doesn't touch the session itself (times, status, etc.), just the
+     * waypoint rows.
+     */
+    public function destroyWaypoints(WorkSession $workSession)
+    {
+        $workSession->waypoints()->delete();
+
+        return back()->with('success', 'Path deleted.');
     }
 
     public function finalise(WorkSession $workSession)

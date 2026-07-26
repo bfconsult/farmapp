@@ -1,7 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
+import BackLink from '@/Components/BackLink';
 
 const TYPE_LABELS = {
     before_start: 'Before Start',
@@ -194,11 +195,9 @@ export default function Show({ checklist }) {
         <AuthenticatedLayout>
             <Head title={checklist.name} />
 
-            <div className="max-w-lg mx-auto space-y-4">
+            <div className="max-w-lg mx-auto mt-2 space-y-4">
                 <div className="flex items-center justify-between">
-                    <Link href={route('jobs.show', checklist.farm_job_id)} className="text-green-600 text-sm">
-                        ← {checklist.farm_job?.name ?? 'Job'}
-                    </Link>
+                    <BackLink href={route('jobs.show', checklist.farm_job_id)}>{checklist.farm_job?.name ?? 'Job'}</BackLink>
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-4">

@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import WaypointTrail from '@/Components/WaypointTrail';
+import BackLink from '@/Components/BackLink';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
@@ -17,7 +18,7 @@ const STATUS_COLORS = {
     approved: 'bg-green-100 text-green-700',
 };
 
-export default function Show({ session, durationInHours, billingAmount, waypoints }) {
+export default function Show({ session, durationInHours, billingAmount, waypoints, zones }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
     const { flash } = usePage().props;
@@ -89,12 +90,10 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
         <AuthenticatedLayout>
             <Head title="Work Session" />
 
-            <div className="max-w-lg mx-auto space-y-4">
+            <div className="max-w-lg mx-auto mt-2 space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                    <Link href={route('work-sessions.index')} className="text-green-600 text-sm">
-                        ← Work
-                    </Link>
+                    <BackLink href={route('work-sessions.index')}>Work</BackLink>
                     {session.status === 'draft' && (
                         <Link
                             href={route('work-sessions.edit', session.id)}
@@ -174,7 +173,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                     </div>
                 </div>
 
-                <WaypointTrail waypoints={waypoints} />
+                <WaypointTrail waypoints={waypoints} zones={zones} workSessionId={session.id} />
 
                 {/* Finalise */}
                 {session.status === 'draft' && session.ended_at && (

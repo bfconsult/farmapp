@@ -107,6 +107,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('work-sessions', WorkSessionController::class);
     Route::post('work-sessions/{workSession}/stop', [WorkSessionController::class, 'stop'])->name('work-sessions.stop');
     Route::post('work-sessions/{workSession}/photos', [PhotoController::class, 'storeForSession'])->name('photos.store-session');
+    Route::delete('work-sessions/{workSession}/waypoints', [WorkSessionController::class, 'destroyWaypoints'])->name('work-sessions.waypoints.destroy');
 });
 
 // added JMB
@@ -160,6 +161,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('metrics', [MetricController::class, 'store'])->name('metrics.store');
     Route::patch('metrics/{metric}', [MetricController::class, 'update'])->name('metrics.update');
     Route::delete('metrics/{metric}', [MetricController::class, 'destroy'])->name('metrics.destroy');
+    Route::get('manage/checklists', [ChecklistTemplateController::class, 'index'])->name('manage.checklists');
     Route::post('checklist-templates', [ChecklistTemplateController::class, 'store'])->name('checklist-templates.store');
     Route::patch('checklist-templates/{checklistTemplate}', [ChecklistTemplateController::class, 'update'])->name('checklist-templates.update');
     Route::delete('checklist-templates/{checklistTemplate}', [ChecklistTemplateController::class, 'destroy'])->name('checklist-templates.destroy');
@@ -210,6 +212,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
     Route::get('metrics', [MetricController::class, 'index'])->name('metrics.index');
     Route::get('metrics/{metric}/history', [MetricController::class, 'history'])->name('metrics.history');
     Route::get('manage', [ManageController::class, 'index'])->name('manage.index');
+    Route::get('manage/assets', [AssetController::class, 'index'])->name('manage.assets');
     Route::get('assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
     Route::get('assets/{asset}/jobs', [AssetController::class, 'jobHistory'])->name('assets.jobs');
     Route::post('notes/{note}/seen', [NoteController::class, 'markSeen'])->name('notes.mark-seen');

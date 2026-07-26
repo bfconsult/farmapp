@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
 import { formatDate } from '@/dateInput';
 import { pillBadgeClass } from '@/Utils/pillColors';
+import BackLink from '@/Components/BackLink';
 
 export default function JobHistory({ asset, jobs }) {
     return (
@@ -10,9 +11,7 @@ export default function JobHistory({ asset, jobs }) {
 
             <div className="max-w-lg mx-auto space-y-4">
                 <div className="flex items-center justify-between">
-                    <Link href={route('assets.show', asset.id)} className="text-green-600 text-sm">
-                        ← {asset.name}
-                    </Link>
+                    <BackLink href={route('assets.show', asset.id)}>{asset.name}</BackLink>
                 </div>
 
                 <h1 className="text-lg font-semibold text-gray-900">Job History</h1>

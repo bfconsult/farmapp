@@ -1,6 +1,7 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import DiaryDays from '@/Components/DiaryDays';
 import MetricsView from '@/Components/MetricsView';
+import BackLink from '@/Components/BackLink';
 import { formatDate } from '@/dateInput';
 
 function formatRangeHeading(dateStr) {
@@ -18,12 +19,7 @@ export default function SharedView({ property, dateFrom, dateTo, days, metrics, 
                         ReportController::previewDiary) - absent on the real
                         public share link, which has no app to return to. */}
                     {backUrl && (
-                        <Link
-                            href={backUrl}
-                            className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
-                        >
-                            ← Back to Reports
-                        </Link>
+                        <BackLink href={backUrl}>Back to Reports</BackLink>
                     )}
 
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-sm mb-2">

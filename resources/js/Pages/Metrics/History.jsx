@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
-import { Head, Link } from '@inertiajs/react';
+import BackLink from '@/Components/BackLink';
+import { Head } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
 
@@ -131,9 +132,7 @@ export default function History({ metric, measurements }) {
 
             <div className="max-w-lg mx-auto space-y-4 pb-24">
                 <div className="flex items-center justify-between">
-                    <Link href={route('metrics.index')} className="text-green-600 text-sm">
-                        ← Metrics
-                    </Link>
+                    <BackLink href={route('metrics.index')}>Metrics</BackLink>
                 </div>
 
                 <div>
