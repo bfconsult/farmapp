@@ -107,17 +107,23 @@ class AssetController extends Controller
 
         $jobIds = $asset->jobs()->pluck('farm_jobs.id');
 
+        $workSessions = $asset->workSessionsQuery()
+            ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
+            ->with('user')
+            ->orderByDesc('started_at')
+            ->get();
+
         return Inertia::render('Assets/Show', [
             'asset' => $asset,
             'recentJobs' => FarmJob::whereIn('id', $jobIds)->with('jobStatus')->latest()->take(5)->get(),
             'jobsCount' => $jobIds->count(),
-            'bookedHours' => round(
-                $asset->workSessionsQuery()
-                    ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
-                    ->get()
-                    ->sum('duration_in_hours'),
-                2
-            ),
+            'bookedHours' => round($workSessions->sum('duration_in_hours'), 2),
+            'workSessions' => $workSessions->map(fn ($session) => [
+                'id' => $session->id,
+                'user_name' => $session->user->name,
+                'started_at' => $session->started_at,
+                'hours' => $session->duration_in_hours,
+            ]),
         ]);
     }
 

@@ -525,7 +525,7 @@ function AddMaintenanceItemForm({ asset, onClose }) {
     );
 }
 
-export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
+export default function Show({ asset, recentJobs, jobsCount, bookedHours, workSessions }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canConvert = canManage || currentUserRole === 'worker';
@@ -547,6 +547,7 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
     const [addingMaintenanceItem, setAddingMaintenanceItem] = useState(false);
     const [addingNote, setAddingNote] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+    const [showSessionHistory, setShowSessionHistory] = useState(false);
     const pastLocations = (asset.locations ?? []).slice(1); // [0] is current_location itself
 
     const describeLocation = (location) => {
@@ -733,9 +734,6 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
                     <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Jobs</h2>
                         <div className="flex items-center gap-3">
-                            {bookedHours > 0 && (
-                                <span className="text-xs text-gray-500">{bookedHours}h booked</span>
-                            )}
                             {canConvert && (
                                 <Link href={route('jobs.create', { asset_id: asset.id })} className="text-xs text-green-600 font-medium">
                                     + New Job
@@ -771,7 +769,55 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours }) {
                         </Link>
                     )}
                 </div>
+
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Work Sessions</h2>
+                    </div>
+                    {workSessions.length === 0 ? (
+                        <p className="text-sm text-gray-400 p-4">No work sessions logged yet.</p>
+                    ) : (
+                        <div className="flex items-center justify-between px-4 py-3">
+                            <div>
+                                <p className="text-lg font-semibold text-gray-900">{bookedHours}h</p>
+                                <p className="text-xs text-gray-500">total logged</p>
+                            </div>
+                            <button onClick={() => setShowSessionHistory(true)} className="text-sm text-green-600 font-medium">
+                                View history →
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
+
+            <Modal show={showSessionHistory} onClose={() => setShowSessionHistory(false)} maxWidth="md">
+                <div className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-sm font-medium text-gray-900">Work Session History</h2>
+                        <button onClick={() => setShowSessionHistory(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                    </div>
+                    <div className="bg-white rounded-lg border border-gray-100 overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="bg-gray-50 border-b border-gray-100 text-left text-gray-500 uppercase tracking-wide">
+                                    <th className="px-2 py-2 font-medium">User</th>
+                                    <th className="px-2 py-2 font-medium">Date</th>
+                                    <th className="px-2 py-2 font-medium text-right">Hours</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {workSessions.map((session) => (
+                                    <tr key={session.id}>
+                                        <td className="px-2 py-2 text-gray-900 whitespace-nowrap">{session.user_name}</td>
+                                        <td className="px-2 py-2 text-gray-500 whitespace-nowrap">{formatDate(session.started_at.slice(0, 10))}</td>
+                                        <td className="px-2 py-2 text-gray-900 font-medium text-right">{session.hours}h</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }
