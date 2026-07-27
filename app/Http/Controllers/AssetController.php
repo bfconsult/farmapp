@@ -112,7 +112,7 @@ class AssetController extends Controller
             'recentJobs' => FarmJob::whereIn('id', $jobIds)->with('jobStatus')->latest()->take(5)->get(),
             'jobsCount' => $jobIds->count(),
             'bookedHours' => round(
-                WorkSession::whereIn('farm_job_id', $jobIds)
+                $asset->workSessionsQuery()
                     ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
                     ->get()
                     ->sum('duration_in_hours'),

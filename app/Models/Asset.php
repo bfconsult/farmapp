@@ -72,4 +72,34 @@ class Asset extends Model
         return FarmJob::where('asset_id', $this->id)
             ->orWhereHas('maintenanceItem', fn ($query) => $query->where('asset_id', $this->id));
     }
+
+    /**
+     * Work sessions logged directly against this asset - ad-hoc work with
+     * no job at all. A session reached via farmJob->asset (job linked to
+     * this asset) already counts toward its time; see workSessionsQuery()
+     * for the combined total that also covers this direct link.
+     */
+    public function workSessions()
+    {
+        return $this->hasMany(WorkSession::class);
+    }
+
+    /**
+     * Every work session that should count toward this asset's time: either
+     * directly logged against it (ad-hoc, no job) or via a job linked to it
+     * (see jobs()). A single query (not two summed queries) so a session
+     * that somehow has both set isn't double-counted.
+     */
+    public function workSessionsQuery()
+    {
+        $jobIds = $this->jobs()->pluck('farm_jobs.id');
+
+        // Grouped into a single where() so callers can safely chain further
+        // ->where(...)/->whereIn(...) filters (e.g. by status) as an AND
+        // across the whole OR pair, instead of AND binding to only the
+        // last branch.
+        return WorkSession::where(function ($query) use ($jobIds) {
+            $query->where('asset_id', $this->id)->orWhereIn('farm_job_id', $jobIds);
+        });
+    }
 }

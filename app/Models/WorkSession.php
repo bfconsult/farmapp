@@ -15,6 +15,7 @@ class WorkSession extends Model
     protected $fillable = [
         'property_id',
         'farm_job_id',
+        'asset_id',
         'zone_id',
         'user_id',
         'description',
@@ -42,6 +43,16 @@ class WorkSession extends Model
     public function farmJob()
     {
         return $this->belongsTo(FarmJob::class);
+    }
+
+    /**
+     * Direct link for ad-hoc work not tied to a job - a session reached via
+     * farmJob->asset already counts toward an asset's time; this covers
+     * sessions with no job at all. See Asset::workSessions().
+     */
+    public function asset()
+    {
+        return $this->belongsTo(Asset::class);
     }
 
     public function zone()

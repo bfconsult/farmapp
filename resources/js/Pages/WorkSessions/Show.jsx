@@ -164,6 +164,17 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                                 </Link>
                             </div>
                         )}
+                        {session.asset && (
+                            <div className="flex justify-between">
+                                <span className="text-sm text-gray-500">Asset</span>
+                                <Link
+                                    href={route('assets.show', session.asset.id)}
+                                    className="text-sm text-green-600"
+                                >
+                                    {session.asset.name}
+                                </Link>
+                            </div>
+                        )}
                         {session.description && (
                             <div>
                                 <p className="text-sm text-gray-500 mb-1">Description</p>

@@ -11,11 +11,12 @@ import {
     floorToBillingBlock,
 } from '@/dateInput';
 
-export default function Create({ plannedJobs, billingBlockMinutes }) {
+export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
     const { currentProperty } = usePage().props;
     const { data, setData, post, processing, errors, transform } = useForm({
         description: '',
         farm_job_id: '',
+        asset_id: '',
         started_date: '',
         started_time: '',
         ended_date: '',
@@ -213,6 +214,32 @@ export default function Create({ plannedJobs, billingBlockMinutes }) {
                                 <option key={job.id} value={job.id}>{job.name}</option>
                             ))}
                         </select>
+                    </div>
+
+                    {/* Link to asset - for ad-hoc work not tied to a planned job */}
+                    <div className="bg-white rounded-lg shadow p-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Asset (optional)
+                        </label>
+                        {assets.length > 0 ? (
+                            <select
+                                value={data.asset_id}
+                                onChange={(e) => setData('asset_id', e.target.value)}
+                                className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                            >
+                                <option value="">No specific asset</option>
+                                {assets.map((asset) => (
+                                    <option key={asset.id} value={asset.id}>{asset.name}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <p className="text-sm text-gray-500">
+                                Once you set up assets for this property, you'll be able to link work to them here.{' '}
+                                <Link href={route('manage.assets')} className="text-green-600 font-medium">
+                                    Add an asset
+                                </Link>
+                            </p>
+                        )}
                     </div>
 
                     {/* Description */}

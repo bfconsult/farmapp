@@ -14,7 +14,7 @@ import {
     ceilToBillingBlock,
 } from '@/dateInput';
 
-export default function Edit({ session, plannedJobs, waypoints, zones, billingBlockMinutes }) {
+export default function Edit({ session, plannedJobs, assets, waypoints, zones, billingBlockMinutes }) {
     // The exact recorded moment (e.g. an auto-tracked visit's GPS timestamp)
     // never needs to be shown or selectable - the start suggests the block
     // boundary before it, the end the one after, so the dropdown only ever
@@ -31,6 +31,7 @@ export default function Edit({ session, plannedJobs, waypoints, zones, billingBl
     const { data, setData, patch, processing, errors, transform } = useForm({
         description: session.description ?? '',
         farm_job_id: session.farm_job_id ?? '',
+        asset_id: session.asset_id ?? '',
         started_date: startedLocal.date,
         started_time: startedLocal.time,
         ended_date: endedLocal.date,
@@ -150,6 +151,29 @@ export default function Edit({ session, plannedJobs, waypoints, zones, billingBl
                                     <option key={job.id} value={job.id}>{job.name}</option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Asset (optional)</label>
+                            {assets.length > 0 ? (
+                                <select
+                                    value={data.asset_id}
+                                    onChange={(e) => setData('asset_id', e.target.value)}
+                                    className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                >
+                                    <option value="">No specific asset</option>
+                                    {assets.map((asset) => (
+                                        <option key={asset.id} value={asset.id}>{asset.name}</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <p className="text-sm text-gray-500">
+                                    Once you set up assets for this property, you'll be able to link work to them here.{' '}
+                                    <Link href={route('manage.assets')} className="text-green-600 font-medium">
+                                        Add an asset
+                                    </Link>
+                                </p>
+                            )}
                         </div>
 
                         <div>

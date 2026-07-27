@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asset;
 use App\Models\FarmJob;
 use App\Models\JobStatus;
 use App\Models\RecurringJob;
@@ -71,6 +72,7 @@ class WorkSessionController extends Controller
 
         return Inertia::render('WorkSessions/Create', [
             'plannedJobs' => $plannedJobs,
+            'assets' => Asset::where('property_id', $currentPropertyId)->orderBy('name')->get(),
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
         ]);
     }
@@ -80,6 +82,7 @@ class WorkSessionController extends Controller
         $validated = $request->validate([
             'description' => 'nullable|string',
             'farm_job_id' => 'nullable|exists:farm_jobs,id',
+            'asset_id' => 'nullable|exists:assets,id',
             'started_at' => 'nullable|date',
             'ended_at' => 'nullable|date|after:started_at',
             'latitude' => 'nullable|numeric|between:-90,90',
@@ -130,7 +133,7 @@ class WorkSessionController extends Controller
             return redirect()->route('work-sessions.edit', $workSession);
         }
 
-        $workSession->load(['farmJob', 'property.zones', 'photos', 'user', 'waypoints']);
+        $workSession->load(['farmJob', 'asset', 'property.zones', 'photos', 'user', 'waypoints']);
         $workSession->has_conflict = $workSession->status === WorkSession::DRAFT
             && $workSession->overlapsFinalisedSession();
 
@@ -157,6 +160,7 @@ class WorkSessionController extends Controller
         return Inertia::render('WorkSessions/Edit', [
             'session' => $workSession,
             'plannedJobs' => $plannedJobs,
+            'assets' => Asset::where('property_id', $workSession->property_id)->orderBy('name')->get(),
             'waypoints' => $workSession->waypoints,
             'zones' => $workSession->property->zones,
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
@@ -172,6 +176,7 @@ class WorkSessionController extends Controller
         $validated = $request->validate([
             'description' => 'nullable|string',
             'farm_job_id' => 'nullable|exists:farm_jobs,id',
+            'asset_id' => 'nullable|exists:assets,id',
             'started_at' => 'required|date',
             'ended_at' => 'nullable|date|after:started_at',
             'latitude' => 'nullable|numeric|between:-90,90',
