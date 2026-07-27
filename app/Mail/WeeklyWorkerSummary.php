@@ -16,7 +16,7 @@ class WeeklyWorkerSummary extends Mailable
     use Queueable, SerializesModels;
 
     /**
-     * @param Collection $summary Each entry: ['property' => Property, 'total_hours' => float, 'jobs' => Collection<['label' => string, 'sessions' => Collection<WorkSession>, 'total_hours' => float]>]
+     * @param Collection $summary Each entry: ['property' => Property, 'total_hours' => float, 'jobs' => Collection<['label' => string, 'draft_sessions' => Collection<WorkSession>, 'finalised_sessions' => Collection<WorkSession>, 'total_hours' => float]>]
      */
     public function __construct(public Collection $summary)
     {

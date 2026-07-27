@@ -55,7 +55,8 @@ class SendWeeklyWorkerSummary extends Command
                         ->groupBy(fn ($s) => $s->farm_job_id ?? 0)
                         ->map(fn ($jobSessions) => [
                             'label' => $jobSessions->first()->farmJob?->name ?? 'Ad-hoc work',
-                            'sessions' => $jobSessions->values(),
+                            'draft_sessions' => $jobSessions->where('status', WorkSession::DRAFT)->values(),
+                            'finalised_sessions' => $jobSessions->where('status', WorkSession::FINALISED)->values(),
                             'total_hours' => $jobSessions->sum(fn ($s) => $s->duration_in_hours ?? 0),
                         ])
                         ->values(),
