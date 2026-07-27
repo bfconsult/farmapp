@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import WaypointTrail from '@/Components/WaypointTrail';
 import BackLink from '@/Components/BackLink';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useMemo } from 'react';
 import {
     toLocalInputValue,
@@ -68,6 +68,12 @@ export default function Edit({ session, plannedJobs, assets, waypoints, zones, b
     // instead or it would look like the button does nothing.
     const backHref = isAutoTracked ? route('work-sessions.index') : route('work-sessions.show', session.id);
     const backLabel = isAutoTracked ? 'Work' : 'Back';
+
+    const destroy = () => {
+        if (confirm('Delete this visit? This cannot be undone.')) {
+            router.delete(route('work-sessions.destroy', session.id));
+        }
+    };
 
     return (
         <AuthenticatedLayout>
@@ -203,6 +209,15 @@ export default function Edit({ session, plannedJobs, assets, waypoints, zones, b
                         </button>
                     </div>
                 </form>
+
+                {isAutoTracked && (
+                    <button
+                        onClick={destroy}
+                        className="w-full mt-3 py-3 text-red-600 border border-red-300 rounded-lg text-sm"
+                    >
+                        Delete Visit
+                    </button>
+                )}
             </div>
         </AuthenticatedLayout>
     );
