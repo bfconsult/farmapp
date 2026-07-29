@@ -14,6 +14,11 @@ export default {
         extend: {
             fontFamily: {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                // Marketing-page-only families (Welcome.jsx) - deliberately
+                // separate from the `sans` default above so the rest of the
+                // app keeps using Figtree untouched.
+                display: ['Archivo', ...defaultTheme.fontFamily.sans],
+                body: ['Inter', ...defaultTheme.fontFamily.sans],
             },
         },
     },
