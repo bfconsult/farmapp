@@ -153,9 +153,15 @@ class WorkSessionController extends Controller
                 ->with('error', 'Only draft work sessions can be edited.');
         }
 
-        $plannedJobs = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))
-            ->where('property_id', $workSession->property_id)
-            ->get();
+        $plannedJobs = $this->bookableJobs($workSession->property_id);
+
+        // The job already linked to this session should stay selectable even
+        // if it's since been closed - otherwise editing a session would
+        // silently drop a perfectly valid existing link just because the
+        // job moved on since the session was logged.
+        if ($workSession->farm_job_id && !$plannedJobs->contains('id', $workSession->farm_job_id)) {
+            $plannedJobs->push($workSession->farmJob);
+        }
 
         return Inertia::render('WorkSessions/Edit', [
             'session' => $workSession,
