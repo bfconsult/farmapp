@@ -1,6 +1,15 @@
 import { Head, Link } from '@inertiajs/react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import SiteNotice from '@/Components/SiteNotice';
+// Imported (not referenced as a plain /public path) so Vite bundles and
+// hashes these the same way it already does for every JS/CSS asset - a
+// plain root-relative <img src="/images/..."> would request the file from
+// the app's own domain, which Vapor only serves via CloudFront/S3 for
+// paths it knows about (build/assets, favicon.ico, robots.txt) - anything
+// else 404s by design (see routes/web.php's manifest.webmanifest route for
+// the same rule already documented there).
+import heroPhoto from '../../images/marketing/hero-photo.jpg';
+import appScreenshot from '../../images/marketing/app-screenshot.png';
 
 // Design handoff: design_handoff_marketing_page/README.md (2026-07-29).
 // The referenced high-fidelity HTML reference wasn't included in the
@@ -121,7 +130,7 @@ export default function Welcome({ auth }) {
                 <main>
                     <section className="relative overflow-hidden bg-[#22271f]">
                         <img
-                            src="/images/marketing/hero-photo.jpg"
+                            src={heroPhoto}
                             alt=""
                             className="absolute inset-0 h-full w-full object-cover"
                         />
@@ -196,7 +205,7 @@ export default function Welcome({ auth }) {
                             <div className="flex justify-center">
                                 <div className="aspect-[9/19] w-64 overflow-hidden rounded-[2.5rem] border-8 border-[#22271f] bg-[#f6f1e7] shadow-xl">
                                     <img
-                                        src="/images/marketing/app-screenshot.png"
+                                        src={appScreenshot}
                                         alt="An auto-tracked work session on FieldWerkz, showing the GPS trail across several named paddocks"
                                         className="h-full w-full object-cover object-top"
                                     />
