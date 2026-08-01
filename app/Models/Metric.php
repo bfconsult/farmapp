@@ -55,6 +55,31 @@ class Metric extends Model
     }
 
     /**
+     * Metrics for a property with latestMeasurement replaced by whichever
+     * measurement's period overlaps the given range - used by Diary views
+     * (Reports/Diary, Diary/SharedView) so they show the value that was
+     * current *during* that range, not whatever is current *now* (mirrors
+     * WorkSession::diaryDays' pattern of building exactly what these Diary
+     * pages need in one place).
+     */
+    public static function forDiaryPeriod(int $propertyId, Carbon $dateFrom, Carbon $dateTo)
+    {
+        return static::where('property_id', $propertyId)
+            ->with(['measurements' => function ($query) use ($dateFrom, $dateTo) {
+                $query->where('period_start', '<=', $dateTo)
+                    ->where('period_end', '>=', $dateFrom)
+                    ->orderByDesc('period_start')
+                    ->with('photos');
+            }])
+            ->orderBy('name')
+            ->get()
+            ->each(function (self $metric) {
+                $metric->setRelation('latestMeasurement', $metric->measurements->first());
+                $metric->unsetRelation('measurements');
+            });
+    }
+
+    /**
      * The end date of a period starting on the given date, per this metric's
      * reporting period - monthly/quarterly/yearly snap to calendar
      * boundaries, daily/weekly are fixed-length windows from $periodStart

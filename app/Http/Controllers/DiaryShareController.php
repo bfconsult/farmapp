@@ -20,21 +20,17 @@ class DiaryShareController extends Controller
     {
         $share = DiaryShare::where('token', $token)->with('property')->firstOrFail();
 
-        $days = WorkSession::diaryDays(
-            $share->property_id,
-            $share->date_from->startOfDay(),
-            $share->date_to->endOfDay(),
-        );
+        $dateFrom = $share->date_from->startOfDay();
+        $dateTo = $share->date_to->endOfDay();
+
+        $days = WorkSession::diaryDays($share->property_id, $dateFrom, $dateTo);
 
         return Inertia::render('Diary/SharedView', [
             'property' => $share->property->only(['name']),
             'dateFrom' => $share->date_from->toDateString(),
             'dateTo' => $share->date_to->toDateString(),
             'days' => $days,
-            'metrics' => Metric::where('property_id', $share->property_id)
-                ->with('latestMeasurement.photos')
-                ->orderBy('name')
-                ->get(),
+            'metrics' => Metric::forDiaryPeriod($share->property_id, $dateFrom, $dateTo),
             // Not a plain "/favicon.svg" path - Vapor only serves favicon.ico
             // and robots.txt directly from the app root; everything else in
             // public/ needs asset(), which redirects to the CDN-backed URL.
