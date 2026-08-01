@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AssetType;
+use App\Models\JobStatus;
+use App\Models\JobType;
+use App\Models\Priority;
 use App\Models\Property;
 use App\Models\Role;
 use Illuminate\Http\Request;
@@ -37,6 +41,11 @@ class PropertyController extends Controller
             'property_id' => $property->id,
             'type' => Role::ADMIN,
         ]);
+
+        JobStatus::seedDefaultsForProperty($property->id);
+        Priority::seedDefaultsForProperty($property->id);
+        JobType::seedDefaultsForProperty($property->id);
+        AssetType::seedDefaultsForProperty($property->id);
 
         return redirect()->route('properties.index');
     }

@@ -67,7 +67,7 @@ class FarmJobController extends Controller
         } else {
             $dateFrom = now()->startOfMonth();
             $dateTo = now()->endOfMonth();
-            $statusIds = JobStatus::where('can_book_time', true)->pluck('id')->all();
+            $statusIds = JobStatus::where('property_id', $currentPropertyId)->where('can_book_time', true)->pluck('id')->all();
             $order = 'latest';
         }
 
@@ -150,7 +150,7 @@ class FarmJobController extends Controller
             'currentOrder' => $order,
             'currentDateFrom' => $dateFrom->toDateString(),
             'currentDateTo' => $dateTo->toDateString(),
-            'jobStatuses' => JobStatus::orderBy('order')->get(),
+            'jobStatuses' => JobStatus::where('property_id', $currentPropertyId)->orderBy('order')->get(),
             'calendarJobs' => $calendarJobs,
             'calendarMonth' => $calendarMonth,
         ]);
@@ -168,9 +168,9 @@ class FarmJobController extends Controller
         }
 
         return Inertia::render('Jobs/Create', [
-            'priorities' => Priority::orderBy('order')->get(),
-            'jobTypes' => JobType::orderBy('name')->get(),
-            'jobStatuses' => JobStatus::orderBy('order')->get(),
+            'priorities' => Priority::where('property_id', $currentProperty->id)->orderBy('order')->get(),
+            'jobTypes' => JobType::where('property_id', $currentProperty->id)->orderBy('name')->get(),
+            'jobStatuses' => JobStatus::where('property_id', $currentProperty->id)->orderBy('order')->get(),
             'currentProperty' => $currentProperty,
             'checklistTemplates' => ChecklistTemplate::where('property_id', session('current_property_id'))
                 ->where('is_active', true)
@@ -238,7 +238,8 @@ class FarmJobController extends Controller
 
         $validated['user_id'] = Auth::id();
         $validated['property_id'] = session('current_property_id');
-        $validated['job_status_id'] = $validated['job_status_id'] ?? JobStatus::where('is_default', true)->value('id');
+        $validated['job_status_id'] = $validated['job_status_id']
+            ?? JobStatus::where('property_id', $validated['property_id'])->where('is_default', true)->value('id');
 
         $farmJob = FarmJob::create($validated);
         $this->attachChecklistTemplates($farmJob, $checklistTemplateIds, $request->user());
@@ -276,7 +277,7 @@ class FarmJobController extends Controller
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(),
-            'suppliers' => Supplier::orderBy('name')->get(),
+            'suppliers' => Supplier::where('property_id', $farmJob->property_id)->orderBy('name')->get(),
         ]);
     }
 
@@ -325,9 +326,9 @@ class FarmJobController extends Controller
 
         return Inertia::render('Jobs/Edit', [
             'job' => $farmJob,
-            'priorities' => Priority::orderBy('order')->get(),
-            'jobStatuses' => JobStatus::orderBy('order')->get(),
-            'jobTypes' => JobType::orderBy('name')->get(),
+            'priorities' => Priority::where('property_id', $farmJob->property_id)->orderBy('order')->get(),
+            'jobStatuses' => JobStatus::where('property_id', $farmJob->property_id)->orderBy('order')->get(),
+            'jobTypes' => JobType::where('property_id', $farmJob->property_id)->orderBy('name')->get(),
             'checklistTemplates' => ChecklistTemplate::where('property_id', $farmJob->property_id)
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -367,7 +368,8 @@ class FarmJobController extends Controller
         $checklistTemplateIds = $validated['checklist_template_ids'] ?? [];
         unset($validated['assignee_ids'], $validated['repeats'], $validated['interval'], $validated['starts_on'], $validated['checklist_template_ids']);
 
-        $validated['job_status_id'] = $validated['job_status_id'] ?? JobStatus::where('is_default', true)->value('id');
+        $validated['job_status_id'] = $validated['job_status_id']
+            ?? JobStatus::where('property_id', $validated['property_id'])->where('is_default', true)->value('id');
 
         // Turn this existing job into the first instance of a new recurring
         // template — only possible if it isn't already part of one.
@@ -451,7 +453,7 @@ class FarmJobController extends Controller
      */
     public function finish(FarmJob $farmJob)
     {
-        $finishedStatusId = JobStatus::where('is_finished_default', true)->value('id');
+        $finishedStatusId = JobStatus::where('property_id', $farmJob->property_id)->where('is_finished_default', true)->value('id');
 
         if (!$finishedStatusId) {
             return back()->with('error', 'No status is set as the "finished" default yet - set one in Settings first.');

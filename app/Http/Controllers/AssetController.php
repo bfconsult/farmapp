@@ -28,7 +28,7 @@ class AssetController extends Controller
 
         return Inertia::render('Manage/Assets', [
             'assets' => $assets,
-            'assetTypes' => $canManage ? AssetType::orderBy('name')->get() : [],
+            'assetTypes' => $canManage ? AssetType::where('property_id', $currentPropertyId)->orderBy('name')->get() : [],
             'canManage' => $canManage,
         ]);
     }

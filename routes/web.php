@@ -117,24 +117,6 @@ Route::middleware(['auth', 'app.admin'])->group(function () {
     Route::get('app-admin/report', [AppAdminController::class, 'index'])->name('app-admin.report');
 });
 
-// added JMB
-Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
-
-// Priorities
-Route::post('settings/priorities', [SettingsController::class, 'storePriority'])->name('settings.priorities.store');
-Route::patch('settings/priorities/{priority}', [SettingsController::class, 'updatePriority'])->name('settings.priorities.update');
-Route::delete('settings/priorities/{priority}', [SettingsController::class, 'destroyPriority'])->name('settings.priorities.destroy');
-
-// Job Types
-Route::post('settings/job-types', [SettingsController::class, 'storeJobType'])->name('settings.job-types.store');
-Route::patch('settings/job-types/{jobType}', [SettingsController::class, 'updateJobType'])->name('settings.job-types.update');
-Route::delete('settings/job-types/{jobType}', [SettingsController::class, 'destroyJobType'])->name('settings.job-types.destroy');
-
-// Job Statuses
-Route::post('settings/job-statuses', [SettingsController::class, 'storeJobStatus'])->name('settings.job-statuses.store');
-Route::patch('settings/job-statuses/{jobStatus}', [SettingsController::class, 'updateJobStatus'])->name('settings.job-statuses.update');
-Route::delete('settings/job-statuses/{jobStatus}', [SettingsController::class, 'destroyJobStatus'])->name('settings.job-statuses.destroy');
-
 // Admin only routes
 Route::middleware(['auth', 'property.role:admin'])->group(function () {
     Route::resource('properties', PropertyController::class)->only(['edit', 'update', 'destroy']);
@@ -265,8 +247,8 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
         // about billing eligibility, not "is this status done", and the two
         // don't always agree (e.g. a custom "complete" status someone forgot
         // to also flag as not-bookable).
-        $jobStatuses = \App\Models\JobStatus::orderBy('order')->get(['id', 'name', 'color']);
-        $defaultJobStatusIds = \App\Models\JobStatus::where('can_book_time', true)->pluck('id');
+        $jobStatuses = \App\Models\JobStatus::where('property_id', $currentPropertyId)->orderBy('order')->get(['id', 'name', 'color']);
+        $defaultJobStatusIds = \App\Models\JobStatus::where('property_id', $currentPropertyId)->where('can_book_time', true)->pluck('id');
 
         // job_status_ids_set distinguishes "the user explicitly chose zero
         // statuses" from "no selection has been made yet" - an empty array

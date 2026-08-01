@@ -21,8 +21,8 @@ class RecurringJobController extends Controller
 
         return Inertia::render('RecurringJobs/Index', [
             'recurringJobs' => $recurringJobs,
-            'jobTypes' => JobType::orderBy('name')->get(),
-            'priorities' => Priority::orderBy('order')->get(),
+            'jobTypes' => JobType::where('property_id', $currentPropertyId)->orderBy('name')->get(),
+            'priorities' => Priority::where('property_id', $currentPropertyId)->orderBy('order')->get(),
         ]);
     }
 

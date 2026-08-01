@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Mail\JobOverdueReminder;
 use App\Models\FarmJob;
 use App\Models\JobReminder;
-use App\Models\JobStatus;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 
@@ -40,10 +39,8 @@ class SendJobReminders extends Command
      */
     private function sendOverdueNoHoursReminders(): void
     {
-        $activeStatusIds = JobStatus::where('can_book_time', true)->pluck('id');
-
         FarmJob::query()
-            ->whereIn('job_status_id', $activeStatusIds)
+            ->whereHas('jobStatus', fn ($query) => $query->where('can_book_time', true))
             ->whereNotNull('scheduled_date')
             ->where('scheduled_date', '<', now()->toDateString())
             ->whereDoesntHave('workSessions')

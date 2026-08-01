@@ -27,9 +27,7 @@ class GenerateRecurringJobs extends Command
      */
     public function handle(): void
     {
-        $closedStatusId = JobStatus::where('is_recurring_closed_default', true)->value('id');
-
-        RecurringJob::where('is_active', true)->get()->each(function (RecurringJob $template) use ($closedStatusId) {
+        RecurringJob::where('is_active', true)->get()->each(function (RecurringJob $template) {
             $latest = $template->instances()->latest('period_start')->first();
 
             if (!$latest) {
@@ -45,6 +43,10 @@ class GenerateRecurringJobs extends Command
             }
 
             if (now()->toDateString() > $latest->period_end->toDateString()) {
+                $closedStatusId = JobStatus::where('property_id', $template->property_id)
+                    ->where('is_recurring_closed_default', true)
+                    ->value('id');
+
                 if ($closedStatusId) {
                     $latest->update(['job_status_id' => $closedStatusId]);
                 }

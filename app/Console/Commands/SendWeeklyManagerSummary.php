@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Mail\WeeklyManagerSummary;
-use App\Models\JobStatus;
 use App\Models\MetricMeasurement;
 use App\Models\Property;
 use App\Models\Role;
@@ -32,8 +31,6 @@ class SendWeeklyManagerSummary extends Command
      */
     public function handle(): void
     {
-        $activeStatusIds = JobStatus::where('can_book_time', true)->pluck('id');
-
         $managers = User::whereHas(
             'roles',
             fn ($query) => $query->whereIn('type', [Role::ADMIN, Role::MANAGER])
@@ -49,7 +46,7 @@ class SendWeeklyManagerSummary extends Command
             $summary = $properties
                 ->map(fn (Property $property) => [
                     'property' => $property,
-                    'jobs' => $this->incompleteJobsFor($property, $activeStatusIds),
+                    'jobs' => $this->incompleteJobsFor($property),
                     'measurements' => $this->incompleteMeasurementsFor($property),
                 ])
                 ->filter(fn ($entry) => $entry['jobs']->isNotEmpty() || $entry['measurements']->isNotEmpty())
@@ -65,10 +62,10 @@ class SendWeeklyManagerSummary extends Command
         }
     }
 
-    private function incompleteJobsFor(Property $property, $activeStatusIds)
+    private function incompleteJobsFor(Property $property)
     {
         return $property->farmJobs()
-            ->whereIn('job_status_id', $activeStatusIds)
+            ->whereHas('jobStatus', fn ($query) => $query->where('can_book_time', true))
             ->whereNotNull('scheduled_date')
             ->where('scheduled_date', '<=', now()->toDateString())
             ->orderBy('scheduled_date')

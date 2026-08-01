@@ -458,6 +458,15 @@ class WorkSessionController extends Controller
                 };
 
                 return now()->lte($graceEnd);
+            })
+            ->reject(function (FarmJob $job) {
+                // The grace window exists to cover the gap before a new
+                // period's instance exists - once one does, this older
+                // instance has been superseded and shouldn't keep showing
+                // for the rest of the grace period too.
+                return FarmJob::where('recurring_job_id', $job->recurring_job_id)
+                    ->where('period_end', '>', $job->period_end)
+                    ->exists();
             });
 
         return $normal->merge($recurringInGrace)->unique('id')->values();
@@ -476,7 +485,7 @@ class WorkSessionController extends Controller
             return;
         }
 
-        $inProgressStatus = JobStatus::where('is_in_progress_default', true)->first();
+        $inProgressStatus = JobStatus::where('property_id', $job->property_id)->where('is_in_progress_default', true)->first();
 
         if ($inProgressStatus) {
             $job->update(['job_status_id' => $inProgressStatus->id]);

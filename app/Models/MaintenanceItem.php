@@ -54,7 +54,7 @@ class MaintenanceItem extends Model
             'description' => $this->description,
             'latitude' => $this->asset->currentLocation?->latitude,
             'longitude' => $this->asset->currentLocation?->longitude,
-            'job_status_id' => JobStatus::where('is_default', true)->value('id'),
+            'job_status_id' => JobStatus::where('property_id', $this->asset->property_id)->where('is_default', true)->value('id'),
             'user_id' => $user->id ?? $this->created_by,
             'property_id' => $this->asset->property_id,
             'maintenance_item_id' => $this->id,

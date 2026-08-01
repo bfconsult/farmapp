@@ -104,7 +104,7 @@ class RecurringJob extends Model
             'hourly_rate' => $this->hourly_rate,
             'priority_id' => $this->priority_id,
             'job_type_id' => $this->job_type_id,
-            'job_status_id' => JobStatus::where('is_default', true)->value('id'),
+            'job_status_id' => JobStatus::where('property_id', $this->property_id)->where('is_default', true)->value('id'),
             'user_id' => $this->created_by,
             'property_id' => $this->property_id,
             'zone_id' => $this->zone_id,
