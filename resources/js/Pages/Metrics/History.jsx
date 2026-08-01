@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
 import BackLink from '@/Components/BackLink';
-import { Head } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
 
@@ -36,7 +36,7 @@ function PhotoGrid({ photos }) {
 /** Numeric metrics: a compact table, with a link that pops open a modal of
  * that row's photos rather than showing them inline (a table row has no
  * room for thumbnails). */
-function NumberHistoryTable({ measurements }) {
+function NumberHistoryTable({ measurements, canMeasure }) {
     const [photosFor, setPhotosFor] = useState(null);
     const photoMeasurement = measurements.find((m) => m.id === photosFor);
 
@@ -63,6 +63,14 @@ function NumberHistoryTable({ measurements }) {
                                     <span className={`px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COLORS[measurement.status]}`}>
                                         {STATUS_LABELS[measurement.status]}
                                     </span>
+                                    {canMeasure && measurement.status === 'incomplete' && (
+                                        <Link
+                                            href={route('metric-measurements.show', measurement.id)}
+                                            className="block mt-1 text-green-600 whitespace-nowrap"
+                                        >
+                                            Update
+                                        </Link>
+                                    )}
                                 </td>
                                 <td className="px-2 py-2">
                                     {measurement.photos.length > 0 ? (
@@ -100,16 +108,26 @@ function NumberHistoryTable({ measurements }) {
 
 /** Text metrics: a card per measurement, with photos shown directly on the
  * card - a table row can't hold free-text plus thumbnails legibly. */
-function TextHistoryCards({ measurements }) {
+function TextHistoryCards({ measurements, canMeasure }) {
     return (
         <div className="space-y-3">
             {measurements.map((measurement) => (
                 <div key={measurement.id} className="bg-white rounded-lg shadow p-4">
                     <div className="flex items-center justify-between mb-2">
                         <p className="text-xs text-gray-500">{formatPeriod(measurement)}</p>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[measurement.status]}`}>
-                            {STATUS_LABELS[measurement.status]}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            {canMeasure && measurement.status === 'incomplete' && (
+                                <Link
+                                    href={route('metric-measurements.show', measurement.id)}
+                                    className="text-xs text-green-600 font-medium"
+                                >
+                                    Update
+                                </Link>
+                            )}
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[measurement.status]}`}>
+                                {STATUS_LABELS[measurement.status]}
+                            </span>
+                        </div>
                     </div>
                     <p className="text-sm text-gray-900 whitespace-pre-wrap">
                         {measurement.value_text || 'No value yet'}
@@ -126,6 +144,9 @@ function TextHistoryCards({ measurements }) {
 }
 
 export default function History({ metric, measurements }) {
+    const { currentUserRole } = usePage().props;
+    const canMeasure = ['admin', 'manager', 'worker'].includes(currentUserRole);
+
     return (
         <AuthenticatedLayout title="Metric History">
             <Head title={`${metric.name} — History`} />
@@ -147,9 +168,9 @@ export default function History({ metric, measurements }) {
                         No measurements yet.
                     </div>
                 ) : metric.answer_type === 'number' ? (
-                    <NumberHistoryTable measurements={measurements} />
+                    <NumberHistoryTable measurements={measurements} canMeasure={canMeasure} />
                 ) : (
-                    <TextHistoryCards measurements={measurements} />
+                    <TextHistoryCards measurements={measurements} canMeasure={canMeasure} />
                 )}
             </div>
         </AuthenticatedLayout>
