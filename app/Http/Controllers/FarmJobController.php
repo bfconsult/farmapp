@@ -44,12 +44,13 @@ class FarmJobController extends Controller
         // back via the main nav (a plain link, no query params) silently
         // reset the date range/status/order back to the hard defaults every
         // time. `date_from` is always sent together with the rest by the
-        // Filters panel and never empty, so its presence is the "the user
-        // has touched the filters this visit" signal (an empty `statuses`
-        // array on its own can't be told apart from "absent" over HTTP).
+        // Filters panel (even when empty, meaning "All" - no date filter),
+        // so its presence is the "the user has touched the filters this
+        // visit" signal (an empty `statuses` array on its own can't be told
+        // apart from "absent" over HTTP).
         if ($request->has('date_from')) {
-            $dateFrom = \Carbon\Carbon::parse($request->date_from)->startOfDay();
-            $dateTo = \Carbon\Carbon::parse($request->date_to)->endOfDay();
+            $dateFrom = $request->date_from ? \Carbon\Carbon::parse($request->date_from)->startOfDay() : null;
+            $dateTo = $request->date_to ? \Carbon\Carbon::parse($request->date_to)->endOfDay() : null;
             $statusIds = collect($request->input('statuses', []))->map(fn ($id) => (int) $id)->all();
             $order = $request->input('order', 'latest');
 
@@ -60,13 +61,16 @@ class FarmJobController extends Controller
                 'order' => $order,
             ]]);
         } elseif ($persisted = session('jobs_index_filters')) {
-            $dateFrom = \Carbon\Carbon::parse($persisted['date_from'])->startOfDay();
-            $dateTo = \Carbon\Carbon::parse($persisted['date_to'])->endOfDay();
+            $dateFrom = $persisted['date_from'] ? \Carbon\Carbon::parse($persisted['date_from'])->startOfDay() : null;
+            $dateTo = $persisted['date_to'] ? \Carbon\Carbon::parse($persisted['date_to'])->endOfDay() : null;
             $statusIds = $persisted['statuses'];
             $order = $persisted['order'];
         } else {
-            $dateFrom = now()->startOfMonth();
-            $dateTo = now()->endOfMonth();
+            // No filter chosen yet this visit - default to All dates rather
+            // than the current month, so a new user's first look at Jobs
+            // isn't quietly missing anything created outside this month.
+            $dateFrom = null;
+            $dateTo = null;
             $statusIds = JobStatus::where('property_id', $currentPropertyId)->where('can_book_time', true)->pluck('id')->all();
             $order = 'latest';
         }
@@ -75,7 +79,7 @@ class FarmJobController extends Controller
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
-            ->whereBetween('created_at', [$dateFrom, $dateTo])
+            ->when($dateFrom && $dateTo, fn ($query) => $query->whereBetween('created_at', [$dateFrom, $dateTo]))
             ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zone', 'workSessions.user', 'expenses', 'notes.views'])
             ->withCount('incompleteChecklists')
             ->whereIn('job_status_id', $statusIds);
@@ -86,7 +90,7 @@ class FarmJobController extends Controller
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
-            ->whereBetween('created_at', [$dateFrom, $dateTo])
+            ->when($dateFrom && $dateTo, fn ($query) => $query->whereBetween('created_at', [$dateFrom, $dateTo]))
             ->with('jobStatus')
             ->get();
 
@@ -148,8 +152,8 @@ class FarmJobController extends Controller
             'counts' => $counts,
             'currentStatusIds' => $statusIds,
             'currentOrder' => $order,
-            'currentDateFrom' => $dateFrom->toDateString(),
-            'currentDateTo' => $dateTo->toDateString(),
+            'currentDateFrom' => $dateFrom?->toDateString(),
+            'currentDateTo' => $dateTo?->toDateString(),
             'jobStatuses' => JobStatus::where('property_id', $currentPropertyId)->orderBy('order')->get(),
             'calendarJobs' => $calendarJobs,
             'calendarMonth' => $calendarMonth,

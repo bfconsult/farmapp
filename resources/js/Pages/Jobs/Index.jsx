@@ -252,13 +252,17 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
         goTo({ dateFrom: from, dateTo: to });
     };
 
+    const showAllDates = () => goTo({ dateFrom: '', dateTo: '' });
+
+    const isAllDates = !currentDateFrom && !currentDateTo;
+
     const isThisMonth = (() => {
         const { from, to } = currentMonthRange();
         return currentDateFrom === from && currentDateTo === to;
     })();
 
     const filterSummary = [
-        isThisMonth ? 'This month' : `${currentDateFrom} → ${currentDateTo}`,
+        isAllDates ? 'All dates' : isThisMonth ? 'This month' : `${currentDateFrom} → ${currentDateTo}`,
         currentStatusIds.length === jobStatuses.length
             ? 'All statuses'
             : `${currentStatusIds.length} status${currentStatusIds.length === 1 ? '' : 'es'}`,
@@ -341,24 +345,31 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-700">Date range</span>
-                                {!isThisMonth && (
-                                    <button onClick={resetToThisMonth} className="text-xs text-green-600">
-                                        Reset to this month
-                                    </button>
-                                )}
+                                <div className="flex gap-3 text-xs">
+                                    {!isAllDates && (
+                                        <button onClick={showAllDates} className="text-green-600">
+                                            All dates
+                                        </button>
+                                    )}
+                                    {!isThisMonth && (
+                                        <button onClick={resetToThisMonth} className="text-green-600">
+                                            Reset to this month
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <button
                                 onClick={() => setShowCalendar((v) => !v)}
                                 className="w-full flex items-center justify-between text-sm border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
                             >
-                                <span>{formatDate(currentDateFrom)} → {formatDate(currentDateTo)}</span>
+                                <span>{isAllDates ? 'All dates' : `${formatDate(currentDateFrom)} → ${formatDate(currentDateTo)}`}</span>
                                 <span className="text-gray-400">{showCalendar ? '▲' : '▼'}</span>
                             </button>
                             {showCalendar && (
                                 <div className="mt-2 border border-gray-200 rounded-lg p-3">
                                     <DateRangeCalendar
-                                        from={currentDateFrom}
-                                        to={currentDateTo}
+                                        from={currentDateFrom || currentMonthRange().from}
+                                        to={currentDateTo || currentMonthRange().to}
                                         onChange={changeRange}
                                     />
                                 </div>
