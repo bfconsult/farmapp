@@ -151,6 +151,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::patch('metrics/{metric}', [MetricController::class, 'update'])->name('metrics.update');
     Route::delete('metrics/{metric}', [MetricController::class, 'destroy'])->name('metrics.destroy');
     Route::get('manage/checklists', [ChecklistTemplateController::class, 'index'])->name('manage.checklists');
+    Route::get('manage/work-sessions', [WorkSessionController::class, 'reviewIndex'])->name('manage.work-sessions');
     Route::post('checklist-templates', [ChecklistTemplateController::class, 'store'])->name('checklist-templates.store');
     Route::patch('checklist-templates/{checklistTemplate}', [ChecklistTemplateController::class, 'update'])->name('checklist-templates.update');
     Route::delete('checklist-templates/{checklistTemplate}', [ChecklistTemplateController::class, 'destroy'])->name('checklist-templates.destroy');

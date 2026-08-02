@@ -52,6 +52,20 @@ export default function Index({ metricsTracked, metricsDue, checklistTemplatesCo
                     />
                 )}
 
+                {canManage && (
+                    <HubCard
+                        href={route('manage.work-sessions')}
+                        title="Work Sessions"
+                        subtitle="Review & correct workers' entries"
+                        icon={
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="9" />
+                                <path d="M12 7v5l3 3" />
+                            </svg>
+                        }
+                    />
+                )}
+
                 <HubCard
                     href={route('manage.assets')}
                     title="Assets"

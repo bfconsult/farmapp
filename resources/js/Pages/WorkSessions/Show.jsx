@@ -1,6 +1,8 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import WaypointTrail from '@/Components/WaypointTrail';
 import BackLink from '@/Components/BackLink';
+import NoteRow from '@/Components/NoteRow';
+import AddNoteForm from '@/Components/AddNoteForm';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
@@ -21,8 +23,11 @@ const STATUS_COLORS = {
 export default function Show({ session, durationInHours, billingAmount, waypoints, zones }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
-    const { flash } = usePage().props;
+    const { flash, currentUserRole } = usePage().props;
+    const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
+    const canCreateNote = canManage || currentUserRole === 'worker';
     const [uploading, setUploading] = useState(false);
+    const [addingNote, setAddingNote] = useState(false);
 
     useEffect(() => {
         if (flash?.addPhoto && cameraInput.current) {
@@ -287,6 +292,30 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                                 </div>
                             ))}
                         </div>
+                    )}
+                </div>
+
+                {/* Notes */}
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
+                        {canCreateNote && !addingNote && (
+                            <button onClick={() => setAddingNote(true)} className="text-xs text-green-600 font-medium">
+                                + Add
+                            </button>
+                        )}
+                    </div>
+                    {session.notes && session.notes.length > 0 ? (
+                        <div className="divide-y divide-gray-100">
+                            {session.notes.map((note) => (
+                                <NoteRow key={note.id} note={note} canManage={canManage} canCreate={canCreateNote} />
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-gray-400 p-4">No notes yet.</p>
+                    )}
+                    {addingNote && (
+                        <AddNoteForm parentField="work_session_id" parentId={session.id} onClose={() => setAddingNote(false)} />
                     )}
                 </div>
 

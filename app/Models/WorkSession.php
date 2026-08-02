@@ -70,6 +70,11 @@ class WorkSession extends Model
         return $this->hasMany(Photo::class);
     }
 
+    public function notes()
+    {
+        return $this->hasMany(Note::class);
+    }
+
     public function waypoints()
     {
         return $this->hasMany(WorkSessionWaypoint::class)->orderBy('recorded_at');

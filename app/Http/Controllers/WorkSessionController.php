@@ -120,6 +120,10 @@ class WorkSessionController extends Controller
 
     public function show(WorkSession $workSession)
     {
+        if ($workSession->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
         // An auto-tracked visit hasn't had a human look at it yet - send
         // straight to Edit instead of the normal Show page until it's been
         // saved through that form once (see update() below, which sets
@@ -133,9 +137,10 @@ class WorkSessionController extends Controller
             return redirect()->route('work-sessions.edit', $workSession);
         }
 
-        $workSession->load(['farmJob', 'asset', 'property.zones', 'photos', 'user', 'waypoints']);
+        $workSession->load(['farmJob', 'asset', 'property.zones', 'photos', 'user', 'waypoints', 'notes.photos', 'notes.createdBy', 'notes.views']);
         $workSession->has_conflict = $workSession->status === WorkSession::DRAFT
             && $workSession->overlapsFinalisedSession();
+        $workSession->notes->each(fn ($note) => $note->is_unread = $note->isUnreadBy(Auth::id()));
 
         return Inertia::render('WorkSessions/Show', [
             'session' => $workSession,
@@ -148,6 +153,10 @@ class WorkSessionController extends Controller
 
     public function edit(WorkSession $workSession)
     {
+        if ($workSession->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
         if ($workSession->status !== WorkSession::DRAFT) {
             return redirect()->route('work-sessions.show', $workSession)
                 ->with('error', 'Only draft work sessions can be edited.');
@@ -175,6 +184,10 @@ class WorkSessionController extends Controller
 
     public function update(Request $request, WorkSession $workSession)
     {
+        if ($workSession->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
         if ($workSession->status !== WorkSession::DRAFT) {
             abort(403, 'Only draft work sessions can be edited.');
         }
@@ -203,6 +216,10 @@ class WorkSessionController extends Controller
 
     public function destroy(WorkSession $workSession)
     {
+        if ($workSession->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
         $workSession->delete();
 
         return redirect()->route('work-sessions.index');
@@ -210,6 +227,10 @@ class WorkSessionController extends Controller
 
     public function stop(WorkSession $workSession)
     {
+        if ($workSession->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
         $workSession->update(['ended_at' => now()]);
 
         return redirect()->route('work-sessions.show', $workSession);
@@ -222,6 +243,10 @@ class WorkSessionController extends Controller
      */
     public function destroyWaypoints(WorkSession $workSession)
     {
+        if ($workSession->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
         $workSession->waypoints()->delete();
 
         return back()->with('success', 'Path deleted.');
@@ -229,6 +254,10 @@ class WorkSessionController extends Controller
 
     public function finalise(WorkSession $workSession)
     {
+        if ($workSession->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
         if (!$workSession->ended_at) {
             abort(403, 'Stop the session before finalising it.');
         }
@@ -248,6 +277,10 @@ class WorkSessionController extends Controller
 
     public function revertToDraft(WorkSession $workSession)
     {
+        if ($workSession->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
         // Only a finalised session can go back to draft — once approved, it's locked in.
         if ($workSession->status !== WorkSession::FINALISED) {
             abort(403, 'Only finalised work sessions can be reverted to draft.');
@@ -256,6 +289,43 @@ class WorkSessionController extends Controller
         $workSession->update(['status' => WorkSession::DRAFT]);
 
         return redirect()->route('work-sessions.show', $workSession);
+    }
+
+    /**
+     * Admin/manager-only visibility across every worker's sessions for the
+     * property, grouped by worker then date - lets them spot a finalised
+     * session that's wrong and unfinalise it (see revertToDraft() above),
+     * which redirects to that session's Show page so a note explaining why
+     * can be added there.
+     */
+    public function reviewIndex(Request $request)
+    {
+        $currentPropertyId = session('current_property_id');
+        [$dateFrom, $dateTo] = $this->parseDateRange($request);
+
+        $sessions = WorkSession::where('property_id', $currentPropertyId)
+            ->whereBetween('started_at', [$dateFrom, $dateTo])
+            ->with(['farmJob', 'user'])
+            ->orderBy('started_at')
+            ->get()
+            ->map(function ($session) {
+                $session->duration_in_hours = $session->duration_in_hours;
+                return $session;
+            });
+
+        $workers = $sessions->groupBy('user_id')
+            ->map(fn ($userSessions) => [
+                'user' => $userSessions->first()->user,
+                'sessions' => $userSessions->values(),
+            ])
+            ->sortBy(fn ($worker) => $worker['user']->name)
+            ->values();
+
+        return Inertia::render('WorkSessions/Review', [
+            'workers' => $workers,
+            'currentDateFrom' => $dateFrom->toDateString(),
+            'currentDateTo' => $dateTo->toDateString(),
+        ]);
     }
 
     public function finaliseAndShare(Request $request)

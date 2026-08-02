@@ -10,6 +10,7 @@ class Note extends Model
         'property_id',
         'asset_id',
         'job_id',
+        'work_session_id',
         'created_by',
         'body',
         'latitude',
@@ -29,6 +30,11 @@ class Note extends Model
     public function job()
     {
         return $this->belongsTo(FarmJob::class);
+    }
+
+    public function workSession()
+    {
+        return $this->belongsTo(WorkSession::class);
     }
 
     public function createdBy()
