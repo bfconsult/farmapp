@@ -83,22 +83,6 @@ Route::middleware('auth')->group(function () {
     Route::post('jobs/{farmJob}/finish', [FarmJobController::class, 'finish'])->name('jobs.finish');
     Route::post('jobs/{farmJob}/photos', [PhotoController::class, 'store'])->name('photos.store');
     Route::delete('photos/{photo}', [PhotoController::class, 'destroy'])->name('photos.destroy');
-    Route::get('map', function () {
-        $currentPropertyId = session('current_property_id');
-        
-        $jobs = \Illuminate\Support\Facades\Auth::user()->farmJobs()
-            ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
-                $query->where('property_id', $currentPropertyId);
-            })
-            ->with(['jobStatus'])
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->get();
-    
-        return Inertia::render('Map', [
-            'jobs' => $jobs,
-        ]);
-    })->name('map');
     // Must be registered before the resource() below — otherwise the literal
     // "finalise-and-share" path collides with the resource's GET /work-sessions/{workSession}.
     Route::get('work-sessions/finalise-and-share', [WorkSessionController::class, 'finaliseAndShare'])->name('work-sessions.finalise-and-share');
@@ -254,12 +238,25 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
 
         // job_status_ids_set distinguishes "the user explicitly chose zero
         // statuses" from "no selection has been made yet" - an empty array
-        // and an absent param are otherwise indistinguishable over HTTP.
-        $jobStatusIds = $request->boolean('job_status_ids_set')
-            ? collect($request->input('job_status_ids', []))->map(fn ($id) => (int) $id)
-            : $defaultJobStatusIds;
+        // and an absent param are otherwise indistinguishable over HTTP. Once
+        // set, the choice (and job_age alongside it) is remembered in the
+        // session so the filter survives navigating away and back, the same
+        // way FarmJobController::index()'s jobs_index_filters does.
+        if ($request->has('job_status_ids_set')) {
+            $jobStatusIds = collect($request->input('job_status_ids', []))->map(fn ($id) => (int) $id);
+            $jobAge = $request->input('job_age', 'all');
 
-        $jobAge = $request->input('job_age', 'all');
+            session(['map_filters' => [
+                'job_status_ids' => $jobStatusIds->values()->all(),
+                'job_age' => $jobAge,
+            ]]);
+        } elseif ($persisted = session('map_filters')) {
+            $jobStatusIds = collect($persisted['job_status_ids']);
+            $jobAge = $persisted['job_age'];
+        } else {
+            $jobStatusIds = $defaultJobStatusIds;
+            $jobAge = 'all';
+        }
 
         // An approver reviews everyone's work without being added to the
         // team on individual jobs - see every job on the property instead of
