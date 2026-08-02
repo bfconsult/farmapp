@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Note;
 use App\Models\Property;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -16,6 +17,13 @@ class ShapeController extends Controller
             'property' => $property,
             'shape' => $property->shape,
             'zones' => $property->zones,
+            // Location notes (e.g. a fence corner) are shown as a toggleable
+            // reference layer while drawing zones - not editable here, so
+            // just the fields needed to label a pin.
+            'notes' => Note::where('property_id', $property->id)
+                ->whereNotNull('latitude')
+                ->with('createdBy')
+                ->get(),
         ]);
     }
 

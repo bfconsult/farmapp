@@ -2,16 +2,39 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import HelpTip from '@/Components/HelpTip';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
+import { formatDate } from '@/dateInput';
 
 const ZONE_COLOR = '#7c3aed';
+const NOTE_COLOR = 'blue';
 
-export default function Shape({ property, shape, zones }) {
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+function escapeHtml(text) {
+    return String(text ?? '').replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
+/** Same pin shape/size everywhere (the default Leaflet marker), just
+ * recolored per layer - matches Map.jsx's pinIcon helper. */
+function pinIcon(L, color) {
+    return L.icon({
+        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
+        iconRetinaUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41],
+    });
+}
+
+export default function Shape({ property, shape, zones, notes }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const leafletRef = useRef(null);
     const polygonLayer = useRef(null);
     const circleLayer = useRef(null);
     const zoneLayers = useRef({});
+    const noteLayerGroup = useRef(null);
     const [hasShape, setHasShape] = useState(!!shape);
     const [hasZone, setHasZone] = useState(
         !!property.non_working_zone_center_lat,
@@ -23,6 +46,10 @@ export default function Shape({ property, shape, zones }) {
     const zonesRef = useRef(zones);
     const [selectedZoneId, setSelectedZoneId] = useState(null);
     const selectedZoneIdRef = useRef(null);
+    // Off by default - this is a reference overlay for drawing zones, not
+    // the primary content of this page, so it shouldn't clutter the
+    // boundary/zone view until asked for.
+    const [showNotes, setShowNotes] = useState(false);
 
     useEffect(() => {
         activeTabRef.current = activeTab;
@@ -164,6 +191,20 @@ export default function Shape({ property, shape, zones }) {
                 zoneLayers.current[zone.id] = polygon;
             });
 
+            // Location notes (e.g. a fence corner) - a read-only reference
+            // layer, off by default (see showNotes) and toggled via the
+            // toolbar switch below, not shown/hidden by tab like zones are.
+            noteLayerGroup.current = L.layerGroup(
+                (notes ?? []).map((note) => {
+                    const marker = L.marker([note.latitude, note.longitude], { icon: pinIcon(L, NOTE_COLOR) });
+                    marker.bindPopup(
+                        `<p style="white-space:pre-wrap;margin:0 0 4px">${escapeHtml(note.body)}</p>` +
+                        `<p style="font-size:12px;color:#6b7280;margin:0">${escapeHtml(note.created_by?.name)} · ${escapeHtml(formatDate(note.created_at))}</p>`,
+                    );
+                    return marker;
+                }),
+            );
+
             const existingBounds = [polygonLayer.current, circleLayer.current]
                 .filter(Boolean)
                 .map(
@@ -276,6 +317,16 @@ export default function Shape({ property, shape, zones }) {
             zoneLayers.current[zone.id] = polygon;
         });
     }, [zones]);
+
+    // Notes visibility isn't tied to the boundary/zones tab like zone
+    // shapes are - it's a standalone reference overlay toggled directly.
+    useEffect(() => {
+        const map = mapInstance.current;
+        if (!map || !noteLayerGroup.current) return;
+
+        if (showNotes) noteLayerGroup.current.addTo(map);
+        else noteLayerGroup.current.remove();
+    }, [showNotes]);
 
     // Swap which geoman draw tools are offered per tab - circle only makes
     // sense for the non-working zone (Boundary tab); Zones only ever draws
@@ -429,9 +480,14 @@ export default function Shape({ property, shape, zones }) {
                 }
             `}</style>
 
-            <div className="-mx-4">
+            {/* Fixed to exactly the space between the top nav (h-14) and the
+                bottom tab nav (h-16) - see AuthenticatedLayout.jsx - so the
+                map (flex-1 below) can never render underneath either one,
+                regardless of how tall the toolbar/tabs/zone list above it
+                happen to be. */}
+            <div className="-mx-4 flex flex-col" style={{ height: 'calc(100dvh - 7.5rem)' }}>
                 {/* Toolbar */}
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-gray-200 bg-white px-4 py-2">
+                <div className="flex flex-shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-gray-200 bg-white px-4 py-2">
                     <div className="flex min-w-0 flex-1 items-center gap-1">
                         <span className="truncate text-sm font-medium text-gray-700">
                             {property.name} — boundary &amp; zones
@@ -439,6 +495,22 @@ export default function Shape({ property, shape, zones }) {
                         <HelpTip messageKey="properties.shape" />
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        {notes && notes.length > 0 && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-700">Notes</span>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={showNotes}
+                                    onClick={() => setShowNotes((v) => !v)}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                        showNotes ? 'bg-blue-600' : 'bg-gray-300'
+                                    }`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showNotes ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+                        )}
                         <button
                             onClick={() =>
                                 router.visit(
@@ -479,7 +551,7 @@ export default function Shape({ property, shape, zones }) {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex items-center gap-2 border-b border-gray-200 bg-white px-4 py-2">
+                <div className="flex flex-shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-4 py-2">
                     <button
                         onClick={() => setActiveTab('boundary')}
                         className={`rounded-full px-3 py-1 text-sm font-medium ${
@@ -503,7 +575,7 @@ export default function Shape({ property, shape, zones }) {
                 </div>
 
                 {activeTab === 'zones' && (
-                    <div className="border-b border-gray-200 bg-white px-4 py-3">
+                    <div className="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-3">
                         <p className="text-xs text-gray-500 mb-2">
                             Use the polygon tool to draw a paddock or other named
                             area - you'll be asked to name it as soon as you finish
@@ -560,16 +632,8 @@ export default function Shape({ property, shape, zones }) {
                     </div>
                 )}
 
-                <div className={activeTab === 'zones' ? 'zones-tab-active' : ''}>
-                    <div
-                        ref={mapRef}
-                        style={{
-                            height:
-                                activeTab === 'zones'
-                                    ? 'calc(100dvh - 14rem)'
-                                    : 'calc(100dvh - 7rem)',
-                        }}
-                    />
+                <div className={`min-h-0 flex-1 ${activeTab === 'zones' ? 'zones-tab-active' : ''}`}>
+                    <div ref={mapRef} style={{ height: '100%' }} />
                 </div>
             </div>
         </AuthenticatedLayout>
