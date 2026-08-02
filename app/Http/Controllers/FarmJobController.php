@@ -25,7 +25,7 @@ class FarmJobController extends Controller
     public function index(Request $request)
     {
         if (Auth::user()->properties()->doesntExist()) {
-            return redirect()->route('properties.create');
+            return redirect()->route('profile.edit');
         }
 
         $currentPropertyId = session('current_property_id');
@@ -167,7 +167,7 @@ class FarmJobController extends Controller
             ->find(session('current_property_id'));
 
         if (!$currentProperty) {
-            return redirect()->route('properties.index')
+            return redirect()->route('profile.edit')
                 ->with('error', 'Please select a property first.');
         }
 

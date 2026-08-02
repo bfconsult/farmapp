@@ -103,8 +103,11 @@ class InvitationController extends Controller
         }
 
         $invitation->update(['accepted_at' => now()]);
-    
-        return redirect()->route('properties.index')->with('success', 'You have joined the property!');
+
+        session(['current_property_id' => $invitation->property_id]);
+        $user->update(['current_property_id' => $invitation->property_id]);
+
+        return redirect()->route('properties.show', $invitation->property_id)->with('success', 'You have joined the property!');
     }
 
     public function updateRole(Request $request, Role $role)

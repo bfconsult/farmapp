@@ -5,11 +5,18 @@ import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
 
 export default function Edit({ mustVerifyEmail, status, currentRole }) {
-    const { auth } = usePage().props;
+    const { auth, currentProperty } = usePage().props;
     const isAdmin = currentRole === 'admin';
     const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
+    // A brand-new user with no property yet must still be able to create
+    // their first one, even before they have any role anywhere.
+    const canAddProperty = !currentProperty || isAdmin;
     const logout = () => {
         router.post(route('logout'));
+    };
+
+    const addProperty = () => {
+        router.post(route('properties.store'));
     };
 
     return (
@@ -25,21 +32,23 @@ export default function Edit({ mustVerifyEmail, status, currentRole }) {
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Properties</h2>
                     </div>
                     <div className="divide-y divide-gray-100">
-                        <Link
-                            href={route('properties.index')}
-                            className="flex items-center justify-between px-4 py-4 hover:bg-gray-50"
-                        >
-                            <span className="text-gray-900">Manage Properties</span>
-                            <span className="text-gray-400">›</span>
-                        </Link>
-                        {isAdmin && (
+                        {currentProperty && (
                             <Link
-                                href={route('properties.create')}
+                                href={route('properties.show', currentProperty.id)}
                                 className="flex items-center justify-between px-4 py-4 hover:bg-gray-50"
+                            >
+                                <span className="text-gray-900">Manage Property</span>
+                                <span className="text-gray-400">›</span>
+                            </Link>
+                        )}
+                        {canAddProperty && (
+                            <button
+                                onClick={addProperty}
+                                className="flex items-center justify-between px-4 py-4 hover:bg-gray-50 w-full text-left"
                             >
                                 <span className="text-gray-900">Add Property</span>
                                 <span className="text-gray-400">›</span>
-                            </Link>
+                            </button>
                         )}
                         {isAdminOrManager && (
                             <Link

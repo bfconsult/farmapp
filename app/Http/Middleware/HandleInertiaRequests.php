@@ -36,9 +36,16 @@ class HandleInertiaRequests extends Middleware
 
     $currentPropertyId = session('current_property_id');
 
-    // Auto-select property if none set
+    // Auto-select property if none set - the session itself only lasts
+    // SESSION_LIFETIME minutes (2 hours in production), so an idle mobile
+    // PWA left backgrounded longer than that gets a fresh empty session on
+    // its next request. Prefer the user's own last explicit selection
+    // (persisted on the User model, so it survives that reset) over the
+    // job-count heuristic below, as long as they still belong to it.
     if (!$currentPropertyId && $properties->count() > 0) {
-        if ($properties->count() === 1) {
+        if ($user->current_property_id && $properties->contains('id', $user->current_property_id)) {
+            $currentPropertyId = $user->current_property_id;
+        } elseif ($properties->count() === 1) {
             $currentPropertyId = $properties->first()->id;
         } else {
             // Select property with most jobs
@@ -50,6 +57,7 @@ class HandleInertiaRequests extends Middleware
                 ?->property_id ?? $properties->first()->id;
         }
         session(['current_property_id' => $currentPropertyId]);
+        $user->update(['current_property_id' => $currentPropertyId]);
     }
 
     $currentProperty = $user && $currentPropertyId

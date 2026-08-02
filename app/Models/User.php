@@ -32,6 +32,7 @@ class User extends Authenticatable
         'deleted',
         'billing_block_minutes',
         'hourly_rate',
+        'current_property_id',
     ];
 
     /**

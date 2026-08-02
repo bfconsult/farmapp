@@ -15,14 +15,16 @@ class EnsurePropertyRole
         $propertyId = session('current_property_id');
 
         if (!$propertyId) {
-            return redirect()->route('properties.index')
+            return redirect()->route('profile.edit')
                 ->with('error', 'Please select a property first.');
         }
 
         $property = Property::find($propertyId);
 
         if (!$property) {
-            return redirect()->route('properties.index')
+            session()->forget('current_property_id');
+
+            return redirect()->route('profile.edit')
                 ->with('error', 'Property not found.');
         }
 

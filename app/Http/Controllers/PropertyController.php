@@ -14,28 +14,15 @@ use Inertia\Inertia;
 
 class PropertyController extends Controller
 {
-    public function index()
+    /**
+     * Creates a property with a placeholder name and no other details, gives
+     * the creator an admin role on it, and switches the session to it -
+     * there's no form here, so the real name/address get filled in on the
+     * Edit page this redirects to instead.
+     */
+    public function store()
     {
-        $properties = Auth::user()->properties()->with('shape')->get();
-
-        return Inertia::render('Properties/Index', [
-            'properties' => $properties,
-        ]);
-    }
-
-    public function create()
-    {
-        return Inertia::render('Properties/Create');
-    }
-
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'required|string|max:255',
-        ]);
-
-        $property = Property::create($validated);
+        $property = Property::create(['name' => 'New Property', 'address' => '']);
 
         Auth::user()->roles()->create([
             'property_id' => $property->id,
@@ -47,11 +34,16 @@ class PropertyController extends Controller
         JobType::seedDefaultsForProperty($property->id);
         AssetType::seedDefaultsForProperty($property->id);
 
-        return redirect()->route('properties.index');
+        session(['current_property_id' => $property->id]);
+        Auth::user()->update(['current_property_id' => $property->id]);
+
+        return redirect()->route('properties.edit', $property);
     }
 
     public function show(Property $property)
     {
+        abort_unless(Auth::user()->roleOn($property), 403);
+
         $property->load('shape');
 
         $currentRole = Auth::user()->roleOn($property);
@@ -90,12 +82,17 @@ class PropertyController extends Controller
         if ((int) session('current_property_id') === $property->id) {
             session()->forget('current_property_id');
         }
+        if ($user->current_property_id === $property->id) {
+            $user->update(['current_property_id' => null]);
+        }
 
-        return redirect()->route('properties.index')->with('success', "You have left {$property->name}.");
+        return redirect()->route('profile.edit')->with('success', "You have left {$property->name}.");
     }
 
     public function edit(Property $property)
     {
+        abort_unless(Auth::user()->roleOn($property) === Role::ADMIN, 403);
+
         return Inertia::render('Properties/Edit', [
             'property' => $property,
         ]);
@@ -103,6 +100,8 @@ class PropertyController extends Controller
 
     public function update(Request $request, Property $property)
     {
+        abort_unless(Auth::user()->roleOn($property) === Role::ADMIN, 403);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'address' => 'required|string|max:255',
@@ -115,8 +114,14 @@ class PropertyController extends Controller
 
     public function destroy(Property $property)
     {
+        abort_unless(Auth::user()->roleOn($property) === Role::ADMIN, 403);
+
+        if ((int) session('current_property_id') === $property->id) {
+            session()->forget('current_property_id');
+        }
+
         $property->delete();
 
-        return redirect()->route('properties.index');
+        return redirect()->route('profile.edit');
     }
 }

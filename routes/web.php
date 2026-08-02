@@ -210,8 +210,6 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
 
     // All authenticated users with a property
     Route::middleware(['auth'])->group(function () {
-    Route::get('properties', [PropertyController::class, 'index'])->name('properties.index');
-    Route::get('properties/create', [PropertyController::class, 'create'])->name('properties.create');
     Route::post('properties', [PropertyController::class, 'store'])->name('properties.store');
     Route::get('properties/{property}', [PropertyController::class, 'show'])->name('properties.show');
     Route::delete('properties/{property}/leave', [PropertyController::class, 'leave'])->name('properties.leave');
@@ -225,8 +223,11 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
     Route::post('work-sessions/{workSession}/photos', [PhotoController::class, 'storeForSession'])->name('photos.store-session');
     Route::delete('photos/{photo}', [PhotoController::class, 'destroy'])->name('photos.destroy');
     Route::post('select-property', function (\Illuminate\Http\Request $request) {
-        $request->validate(['property_id' => 'required|exists:properties,id']);
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $request->validate(['property_id' => ['required', \Illuminate\Validation\Rule::exists('properties', 'id')]]);
+        abort_unless($user->properties()->where('properties.id', $request->property_id)->exists(), 403);
         session(['current_property_id' => $request->property_id]);
+        $user->update(['current_property_id' => $request->property_id]);
         return back();
     })->name('property.select');
     Route::get('map', function (\Illuminate\Http\Request $request) {

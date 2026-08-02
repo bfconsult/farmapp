@@ -42,7 +42,7 @@ export default function Show({ property, currentRole, canLeave }) {
                             >
                                 Edit
                             </Link>
-                            <BackLink href={route('properties.index')}>Back</BackLink>
+                            <BackLink href={route('profile.edit')}>Back</BackLink>
                         </div>
                     </div>
 

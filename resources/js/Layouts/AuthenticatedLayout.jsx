@@ -10,6 +10,10 @@ export default function AuthenticatedLayout({ title, children }) {
         router.post(route('property.select'), { property_id: e.target.value });
     };
 
+    const addProperty = () => {
+        router.post(route('properties.store'));
+    };
+
     return (
         <div className="min-h-screen bg-gray-100 pb-16">
             {/* Top bar */}
@@ -82,12 +86,12 @@ export default function AuthenticatedLayout({ title, children }) {
                             <span className="pointer-events-none absolute right-0 text-gray-400 text-xs">▾</span>
                         </div>
                     ) : (
-                        <Link
-                            href={route('properties.create')}
+                        <button
+                            onClick={addProperty}
                             className="text-sm text-green-600"
                         >
                             Add Property
-                        </Link>
+                        </button>
                     )
                 )}
                 </div>
