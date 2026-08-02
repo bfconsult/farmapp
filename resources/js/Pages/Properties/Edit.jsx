@@ -1,7 +1,10 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 
 export default function Edit({ property }) {
+    const { flash } = usePage().props;
+    const isNewProperty = !!flash?.isNewProperty;
+
     const { data, setData, patch, processing, errors } = useForm({
         name: property.name,
         address: property.address,
@@ -10,6 +13,12 @@ export default function Edit({ property }) {
     const submit = (e) => {
         e.preventDefault();
         patch(route('properties.update', property.id));
+    };
+
+    const discardNewProperty = () => {
+        if (confirm("Discard this new property? It hasn't been saved with any real details yet.")) {
+            router.delete(route('properties.destroy', property.id));
+        }
     };
 
     return (
@@ -55,12 +64,22 @@ export default function Edit({ property }) {
                             </div>
 
                             <div className="flex justify-end gap-4">
-                                <Link
-                                    href={route('properties.show', property.id)}
-                                    className="px-4 py-2 text-gray-700 hover:text-gray-900"
-                                >
-                                    Cancel
-                                </Link>
+                                {isNewProperty ? (
+                                    <button
+                                        type="button"
+                                        onClick={discardNewProperty}
+                                        className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                                    >
+                                        Cancel
+                                    </button>
+                                ) : (
+                                    <Link
+                                        href={route('properties.show', property.id)}
+                                        className="px-4 py-2 text-gray-700 hover:text-gray-900"
+                                    >
+                                        Cancel
+                                    </Link>
+                                )}
                                 <button
                                     type="submit"
                                     disabled={processing}

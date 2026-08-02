@@ -37,7 +37,7 @@ class PropertyController extends Controller
         session(['current_property_id' => $property->id]);
         Auth::user()->update(['current_property_id' => $property->id]);
 
-        return redirect()->route('properties.edit', $property);
+        return redirect()->route('properties.edit', $property)->with('isNewProperty', true);
     }
 
     public function show(Property $property)
