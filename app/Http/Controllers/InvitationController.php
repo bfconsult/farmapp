@@ -53,6 +53,13 @@ class InvitationController extends Controller
             abort(403, 'Managers can only invite workers.');
         }
 
+        // Superseded by this new invite - an old token for the same person
+        // must not stay valid alongside the fresh one we're about to send.
+        Invitation::where('property_id', $property->id)
+            ->where('email', strtolower($validated['email']))
+            ->whereNull('accepted_at')
+            ->delete();
+
         $invitation = Invitation::create([
             'property_id' => $property->id,
             'invited_by' => Auth::id(),
@@ -176,6 +183,13 @@ class InvitationController extends Controller
                 abort(403, 'Cannot remove the last admin.');
             }
         }
+
+        // Clear any pending invitation for them too, so a stale token can't
+        // resurface later pointing at a role that no longer exists.
+        Invitation::where('property_id', $property->id)
+            ->where('email', strtolower($role->user->email))
+            ->whereNull('accepted_at')
+            ->delete();
 
         $role->delete();
 
