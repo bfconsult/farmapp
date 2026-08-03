@@ -29,7 +29,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [
             HandleInertiaRequests::class,
+            \App\Http\Middleware\CaptureUserTimezone::class,
         ]);
+        // Set directly by JS (resources/js/bootstrap.js), not by a Laravel
+        // response, so it isn't in Laravel's encrypted cookie format -
+        // without this it would silently decrypt to null on every request.
+        $middleware->encryptCookies(except: ['timezone']);
         $middleware->alias([
             'property.role' => \App\Http\Middleware\EnsurePropertyRole::class,
             'app.admin' => \App\Http\Middleware\EnsureAppAdmin::class,

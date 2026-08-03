@@ -390,11 +390,18 @@ class WorkSessionController extends Controller
 
         $sessions = $this->exportableSessionsQuery($currentPropertyId, $dateFrom, $dateTo)->get();
 
+        // started_at/ended_at are UTC in the DB. The React UI never needs an
+        // explicit conversion here - the browser's own Date/toLocaleTimeString
+        // does it for free - but there's no browser for a server-rendered
+        // PDF/Excel export, so it must be converted explicitly or it prints
+        // raw UTC wall-clock time.
+        $timezone = $request->user()->displayTimezone();
+
         $rows = $sessions->map(fn ($session) => [
-            'date' => $session->started_at->format('d/m/Y'),
+            'date' => $session->started_at->clone()->setTimezone($timezone)->format('d/m/Y'),
             'job' => $session->farmJob?->name ?? 'Ad-hoc',
-            'start' => $session->started_at->format('H:i'),
-            'end' => $session->ended_at?->format('H:i') ?? '—',
+            'start' => $session->started_at->clone()->setTimezone($timezone)->format('H:i'),
+            'end' => $session->ended_at?->clone()->setTimezone($timezone)->format('H:i') ?? '—',
             'duration' => $session->duration_in_hours,
             'amount' => $session->billing_amount,
         ]);

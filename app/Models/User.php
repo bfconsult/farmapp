@@ -33,6 +33,7 @@ class User extends Authenticatable
         'billing_block_minutes',
         'hourly_rate',
         'current_property_id',
+        'timezone',
     ];
 
     /**
@@ -110,6 +111,17 @@ class User extends Authenticatable
     public function adminProperties()
     {
         return $this->belongsToMany(Property::class, 'roles')->wherePivot('type', Role::ADMIN);
+    }
+
+    /**
+     * The timezone to render this user's times in server-side (PDF/Excel
+     * exports, emails) - captured automatically from their browser via
+     * CaptureUserTimezone. Falls back to the app's UTC default for a user
+     * who hasn't loaded an authenticated page since that middleware shipped.
+     */
+    public function displayTimezone(): string
+    {
+        return $this->timezone ?? config('app.timezone');
     }
 
     public function roleOn(Property $property): ?string
