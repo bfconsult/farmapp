@@ -27,11 +27,11 @@ You only need to do this once on any machine you plan to deploy from:
    git commit -m "..."
    git push origin main
    ```
-2. **Deploy — always with `APP_URL` overridden for the build:**
+2. **Deploy:**
    ```
-   APP_URL=https://fieldwerkz.com vapor deploy production
+   vapor deploy production
    ```
-   **Do not run plain `vapor deploy production` from a local dev machine.** See "Critical: APP_URL during builds" below for why — this was actually missed for several deploys in a row (2026-07-15) before being caught, shipping a broken client-side `route()` base URL to production each time.
+   No `APP_URL=` prefix needed anymore — see "Critical: APP_URL during builds" below. This *was* required (and missed repeatedly: 2026-07-15, then again 2026-08-03) until it was fixed at the source in `vapor.yml` itself, so it can no longer depend on the person/session running the deploy remembering it.
 
    This single command:
    - Runs the `build` steps from `vapor.yml` (composer install, `npm run build`, route/view/event caching)
@@ -56,11 +56,9 @@ For a Docker-runtime project like this one, Vapor's `build:` commands (`composer
 
 This matters specifically for `php artisan ziggy:generate`: it bakes the app's base URL into `resources/js/ziggy.js`, which then gets bundled into the shipped frontend JS and used as the base for every `route()`-generated link in the app (invitation-accept links, export downloads, any `route()` call in a React page). If your local `.env` has `APP_URL=http://localhost:8000` (the normal local dev setting), that's what ends up live in production — every generated link points at `localhost:8000` instead of the real domain, silently broken for anyone but whoever's running the local dev server. This is easy to miss: the page itself still loads fine (HTTP 200), only client-side `<Link>`/`router.visit()` navigation silently fails with a browser-console CORS error, so a quick "does the site load" check won't catch it.
 
-**Fix:** always prefix the deploy command with the correct URL as a real shell environment variable (not by editing `.env`, which risks being left in place and breaking local dev):
-```
-APP_URL=https://fieldwerkz.com vapor deploy production
-```
-A real environment variable takes precedence over the value in `.env`, so this overrides it just for that one command without touching any files.
+This was originally "fixed" by remembering to prefix the deploy command with a real shell environment variable (`APP_URL=https://fieldwerkz.com vapor deploy production`) — but that depends on a human or an AI session remembering it every single time, and it was missed repeatedly (2026-07-15, then again 2026-08-03, causing a real production outage — "no links work"). A same-day attempt to fix it by embedding `APP_URL=https://fieldwerkz.com php artisan ziggy:generate` (shell prefix syntax) directly into `vapor.yml`'s build step *also* failed, for a different reason: Vapor's `build:` commands run through Windows `cmd.exe` on this machine, which doesn't understand POSIX `VAR=value command` syntax — the step errored (`'APP_URL' is not recognized as an internal or external command`), and the deploy silently continued using stale build artifacts, shipping the same broken bundle a second time.
+
+**As of 2026-08-03, this is fixed properly**: `ziggy:generate` has a native `--url` flag, so `vapor.yml`'s production build step is `php artisan ziggy:generate --url=https://fieldwerkz.com` — a plain CLI argument, no shell env-var syntax at all, so it works identically on Windows and Unix. Don't reintroduce the `APP_URL=... command` shell-prefix pattern in `vapor.yml` — always use `--url` for this specific command. (Also note: `.env.production` locally still has the stale `APP_URL=https://farmtask.be` from before the domain migration — don't use `--env=production` as an alternative fix without correcting that first.)
 
 **How to tell if this has happened:** fetch the live app's JS bundle and search for `localhost`:
 ```

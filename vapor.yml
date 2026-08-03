@@ -16,7 +16,19 @@ environments:
             - default
         build:
             - 'composer install --no-dev --optimize-autoloader'
-            - 'php artisan ziggy:generate'
+            # The --url flag is used here (not env:` below, or local .env)
+            # because this build step runs locally on the deploying machine,
+            # before the Docker image exists - ziggy:generate bakes whatever
+            # URL it's given into the shipped JS bundle. Without an explicit
+            # override, a local `.env` set to http://localhost:8000 (the
+            # normal dev setting) silently breaks every client-side
+            # route()-based link in production. Happened repeatedly
+            # (2026-07-15, 2026-08-03) before being fixed here. Use --url,
+            # NOT an `APP_URL=... command` shell prefix - Vapor's build steps
+            # run through Windows cmd.exe on this machine, which doesn't
+            # understand POSIX env-var-prefix syntax and fails silently
+            # partway through the build (confirmed 2026-08-03).
+            - 'php artisan ziggy:generate --url=https://fieldwerkz.com'
             - 'npm ci'
             - 'npm run build'
             - 'rm -rf node_modules'
