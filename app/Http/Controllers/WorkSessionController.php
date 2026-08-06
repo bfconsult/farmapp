@@ -211,6 +211,10 @@ class WorkSessionController extends Controller
 
         $workSession->update([...$validated, 'reviewed_at' => $workSession->reviewed_at ?? now()]);
 
+        if ($workSession->farm_job_id) {
+            $this->promoteJobToInProgress($workSession->farm_job_id);
+        }
+
         return redirect()->route('work-sessions.show', $workSession);
     }
 
