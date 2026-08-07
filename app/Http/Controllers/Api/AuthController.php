@@ -24,6 +24,24 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Identifies the user behind a stored token, so the mobile app can show
+     * who's logged in after a cold start without asking them to log in
+     * again - a stored token is otherwise trusted optimistically with no
+     * way to attach a name/email to it (see AuthController's doc comment
+     * on the Flutter side).
+     */
+    public function me(Request $request)
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+        ]);
+    }
+
     public function logout(Request $request)
     {
         // Revokes only the token used for this request, not all of the
