@@ -33,12 +33,7 @@ export default function Legal() {
 
                 <main className="mx-auto max-w-3xl px-6 py-12 bg-white sm:rounded-lg sm:shadow sm:my-8">
                     <h1 className="text-3xl font-bold text-gray-900 mb-1">Privacy Policy</h1>
-                    <p className="text-sm text-gray-400 mb-2">Last updated: 23 July 2026</p>
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-8">
-                        This is a plain-language draft describing what FieldWerkz actually collects and does today.
-                        It hasn't been reviewed by a lawyer — please have it checked against your specific legal
-                        obligations before relying on it.
-                    </p>
+                    <p className="text-sm text-gray-400 mb-8">Last updated: 7 August 2026</p>
 
                     <Section title="Who we are">
                         <p>
@@ -51,7 +46,7 @@ export default function Legal() {
                     <Section title="Information we collect">
                         <p><strong>Account information</strong> — your name, email address, and password (stored as a secure hash, never in plain text).</p>
                         <p><strong>Property and job data</strong> — the properties, jobs, work sessions, checklists, metrics, maintenance items, assets, and notes that you or your team create.</p>
-                        <p><strong>Location data</strong> — GPS coordinates recorded when you start or stop a work session, or when you or your team set a location for a job, asset, or note, so the location of work can be shown on the map.</p>
+                        <p><strong>Location data</strong> — GPS coordinates recorded when you start or stop a work session, when you or your team set a location for a job, asset, or note, and — if you turn on automatic tracking in the FieldWerkz mobile app — in the background while the app isn't open, so it can detect when you arrive at or leave a property.</p>
                         <p><strong>Photos</strong> — images you choose to upload against a job, checklist item, work session, or note.</p>
                         <p><strong>Team information</strong> — invitations you send, and the roles assigned to people on your property's team.</p>
                     </Section>
@@ -78,11 +73,24 @@ export default function Legal() {
                     <Section title="Location data specifically">
                         <p>
                             Because FieldWerkz is built for field work, location data is a core part of the
-                            product rather than something collected in the background. It's recorded only while
-                            you have an active work session, or when you or a teammate explicitly place a pin for
-                            a job, asset, or note. Recorded locations are visible to your property's team,
-                            according to their role, and are not shared outside your property or used for
-                            advertising.
+                            product. It's recorded when you or a teammate explicitly place a pin for a job, asset,
+                            or note, and during any work session, whether logged manually in the web app or
+                            started automatically by the mobile app.
+                        </p>
+                        <p>
+                            <strong>Automatic background tracking (mobile app only).</strong> If you turn on
+                            tracking in the FieldWerkz mobile app, it monitors your location — including while the
+                            app is closed or your phone is locked — to automatically detect when you enter or
+                            leave a property boundary your team has set up, and to record a periodic location
+                            trail while you're on-site. This is what lets a work session start and stop without
+                            you having to open the app. You can turn tracking off at any time from the app's Home
+                            screen, and restrict it to only run during set hours from Settings → Schedule.
+                            Automatic tracking only monitors properties belonging to teams you're a member of — it
+                            does not track your location anywhere else.
+                        </p>
+                        <p>
+                            Recorded locations are visible to your property's team, according to their role, and
+                            are not shared outside your property or used for advertising.
                         </p>
                     </Section>
 
