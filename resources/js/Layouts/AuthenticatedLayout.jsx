@@ -29,7 +29,10 @@ export default function AuthenticatedLayout({ title, children }) {
     }, [showPropertyMenu]);
 
     const togglePropertyMenu = () => {
-        setShowChangeList(false);
+        // Expanded by default when the menu opens - Change is the more
+        // common reason to open this at all, so requiring an extra tap to
+        // reveal it defeated the point of having it in the menu.
+        setShowChangeList(true);
         setShowPropertyMenu((v) => !v);
     };
 
@@ -47,8 +50,13 @@ export default function AuthenticatedLayout({ title, children }) {
 
     return (
         <div className="min-h-screen bg-gray-100 pb-16">
-            {/* Top bar */}
-            <nav className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-10">
+            {/* Top bar. z-[1100] (not the usual z-10) for the same reason
+                as the bottom nav below: Leaflet's .leaflet-top/.leaflet-bottom
+                control panes are z-index:1000 and escape their local
+                container, so on a page with an embedded map (e.g. Map.jsx)
+                this nav - and the property picker dropdown inside it - would
+                otherwise render behind the map's own controls. */}
+            <nav className="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-[1100]">
                 <div className="flex items-center justify-between px-4 h-14">
                     {/* Left: logo + page title */}
                     <div className="flex items-center gap-2">
