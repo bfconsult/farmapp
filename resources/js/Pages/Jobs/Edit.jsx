@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 
 const ROLE_LABELS = {
     admin: 'Admin',
@@ -16,6 +16,9 @@ const ROLE_COLORS = {
 };
 
 export default function Edit({ job, priorities, jobTypes, jobStatuses, properties, teamRoles, checklistTemplates }) {
+    const { currentUserRole } = usePage().props;
+    const canManageRecurring = currentUserRole === 'admin' || currentUserRole === 'manager';
+
     const attachedTemplateIds = (job.checklists ?? [])
         .map((checklist) => checklist.checklist_template_id)
         .filter((id) => id !== null);
@@ -336,6 +339,17 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                            )}
+
+                            {job.recurring_job_id && canManageRecurring && (
+                                <div className="mb-6 border-t border-gray-200 pt-4">
+                                    <Link
+                                        href={`${route('recurring-jobs.index')}?edit=${job.recurring_job_id}`}
+                                        className="text-sm text-green-600"
+                                    >
+                                        Manage Repeating Settings
+                                    </Link>
                                 </div>
                             )}
 

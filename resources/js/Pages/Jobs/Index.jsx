@@ -288,6 +288,19 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
                     ) : <span />}
 
                     <div className="flex items-center gap-2">
+                        {canManageRecurring && (
+                            <Link
+                                href={route('recurring-jobs.index')}
+                                aria-label="Repeating Jobs"
+                                className="p-2 rounded-lg border bg-white border-gray-300 text-gray-500"
+                            >
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="23 4 23 10 17 10" />
+                                    <polyline points="1 20 1 14 7 14" />
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                                </svg>
+                            </Link>
+                        )}
                         <button
                             type="button"
                             onClick={() => setView('list')}
@@ -404,17 +417,6 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
                                 ))}
                             </div>
                         </div>
-
-                        {canManageRecurring && (
-                            <div className="border-t border-gray-100 pt-3">
-                                <Link
-                                    href={route('recurring-jobs.index')}
-                                    className="text-sm text-green-600"
-                                >
-                                    Recurring Jobs →
-                                </Link>
-                            </div>
-                        )}
                     </div>
                 )}
 

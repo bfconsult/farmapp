@@ -486,7 +486,23 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers }) {
 
                 {/* Job name & badges */}
                 <div className="bg-white rounded-lg shadow p-4">
-                    <h1 className="text-xl font-semibold text-gray-900 mb-3">{job.name}</h1>
+                    <div className="flex items-center gap-2 mb-3">
+                        {job.recurring_job_id && canManage && (
+                            <Link
+                                href={`${route('recurring-jobs.index')}?edit=${job.recurring_job_id}`}
+                                aria-label="Part of a repeating series - manage"
+                                title="Part of a repeating series - manage"
+                                className="p-1.5 rounded-lg border border-gray-300 text-gray-500 flex-shrink-0"
+                            >
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="23 4 23 10 17 10" />
+                                    <polyline points="1 20 1 14 7 14" />
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                                </svg>
+                            </Link>
+                        )}
+                        <h1 className="text-xl font-semibold text-gray-900">{job.name}</h1>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                         {job.job_status && (
                             <span className={`text-xs px-2 py-1 rounded-full font-medium ${pillBadgeClass(job.job_status.color)}`}>

@@ -87,8 +87,8 @@ function RecurringJobFields({ values, setValues, jobTypes, priorities }) {
     );
 }
 
-function RecurringJobRow({ recurringJob, jobTypes, priorities }) {
-    const [editing, setEditing] = useState(false);
+function RecurringJobRow({ recurringJob, jobTypes, priorities, startEditing }) {
+    const [editing, setEditing] = useState(startEditing);
     const [values, setValues] = useState({
         name: recurringJob.name,
         description: recurringJob.description ?? '',
@@ -150,18 +150,23 @@ function RecurringJobRow({ recurringJob, jobTypes, priorities }) {
 }
 
 export default function Index({ recurringJobs, jobTypes, priorities }) {
+    // Supports being linked to directly from a specific job's page (Jobs/Show,
+    // Jobs/Edit) via ?edit=<recurringJobId>, so "manage this job's recurring
+    // series" doesn't just dump the user on a list they have to search through.
+    const editId = Number(new URLSearchParams(window.location.search).get('edit')) || null;
+
     return (
-        <AuthenticatedLayout title="Recurring Jobs">
-            <Head title="Recurring Jobs" />
+        <AuthenticatedLayout title="Repeating Jobs">
+            <Head title="Repeating Jobs" />
 
             <div className="max-w-lg mx-auto mt-2 space-y-4 pb-24">
                 <p className="text-sm text-gray-500">
-                    Recurring jobs automatically create a new job instance each period (e.g. a monthly management-hours bucket), closing out the previous one once its period ends. To set up a new one, check "Make this job repeat" on the job creation screen.
+                    Repeating jobs automatically create a new job instance each period (e.g. a monthly management-hours bucket), closing out the previous one once its period ends. To set up a new one, check "Make this job repeat" on the job creation screen.
                 </p>
 
                 {recurringJobs.length === 0 ? (
                     <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-                        No recurring jobs set up yet.
+                        No repeating jobs set up yet.
                     </div>
                 ) : (
                     <div className="bg-white rounded-lg shadow divide-y divide-gray-100">
@@ -171,6 +176,7 @@ export default function Index({ recurringJobs, jobTypes, priorities }) {
                                 recurringJob={recurringJob}
                                 jobTypes={jobTypes}
                                 priorities={priorities}
+                                startEditing={recurringJob.id === editId}
                             />
                         ))}
                     </div>
@@ -180,7 +186,7 @@ export default function Index({ recurringJobs, jobTypes, priorities }) {
                     href={route('jobs.create')}
                     className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
                 >
-                    + Add Recurring Job
+                    + Add Repeating Job
                 </Link>
             </div>
         </AuthenticatedLayout>

@@ -61,7 +61,7 @@ function LookupRow({ item, onSave, onDelete, extraFields }) {
                 )}
                 {item.is_recurring_closed_default && (
                     <span className="text-xs ml-2 px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
-                        recurring-closed default
+                        repeating-closed default
                     </span>
                 )}
                 {item.is_finished_default && (
@@ -309,7 +309,7 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, s
                     onChange={(e) => setValues({ ...values, is_recurring_closed_default: e.target.checked })}
                     className="rounded"
                 />
-                Switch a recurring job's instance to this status once its period ends
+                Switch a repeating job's instance to this status once its period ends
             </label>
             <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input

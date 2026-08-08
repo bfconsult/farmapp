@@ -90,6 +90,24 @@ class RecurringJob extends Model
     }
 
     /**
+     * The bit appended to an instance's name so e.g. a monthly "Stock
+     * Management" template's instances read "Stock Management - July",
+     * "Stock Management - August", etc. instead of all sharing one
+     * identical, undated name.
+     */
+    private function titleSuffixFor(\Carbon\Carbon $periodStart): string
+    {
+        return match ($this->interval) {
+            // Weekly's $periodStart is already the first day of the period
+            // (see periodEndFor() - it's periodStart..+6 days), so daily and
+            // weekly share the same "day date month" format.
+            self::DAILY, self::WEEKLY => $periodStart->format('D d M'),
+            self::MONTHLY => $periodStart->format('F'),
+            self::YEARLY => $periodStart->format('Y'),
+        };
+    }
+
+    /**
      * Create this template's job instance for the period starting on the
      * given date — used both by the daily scheduler and to create the first
      * instance immediately when a recurring job is created.
@@ -97,7 +115,7 @@ class RecurringJob extends Model
     public function createInstance(\Carbon\Carbon $periodStart): FarmJob
     {
         $job = FarmJob::create([
-            'name' => $this->name,
+            'name' => "{$this->name} - {$this->titleSuffixFor($periodStart)}",
             'description' => $this->description,
             'estimated_hours' => $this->estimated_hours,
             'budget' => $this->budget,
