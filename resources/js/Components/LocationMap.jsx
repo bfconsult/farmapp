@@ -98,6 +98,16 @@ export default function LocationMap({
                         const { lat, lng } = marker.getLatLng();
                         onDragEnd?.(lat, lng);
                     });
+
+                    // Tapping/clicking anywhere on the map moves the pin
+                    // straight there, rather than requiring the user to
+                    // first grab it from wherever it currently sits and
+                    // drag it - dragging still works too, for fine
+                    // adjustment once it's roughly in place.
+                    map.on('click', (e) => {
+                        marker.setLatLng(e.latlng);
+                        onDragEnd?.(e.latlng.lat, e.latlng.lng);
+                    });
                 }
             }
 
