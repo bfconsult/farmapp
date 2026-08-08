@@ -68,11 +68,24 @@ export default function Map({
     const canCreateNote = isAdminOrManager || currentRole === 'worker';
     const jobsWithLocation = jobs.filter(j => j.latitude && j.longitude);
 
+    // Rebuilds the whole map (boundary, non-working zone, initial camera
+    // fit, and the zone/asset layer groups the toggle effects below attach
+    // to) whenever the selected property changes, not just once on mount -
+    // otherwise switching property via the picker while already on this
+    // page leaves the old property's boundary/zone/camera on screen (only
+    // job/note pins would update, since those alone have their own
+    // prop-watching effects further down). mapReady is reset to false up
+    // front so those other effects sit out the rebuild instead of touching
+    // a map instance that's mid-teardown.
     useEffect(() => {
-        if (mapInstance.current) return;
+        setMapReady(false);
+        if (mapInstance.current) return undefined;
+
+        let cancelled = false;
 
         import('leaflet').then(async (L) => {
             await import('leaflet/dist/leaflet.css');
+            if (cancelled) return;
             leafletRef.current = L;
             // Fix default marker icons
             delete L.Icon.Default.prototype._getIconUrl;
@@ -217,18 +230,27 @@ export default function Map({
         });
 
         return () => {
+            cancelled = true;
             if (mapInstance.current) {
                 mapInstance.current.remove();
                 mapInstance.current = null;
             }
         };
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentProperty?.id]);
 
     // Job status/age are filtered server-side and re-fetched via the
     // Filters popout on this same page, so (like notes) this layer must
     // rebuild whenever the `jobs` prop changes, not just once on mount.
+    //
+    // Also checks mapInstance.current directly, not just mapReady: when the
+    // property switches, the main effect's cleanup nulls mapInstance.current
+    // synchronously, but its setMapReady(false) is a state update that only
+    // takes effect next render - so for one flush mapReady can still read
+    // true (this render's captured value) while mapInstance.current is
+    // already null, and every effect below shares that same gap.
     useEffect(() => {
-        if (!mapReady || !leafletRef.current) return;
+        if (!mapReady || !mapInstance.current || !leafletRef.current) return;
         const L = leafletRef.current;
 
         jobLayerGroup.current?.remove();
@@ -250,14 +272,14 @@ export default function Map({
     }, [jobs, mapReady]);
 
     useEffect(() => {
-        if (!mapReady) return;
+        if (!mapReady || !mapInstance.current) return;
 
         if (showJobs) jobLayerGroup.current?.addTo(mapInstance.current);
         else jobLayerGroup.current?.remove();
     }, [showJobs, mapReady]);
 
     useEffect(() => {
-        if (!mapReady) return;
+        if (!mapReady || !mapInstance.current) return;
 
         if (showZones) {
             zoneLayerGroup.current.addTo(mapInstance.current);
@@ -268,7 +290,7 @@ export default function Map({
     }, [showZones, mapReady]);
 
     useEffect(() => {
-        if (!mapReady) return;
+        if (!mapReady || !mapInstance.current) return;
 
         if (showAssets) {
             assetLayerGroup.current.addTo(mapInstance.current);
@@ -284,7 +306,7 @@ export default function Map({
     // different page) this layer must rebuild from scratch whenever the
     // `notes` prop changes, not just once on mount.
     useEffect(() => {
-        if (!mapReady || !leafletRef.current) return;
+        if (!mapReady || !mapInstance.current || !leafletRef.current) return;
         const L = leafletRef.current;
 
         noteLayerGroup.current?.remove();
@@ -315,7 +337,7 @@ export default function Map({
     }, [notes, mapReady]);
 
     useEffect(() => {
-        if (!mapReady) return;
+        if (!mapReady || !mapInstance.current) return;
 
         if (showNotes) noteLayerGroup.current?.addTo(mapInstance.current);
         else noteLayerGroup.current?.remove();
@@ -331,7 +353,7 @@ export default function Map({
 
     // "+ Add Note" draft marker - a single draggable pin shown while creating.
     useEffect(() => {
-        if (!mapReady || !leafletRef.current || !creatingNote || !draftNoteLatLng) return;
+        if (!mapReady || !mapInstance.current || !leafletRef.current || !creatingNote || !draftNoteLatLng) return;
         const L = leafletRef.current;
 
         const marker = L.marker([draftNoteLatLng.lat, draftNoteLatLng.lng], { draggable: true, icon: pinIcon(L, 'green') })
@@ -349,7 +371,7 @@ export default function Map({
     // "Edit location" draft marker - swaps a note's static marker for a
     // single draggable overlay while repositioning it.
     useEffect(() => {
-        if (!mapReady || !leafletRef.current || !editingLocationNoteId || !pendingNoteLatLng) return;
+        if (!mapReady || !mapInstance.current || !leafletRef.current || !editingLocationNoteId || !pendingNoteLatLng) return;
         const L = leafletRef.current;
         const group = noteLayerGroup.current;
         const staticMarker = noteMarkersById.current[editingLocationNoteId];
