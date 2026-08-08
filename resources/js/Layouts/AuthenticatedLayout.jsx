@@ -118,14 +118,22 @@ export default function AuthenticatedLayout({ title, children }) {
             {currentProperty && route().current('map') && (
                 <Link
                     href={route('jobs.create')}
-                    className="fixed bottom-20 right-4 z-20 bg-green-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg text-2xl hover:bg-green-700"
+                    className="fixed bottom-20 right-4 z-[1100] bg-green-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg text-2xl hover:bg-green-700"
                 >
                     +
                 </Link>
             )}
 
-            {/* Bottom navigation */}
-            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
+            {/* Bottom navigation. z-[1100] (not the usual z-10) because
+                Leaflet's own .leaflet-top/.leaflet-bottom control panes are
+                z-index:1000 and, since .leaflet-container never sets its own
+                z-index, that 1000 competes directly against this nav rather
+                than staying scoped inside the map - on a page where content
+                above an embedded map (e.g. Map.jsx's "no boundary"/"no
+                jobs" banners) pushes the map down far enough, Leaflet's
+                controls would otherwise paint over this nav and steal its
+                clicks. */}
+            <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[1100]">
                 <div className="flex justify-around items-center h-16">
                     <Link
                         href={route('work-sessions.index')}
