@@ -18,20 +18,9 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
-        $currentPropertyId = session('current_property_id');
-        $currentRole = null;
-    
-        if ($currentPropertyId) {
-            $property = \App\Models\Property::find($currentPropertyId);
-            if ($property) {
-                $currentRole = $request->user()->roleOn($property);
-            }
-        }
-    
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
-            'currentRole' => $currentRole,
         ]);
     }
 

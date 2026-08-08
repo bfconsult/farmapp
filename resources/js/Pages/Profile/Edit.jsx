@@ -4,72 +4,18 @@ import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
 
-export default function Edit({ mustVerifyEmail, status, currentRole }) {
-    const { auth, currentProperty } = usePage().props;
-    const isAdmin = currentRole === 'admin';
-    const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
-    // A brand-new user with no property yet must still be able to create
-    // their first one, even before they have any role anywhere.
-    const canAddProperty = !currentProperty || isAdmin;
+export default function Edit({ mustVerifyEmail, status }) {
+    const { auth } = usePage().props;
     const logout = () => {
         router.post(route('logout'));
     };
 
-    const addProperty = () => {
-        router.post(route('properties.store'));
-    };
-
     return (
         <AuthenticatedLayout>
-            <Head title="Profile" />
+            <Head title="Account Settings" />
 
             <div className="max-w-lg mx-auto space-y-4">
-                <h1 className="text-xl font-semibold text-gray-900 mb-6">Profile</h1>
-
-                {/* Properties section */}
-                <div className="bg-white rounded-lg shadow">
-                    <div className="px-4 py-3 border-b border-gray-100">
-                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Properties</h2>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                        {currentProperty && (
-                            <Link
-                                href={route('properties.show', currentProperty.id)}
-                                className="flex items-center justify-between px-4 py-4 hover:bg-gray-50"
-                            >
-                                <span className="text-gray-900">Manage Property</span>
-                                <span className="text-gray-400">›</span>
-                            </Link>
-                        )}
-                        {canAddProperty && (
-                            <button
-                                onClick={addProperty}
-                                className="flex items-center justify-between px-4 py-4 hover:bg-gray-50 w-full text-left"
-                            >
-                                <span className="text-gray-900">Add Property</span>
-                                <span className="text-gray-400">›</span>
-                            </button>
-                        )}
-                        {isAdminOrManager && (
-                            <Link
-                                href={route('invitations.index')}
-                                className="flex items-center justify-between px-4 py-4 hover:bg-gray-50"
-                            >
-                                <span className="text-gray-900">Team</span>
-                                <span className="text-gray-400">›</span>
-                            </Link>
-                        )}
-                        {isAdminOrManager && (
-                            <Link
-                                href={route('settings.index')}
-                                className="flex items-center justify-between px-4 py-4 hover:bg-gray-50"
-                            >
-                                <span className="text-gray-900">Custom settings</span>
-                                <span className="text-gray-400">›</span>
-                            </Link>
-                        )}
-                    </div>
-                </div>
+                <h1 className="text-xl font-semibold text-gray-900 mb-6">Account Settings</h1>
 
                 {auth.user.app_admin && (
                     <div className="bg-white rounded-lg shadow">

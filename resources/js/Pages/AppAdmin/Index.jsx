@@ -18,7 +18,7 @@ export default function Index({ users }) {
 
             <div className="max-w-4xl mx-auto mt-2 space-y-4 pb-24 px-4">
                 <div className="flex items-center justify-between">
-                    <BackLink href={route('profile.edit')}>Profile</BackLink>
+                    <BackLink href={route('profile.edit')}>Account</BackLink>
                 </div>
 
                 <div>

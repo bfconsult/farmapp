@@ -42,7 +42,7 @@ export default function Show({ property, currentRole, canLeave }) {
                             >
                                 Edit
                             </Link>
-                            <BackLink href={route('profile.edit')}>Back</BackLink>
+                            <BackLink href={route('dashboard')}>Back</BackLink>
                         </div>
                     </div>
 
@@ -61,6 +61,25 @@ export default function Show({ property, currentRole, canLeave }) {
                             </div>
                         </div>
                     </div>
+
+                    {isAdminOrManager && (
+                        <div className="bg-white rounded-lg shadow mb-6 divide-y divide-gray-100">
+                            <Link
+                                href={route('invitations.index')}
+                                className="flex items-center justify-between px-6 py-4 hover:bg-gray-50"
+                            >
+                                <span className="text-gray-900">Team</span>
+                                <span className="text-gray-400">›</span>
+                            </Link>
+                            <Link
+                                href={route('settings.index')}
+                                className="flex items-center justify-between px-6 py-4 hover:bg-gray-50"
+                            >
+                                <span className="text-gray-900">Custom settings</span>
+                                <span className="text-gray-400">›</span>
+                            </Link>
+                        </div>
+                    )}
 
                     {isAdminOrManager && (
                         <div className="bg-white rounded-lg shadow p-6 mb-6">

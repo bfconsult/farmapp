@@ -1,16 +1,38 @@
 import { Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 
 export default function AuthenticatedLayout({ title, children }) {
     const { auth, properties, currentProperty, currentUserRole, hasIncompleteMetrics, flash } = usePage().props;
     const canViewReports = currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserRole === 'approver';
     const canViewMetrics = currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserRole === 'worker' || currentUserRole === 'approver';
+    // Same as Profile/Edit's old "can add another property" rule: always
+    // available with no current property to fall back to, otherwise
+    // admin-only.
+    const canAddProperty = !currentProperty || currentUserRole === 'admin';
 
-    const selectProperty = (e) => {
-        router.post(route('property.select'), { property_id: e.target.value });
+    const [showPropertyPicker, setShowPropertyPicker] = useState(false);
+    const propertyPickerRef = useRef(null);
+
+    useEffect(() => {
+        if (!showPropertyPicker) return undefined;
+
+        const closeOnOutsideClick = (e) => {
+            if (propertyPickerRef.current && !propertyPickerRef.current.contains(e.target)) {
+                setShowPropertyPicker(false);
+            }
+        };
+        document.addEventListener('mousedown', closeOnOutsideClick);
+        return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+    }, [showPropertyPicker]);
+
+    const selectProperty = (propertyId) => {
+        setShowPropertyPicker(false);
+        router.post(route('property.select'), { property_id: propertyId });
     };
 
     const addProperty = () => {
+        setShowPropertyPicker(false);
         router.post(route('properties.store'));
     };
 
@@ -27,73 +49,67 @@ export default function AuthenticatedLayout({ title, children }) {
                         )}
                     </div>
 
-                    {/* Right: property selector */}
-                    {currentProperty ? (
-                    <div className="relative flex items-center">
-                        <select
-                            onChange={selectProperty}
-                            value={currentProperty?.id ?? ''}
-                            style={{ 
-                                appearance: 'none',
-                                WebkitAppearance: 'none',
-                                MozAppearance: 'none',
-                                background: 'transparent',
-                                border: 'none',
-                                outline: 'none',
-                                padding: '0',
-                                paddingRight: '16px',
-                                fontSize: '14px',
-                                color: '#15803d',
-                                fontWeight: '500',
-                                cursor: 'pointer',
-                            }}
-                        >
-                            {properties.map((property) => (
-                                <option key={property.id} value={property.id}>
-                                    {property.name}
-                                </option>
-                            ))}
-                        </select>
-                        <span className="pointer-events-none absolute right-0 text-green-700 text-xs">▾</span>
-                    </div>
-                   ) : (
-                    properties.length > 0 ? (
-                        <div className="relative flex items-center">
-                            <select
-                                onChange={selectProperty}
-                                value=""
-                                style={{
-                                    appearance: 'none',
-                                    WebkitAppearance: 'none',
-                                    MozAppearance: 'none',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    outline: 'none',
-                                    padding: '0',
-                                    paddingRight: '16px',
-                                    fontSize: '14px',
-                                    color: '#6b7280',
-                                    cursor: 'pointer',
-                                }}
-                            >
-                                <option value="">Select Property</option>
-                                {properties.map((property) => (
-                                    <option key={property.id} value={property.id}>
-                                        {property.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <span className="pointer-events-none absolute right-0 text-gray-400 text-xs">▾</span>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={addProperty}
-                            className="text-sm text-green-600"
-                        >
+                    {/* Right: property picker. The name (when there is a
+                        current property) is a plain link straight to that
+                        property's settings page - switching between
+                        properties, or adding a new one, only ever happens
+                        via the separate arrow's dropdown, so the two
+                        actions can't be hit by mistake. */}
+                    {properties.length === 0 ? (
+                        <button onClick={addProperty} className="text-sm text-green-600">
                             Add Property
                         </button>
-                    )
-                )}
+                    ) : (
+                        <div className="relative flex items-center" ref={propertyPickerRef}>
+                            {currentProperty ? (
+                                <Link
+                                    href={route('properties.show', currentProperty.id)}
+                                    className="text-sm font-medium text-green-700"
+                                >
+                                    {currentProperty.name}
+                                </Link>
+                            ) : (
+                                <span className="text-sm text-gray-500">Select Property</span>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => setShowPropertyPicker((v) => !v)}
+                                aria-label="Switch property"
+                                aria-expanded={showPropertyPicker}
+                                className={`px-1.5 py-1 text-xs ${currentProperty ? 'text-green-700' : 'text-gray-400'}`}
+                            >
+                                ▾
+                            </button>
+
+                            {showPropertyPicker && (
+                                <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                                    {properties.map((property) => (
+                                        <button
+                                            key={property.id}
+                                            type="button"
+                                            onClick={() => selectProperty(property.id)}
+                                            className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
+                                                property.id === currentProperty?.id
+                                                    ? 'text-green-700 font-medium'
+                                                    : 'text-gray-700'
+                                            }`}
+                                        >
+                                            {property.name}
+                                        </button>
+                                    ))}
+                                    {canAddProperty && (
+                                        <button
+                                            type="button"
+                                            onClick={addProperty}
+                                            className="block w-full text-left px-4 py-2 text-sm text-green-600 border-t border-gray-100 mt-1 pt-2"
+                                        >
+                                            + Add Property
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </nav>
 
@@ -205,7 +221,7 @@ export default function AuthenticatedLayout({ title, children }) {
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                         </svg>
-                        Profile
+                        Account
                     </Link>
                 </div>
             </nav>
