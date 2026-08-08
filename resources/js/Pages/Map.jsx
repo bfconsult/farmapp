@@ -13,6 +13,21 @@ const ASSET_COLOR = '#2563eb';
 // each other and obscure the shapes they're meant to label.
 const ZONE_LABEL_MIN_ZOOM = 16;
 
+// The Layers toggles (unlike job status/age) never change what's fetched
+// from the server, only what's shown from data already on the page, so
+// there's no need to round-trip them through the backend the way
+// updateJobFilters does - localStorage is enough to survive navigating
+// away and back, which is all "persisting" means for a display toggle.
+const LAYER_PREFS_KEY = 'fieldwerkz_map_layer_prefs';
+
+function loadLayerPrefs() {
+    try {
+        return JSON.parse(localStorage.getItem(LAYER_PREFS_KEY)) ?? {};
+    } catch {
+        return {};
+    }
+}
+
 /** Same pin shape/size everywhere (the default Leaflet marker), just
  * recolored per layer - a same-dimension swap of the stock icon, not a
  * different marker style. */
@@ -46,10 +61,12 @@ export default function Map({
     const updateAssetLabels = useRef(null);
     // Jobs default to visible (this page's original, only content before the
     // other layers existed) - the rest default off since they're additions.
-    const [showJobs, setShowJobs] = useState(true);
-    const [showZones, setShowZones] = useState(false);
-    const [showAssets, setShowAssets] = useState(false);
-    const [showNotes, setShowNotes] = useState(false);
+    // Initial value only reads localStorage once per mount, matching how
+    // useState(initialValue) already behaves for everything else here.
+    const [showJobs, setShowJobs] = useState(() => loadLayerPrefs().showJobs ?? true);
+    const [showZones, setShowZones] = useState(() => loadLayerPrefs().showZones ?? false);
+    const [showAssets, setShowAssets] = useState(() => loadLayerPrefs().showAssets ?? false);
+    const [showNotes, setShowNotes] = useState(() => loadLayerPrefs().showNotes ?? false);
     const [showFiltersPanel, setShowFiltersPanel] = useState(false);
     const [jobStatusIds, setJobStatusIds] = useState(currentJobStatusIds);
     const [jobAge, setJobAge] = useState(currentJobAge);
@@ -67,6 +84,10 @@ export default function Map({
     const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
     const canCreateNote = isAdminOrManager || currentRole === 'worker';
     const jobsWithLocation = jobs.filter(j => j.latitude && j.longitude);
+
+    useEffect(() => {
+        localStorage.setItem(LAYER_PREFS_KEY, JSON.stringify({ showJobs, showZones, showAssets, showNotes }));
+    }, [showJobs, showZones, showAssets, showNotes]);
 
     // Rebuilds the whole map (boundary, non-working zone, initial camera
     // fit, and the zone/asset layer groups the toggle effects below attach
