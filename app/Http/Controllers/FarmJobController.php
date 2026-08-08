@@ -163,7 +163,7 @@ class FarmJobController extends Controller
     public function create(Request $request)
     {
         $currentProperty = Auth::user()->properties()
-            ->with('zones')
+            ->with(['zones', 'shape'])
             ->find(session('current_property_id'));
 
         if (!$currentProperty) {

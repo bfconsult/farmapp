@@ -1,8 +1,19 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Modal from '@/Components/Modal';
+import LocationMap from '@/Components/LocationMap';
 import { Head, useForm } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/** Rough centroid of a property boundary, used to give the location picker
+ * a sensible starting pin position when GPS hasn't provided one. */
+function boundaryCenter(coordinates) {
+    if (!coordinates || coordinates.length === 0) return null;
+    const lat = coordinates.reduce((sum, [pointLat]) => sum + pointLat, 0) / coordinates.length;
+    const lng = coordinates.reduce((sum, [, pointLng]) => sum + pointLng, 0) / coordinates.length;
+    return { lat, lng };
+}
 
 export default function Create({ priorities, jobTypes, jobStatuses, currentProperty, checklistTemplates, assets, selectedAssetId }) {
     const defaultStatus = jobStatuses.find((status) => status.is_default);
@@ -37,6 +48,33 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
 
     const [locationStatus, setLocationStatus] = useState('getting');
     const [showOptional, setShowOptional] = useState(false);
+    const [showLocationModal, setShowLocationModal] = useState(false);
+    const [pendingLocation, setPendingLocation] = useState(null);
+
+    const propertyBoundary = currentProperty.shape?.coordinates;
+
+    const openLocationModal = () => {
+        setPendingLocation(
+            data.latitude && data.longitude
+                ? { lat: data.latitude, lng: data.longitude }
+                : boundaryCenter(propertyBoundary)
+        );
+        setShowLocationModal(true);
+    };
+
+    const saveLocation = () => {
+        if (pendingLocation) {
+            setData((current) => ({ ...current, latitude: pendingLocation.lat, longitude: pendingLocation.lng }));
+        }
+        setShowLocationModal(false);
+    };
+
+    const hasPin = Boolean(data.latitude && data.longitude);
+    const locationCaption = hasPin
+        ? 'Location set'
+        : locationStatus === 'getting'
+            ? 'Finding your location…'
+            : 'No location set';
 
     useEffect(() => {
         if (navigator.geolocation) {
@@ -74,18 +112,8 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
             <Head title="Add Job" />
 
             <div className="max-w-lg mx-auto">
-                <div className="flex items-center justify-between mb-6">
+                <div className="mb-6">
                     <h1 className="text-xl font-semibold text-gray-900">Add Job</h1>
-                    <div className="text-xs text-gray-500">
-                        {locationStatus === 'getting' && '📍 Getting location...'}
-                        {locationStatus === 'got' && '📍 Location saved'}
-                        {locationStatus === 'failed' && '📍 Location unavailable'}
-                    </div>
-                </div>
-
-                <div className="mb-4 p-3 bg-green-50 rounded-md border border-green-200">
-                    <p className="text-xs text-gray-500">Property</p>
-                    <p className="font-medium text-green-800">{currentProperty.name}</p>
                 </div>
 
                 {currentProperty.zones && currentProperty.zones.length > 0 && (
@@ -137,6 +165,33 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                             className="w-full text-lg border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-4"
                         />
                         {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                    </div>
+
+                    <div className="rounded-lg border border-gray-200 overflow-hidden">
+                        {hasPin || propertyBoundary ? (
+                            <LocationMap
+                                key={`${data.latitude}-${data.longitude}`}
+                                latitude={data.latitude || null}
+                                longitude={data.longitude || null}
+                                propertyBoundary={propertyBoundary}
+                                interactive={false}
+                                height="128px"
+                            />
+                        ) : (
+                            <div className="h-32 flex items-center justify-center text-sm text-gray-400">
+                                {locationStatus === 'getting' ? 'Finding your location…' : 'Location unavailable'}
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between px-3 py-2 bg-white border-t border-gray-200">
+                            <span className="text-xs text-gray-500">{locationCaption}</span>
+                            <button
+                                type="button"
+                                onClick={openLocationModal}
+                                className="text-sm text-green-600 font-medium"
+                            >
+                                Change
+                            </button>
+                        </div>
                     </div>
 
                     <button
@@ -367,6 +422,36 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                         )}
                     </div>
                 </form>
+
+                <Modal show={showLocationModal} onClose={() => setShowLocationModal(false)} maxWidth="lg">
+                    <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-medium text-gray-700">Location</h3>
+                            <div className="flex items-center gap-3">
+                                <button onClick={saveLocation} className="text-sm text-green-600 font-medium">Save</button>
+                                <button onClick={() => setShowLocationModal(false)} className="text-sm text-gray-500">Cancel</button>
+                            </div>
+                        </div>
+                        {showLocationModal && (
+                            pendingLocation ? (
+                                <LocationMap
+                                    latitude={pendingLocation.lat}
+                                    longitude={pendingLocation.lng}
+                                    propertyBoundary={propertyBoundary}
+                                    editable
+                                    onDragEnd={(lat, lng) => setPendingLocation({ lat, lng })}
+                                />
+                            ) : (
+                                <p className="text-sm text-gray-500 py-8 text-center">
+                                    Couldn't determine a starting location - try again once GPS is available.
+                                </p>
+                            )
+                        )}
+                        {pendingLocation && (
+                            <p className="text-xs text-gray-400 mt-2">Drag the pin to set the location.</p>
+                        )}
+                    </div>
+                </Modal>
             </div>
         </AuthenticatedLayout>
     );

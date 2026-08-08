@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
+import LocationMap from '@/Components/LocationMap';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
 import BackLink from '@/Components/BackLink';
@@ -8,92 +9,6 @@ import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import { formatDate } from '@/dateInput';
 import { pillBadgeClass } from '@/Utils/pillColors';
-
-const PROPERTY_BOUNDARY_COLOR = '#ca8a04';
-const PROPERTY_BOUNDARY_FILL = '#fef08a';
-
-function loadLeaflet() {
-    return Promise.all([
-        import('leaflet'),
-        import('leaflet/dist/leaflet.css'),
-    ]).then(([L]) => {
-        delete L.Icon.Default.prototype._getIconUrl;
-        L.Icon.Default.mergeOptions({
-            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        });
-        return L;
-    });
-}
-
-/** Map shown in the Location popover: the job's pin in the context of the property's boundary. When `editable`, the pin can be dragged and reports its new position via `onDragEnd`. */
-function JobLocationMap({ job, propertyBoundary, editable, onDragEnd }) {
-    const mapRef = useRef(null);
-    const mapInstance = useRef(null);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        loadLeaflet().then((L) => {
-            if (cancelled || mapInstance.current) return;
-
-            const map = L.map(mapRef.current);
-            mapInstance.current = map;
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors',
-                maxZoom: 19,
-            }).addTo(map);
-
-            const bounds = L.latLngBounds([]);
-
-            if (propertyBoundary) {
-                const boundary = L.polygon(propertyBoundary, {
-                    color: PROPERTY_BOUNDARY_COLOR,
-                    weight: 2,
-                    dashArray: '6, 6',
-                    fillColor: PROPERTY_BOUNDARY_FILL,
-                    fillOpacity: 0.15,
-                    interactive: false,
-                }).addTo(map);
-                bounds.extend(boundary.getBounds());
-            }
-
-            const marker = L.marker([job.latitude, job.longitude], {
-                draggable: Boolean(editable),
-                icon: L.icon({
-                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                }),
-            }).addTo(map);
-            bounds.extend([job.latitude, job.longitude]);
-
-            if (editable) {
-                marker.on('dragend', () => {
-                    const { lat, lng } = marker.getLatLng();
-                    onDragEnd?.(lat, lng);
-                });
-            }
-
-            map.invalidateSize();
-            map.fitBounds(bounds, { padding: [40, 40] });
-        });
-
-        return () => {
-            cancelled = true;
-            if (mapInstance.current) {
-                mapInstance.current.remove();
-                mapInstance.current = null;
-            }
-        };
-    }, []);
-
-    return <div ref={mapRef} style={{ height: '300px' }} />;
-}
 
 const CHECKLIST_TYPE_LABELS = {
     before_start: 'Before Start',
@@ -619,9 +534,10 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers }) {
                                 </div>
                             </div>
                             {showLocationModal && (
-                                <JobLocationMap
+                                <LocationMap
                                     key={editingLocation ? 'edit' : 'view'}
-                                    job={job}
+                                    latitude={job.latitude}
+                                    longitude={job.longitude}
                                     propertyBoundary={job.property?.shape?.coordinates}
                                     editable={editingLocation}
                                     onDragEnd={(lat, lng) => setPendingLocation({ lat, lng })}
