@@ -1,9 +1,11 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import PropertyBoundaryPicker from '@/Components/PropertyBoundaryPicker';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 
 export default function Edit({ property }) {
     const { flash } = usePage().props;
     const isNewProperty = !!flash?.isNewProperty;
+    const title = isNewProperty ? 'Create New Property' : 'Edit Property';
 
     const { data, setData, patch, processing, errors } = useForm({
         name: property.name,
@@ -15,6 +17,16 @@ export default function Edit({ property }) {
         patch(route('properties.update', property.id));
     };
 
+    // The boundary picker's "refine it on the Boundary page" link navigates
+    // straight to shape.edit - without this, whatever name/address the user
+    // had typed but not yet hit "Update Property" for was silently lost.
+    const goToBoundaryEditor = () => {
+        patch(route('properties.update', property.id), {
+            preserveScroll: true,
+            onSuccess: () => router.visit(route('shape.edit', property.id)),
+        });
+    };
+
     const discardNewProperty = () => {
         if (confirm("Discard this new property? It hasn't been saved with any real details yet.")) {
             router.delete(route('properties.destroy', property.id));
@@ -23,12 +35,12 @@ export default function Edit({ property }) {
 
     return (
         <AuthenticatedLayout>
-            <Head title={`Edit ${property.name}`} />
+            <Head title={isNewProperty ? title : `Edit ${property.name}`} />
 
             <div className="py-12">
                 <div className="max-w-2xl mx-auto sm:px-6 lg:px-8">
                     <h1 className="text-2xl font-semibold text-gray-900 mb-6">
-                        Edit Property
+                        {title}
                     </h1>
 
                     <div className="bg-white rounded-lg shadow p-6">
@@ -62,6 +74,8 @@ export default function Edit({ property }) {
                                     <p className="mt-1 text-sm text-red-600">{errors.address}</p>
                                 )}
                             </div>
+
+                            <PropertyBoundaryPicker property={property} onRefineClick={goToBoundaryEditor} />
 
                             <div className="flex justify-end gap-4">
                                 {isNewProperty ? (

@@ -35,6 +35,8 @@ export default function LocationMap({
     onDragEnd,
     height = '300px',
     interactive = true,
+    boundaryColor = PROPERTY_BOUNDARY_COLOR,
+    boundaryFillColor = PROPERTY_BOUNDARY_FILL,
 }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
@@ -68,10 +70,10 @@ export default function LocationMap({
 
             if (propertyBoundary) {
                 const boundary = L.polygon(propertyBoundary, {
-                    color: PROPERTY_BOUNDARY_COLOR,
+                    color: boundaryColor,
                     weight: 2,
                     dashArray: '6, 6',
-                    fillColor: PROPERTY_BOUNDARY_FILL,
+                    fillColor: boundaryFillColor,
                     fillOpacity: 0.15,
                     interactive: false,
                 }).addTo(map);

@@ -38,11 +38,12 @@ class ShapeController extends Controller
             ['coordinates' => $validated['coordinates']]
         );
 
-        // Stays on the editor rather than returning to the property page,
-        // since an admin may still want to save the non-working zone on the
-        // same visit.
-        return redirect()->route('shape.edit', $property)
-            ->with('status', 'Boundary saved.');
+        // Returns to whichever page submitted this - normally shape.edit
+        // itself (an admin may still want to save the non-working zone on
+        // the same visit, so staying there matters), but also reachable from
+        // the quick boundary picker on Properties/Edit for a freshly created
+        // property, which shouldn't get yanked onto the full editor.
+        return back()->with('status', 'Boundary saved.');
     }
 
     public function destroy(Property $property)

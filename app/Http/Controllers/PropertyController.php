@@ -93,6 +93,8 @@ class PropertyController extends Controller
     {
         abort_unless(Auth::user()->roleOn($property) === Role::ADMIN, 403);
 
+        $property->load('shape');
+
         return Inertia::render('Properties/Edit', [
             'property' => $property,
         ]);
