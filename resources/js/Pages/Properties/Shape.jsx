@@ -151,6 +151,18 @@ export default function Shape({ property, shape, zones, notes }) {
             // grabbing something unintended.
             map.pm.setGlobalOptions({ snapDistance: 8 });
 
+            // Geoman's default button titles talk about "Layers", which
+            // means nothing on this page (there's a Boundary and there are
+            // Zones, never a bare "layer") - relabel the two that apply to
+            // the Boundary tab (see the addControls effect below, which
+            // keeps them off the Zones tab entirely).
+            map.pm.setLang('en', {
+                buttonTitles: {
+                    editButton: 'Edit Boundary',
+                    rotateButton: 'Rotate Boundary',
+                },
+            }, 'en');
+
             // Load existing boundary
             if (shape?.coordinates) {
                 const polygon = L.polygon(shape.coordinates, {
@@ -330,13 +342,22 @@ export default function Shape({ property, shape, zones, notes }) {
 
     // Swap which geoman draw tools are offered per tab - circle only makes
     // sense for the non-working zone (Boundary tab); Zones only ever draws
-    // polygons. The global Edit Mode button only makes sense on the
-    // Boundary tab (a single shape + circle, no ambiguity); on the Zones
-    // tab it's replaced entirely by per-zone selection (see
-    // selectZoneForEditing) since multiple overlapping zones can't share
-    // one global edit toggle. Zone shapes themselves are also only shown on
-    // the map while the Zones tab is active, kept off the Boundary view
-    // entirely.
+    // polygons. The global Edit Mode and Rotate buttons only make sense on
+    // the Boundary tab (a single shape + circle, no ambiguity, and their
+    // "Edit/Rotate Boundary" label - see setLang above - would be wrong on
+    // Zones); on the Zones tab editing is replaced entirely by per-zone
+    // selection (see selectZoneForEditing) since multiple overlapping zones
+    // can't share one global edit toggle. Zone shapes themselves are also
+    // only shown on the map while the Zones tab is active, kept off the
+    // Boundary view entirely.
+    //
+    // The draw-polygon/draw-circle buttons stay visible but are greyed out
+    // (see the has-shape/has-zone CSS below) once a boundary/zone already
+    // exists - there's only ever one of each, and re-drawing would just
+    // silently replace it (see pm:create above), so a visible "delete
+    // first" step (the Remove boundary/zone buttons) is clearer than a draw
+    // tool that secretly overwrites. Greying out rather than hiding keeps
+    // the toolbar layout stable and the tool discoverable.
     useEffect(() => {
         const map = mapInstance.current;
         if (!map) return;
@@ -352,6 +373,7 @@ export default function Shape({ property, shape, zones, notes }) {
             drawPolygon: true,
             drawCircle: activeTab === 'boundary',
             editMode: activeTab === 'boundary',
+            rotateMode: activeTab === 'boundary',
             dragMode: false,
             cutPolygon: false,
             removalMode: false,
@@ -394,6 +416,21 @@ export default function Shape({ property, shape, zones, notes }) {
                 onFinish: () => setSavingShape(false),
             },
         );
+    };
+
+    const removeShape = () => {
+        if (!confirm('Remove the boundary for this property? You can redraw it afterwards.')) return;
+
+        router.delete(route('shape.destroy', property.id), {
+            preserveScroll: true,
+            onSuccess: () => {
+                if (polygonLayer.current) {
+                    polygonLayer.current.remove();
+                    polygonLayer.current = null;
+                }
+                setHasShape(false);
+            },
+        });
     };
 
     const removeZone = () => {
@@ -478,6 +515,31 @@ export default function Shape({ property, shape, zones, notes }) {
                 .zones-tab-active .leaflet-buttons-control-button:has(.leaflet-pm-icon-polygon) {
                     background-color: ${ZONE_COLOR};
                 }
+                .leaflet-buttons-control-button:has(.leaflet-pm-icon-edit),
+                .leaflet-buttons-control-button:has(.leaflet-pm-icon-rotate) {
+                    background-color: #16a34a;
+                }
+                .leaflet-buttons-control-button:has(.leaflet-pm-icon-edit) .leaflet-pm-icon-edit,
+                .leaflet-buttons-control-button:has(.leaflet-pm-icon-rotate) .leaflet-pm-icon-rotate {
+                    filter: brightness(0) invert(1);
+                }
+
+                /* Grey out (rather than hide) the draw-polygon/draw-circle
+                   buttons once a boundary/zone already exists - keeps the
+                   toolbar layout stable instead of shifting buttons around,
+                   while still showing there's nothing left to draw. Scoped
+                   away from the Zones tab, where drawing a polygon always
+                   means adding another zone regardless of has-shape. */
+                .has-shape:not(.zones-tab-active) .leaflet-buttons-control-button:has(.leaflet-pm-icon-polygon) {
+                    background-color: #9ca3af;
+                    pointer-events: none;
+                    cursor: not-allowed;
+                }
+                .has-zone .leaflet-buttons-control-button:has(.leaflet-pm-icon-circle) {
+                    background-color: #9ca3af;
+                    pointer-events: none;
+                    cursor: not-allowed;
+                }
             `}</style>
 
             {/* Fixed to exactly the space between the top nav (h-14) and the
@@ -521,6 +583,14 @@ export default function Shape({ property, shape, zones, notes }) {
                         >
                             Done
                         </button>
+                        {activeTab === 'boundary' && hasShape && (
+                            <button
+                                onClick={removeShape}
+                                className="px-3 py-1.5 text-sm text-red-600 hover:text-red-800"
+                            >
+                                Remove boundary
+                            </button>
+                        )}
                         {activeTab === 'boundary' && hasZone && (
                             <button
                                 onClick={removeZone}
@@ -632,7 +702,7 @@ export default function Shape({ property, shape, zones, notes }) {
                     </div>
                 )}
 
-                <div className={`min-h-0 flex-1 ${activeTab === 'zones' ? 'zones-tab-active' : ''}`}>
+                <div className={`min-h-0 flex-1 ${activeTab === 'zones' ? 'zones-tab-active' : ''} ${hasShape ? 'has-shape' : ''} ${hasZone ? 'has-zone' : ''}`}>
                     <div ref={mapRef} style={{ height: '100%' }} />
                 </div>
             </div>
