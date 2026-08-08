@@ -32,7 +32,6 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
         priority_id: job.priority_id ?? '',
         job_type_id: job.job_type_id ?? '',
         job_status_id: job.job_status_id ?? '',
-        property_id: job.property_id,
         zone_id: job.zone_id ?? '',
         assignee_ids: job.assignees.map((user) => user.id),
         repeats: false,
@@ -51,17 +50,9 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
         );
     };
 
-    const selectedProperty = properties.find((property) => property.id === Number(data.property_id));
-    const zonesForSelectedProperty = selectedProperty?.zones ?? [];
-
-    const changeProperty = (propertyId) => {
-        const zones = properties.find((property) => property.id === Number(propertyId))?.zones ?? [];
-        setData((current) => ({
-            ...current,
-            property_id: propertyId,
-            zone_id: zones.some((zone) => zone.id === Number(current.zone_id)) ? current.zone_id : '',
-        }));
-    };
+    // The job's property is fixed - not user-editable here (see Edit form
+    // below) - so zones are always scoped to it, not to any form state.
+    const zonesForJobProperty = properties.find((property) => property.id === job.property_id)?.zones ?? [];
 
     const submit = (e) => {
         e.preventDefault();
@@ -163,32 +154,17 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                             </div>
 
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Property</label>
-                                <select
-                                    value={data.property_id}
-                                    onChange={(e) => changeProperty(e.target.value)}
-                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
-                                >
-                                    <option value="">Select a property</option>
-                                    {properties.map((property) => (
-                                        <option key={property.id} value={property.id}>{property.name}</option>
-                                    ))}
-                                </select>
-                                {errors.property_id && <p className="mt-1 text-sm text-red-600">{errors.property_id}</p>}
-                            </div>
-
-                            <div className="mb-4">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
                                 <select
                                     value={data.zone_id}
                                     onChange={(e) => setData('zone_id', e.target.value)}
-                                    disabled={zonesForSelectedProperty.length === 0}
+                                    disabled={zonesForJobProperty.length === 0}
                                     className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 disabled:bg-gray-50 disabled:text-gray-400"
                                 >
                                     <option value="">
-                                        {zonesForSelectedProperty.length === 0 ? 'No zones on this property' : 'No specific zone'}
+                                        {zonesForJobProperty.length === 0 ? 'No zones on this property' : 'No specific zone'}
                                     </option>
-                                    {zonesForSelectedProperty.map((zone) => (
+                                    {zonesForJobProperty.map((zone) => (
                                         <option key={zone.id} value={zone.id}>{zone.name}</option>
                                     ))}
                                 </select>

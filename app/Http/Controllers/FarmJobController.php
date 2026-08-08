@@ -353,7 +353,6 @@ class FarmJobController extends Controller
             'priority_id' => 'nullable|exists:priorities,id',
             'job_type_id' => 'nullable|exists:job_types,id',
             'job_status_id' => 'nullable|exists:job_statuses,id',
-            'property_id' => 'required|exists:properties,id',
             'zone_id' => 'nullable|exists:zones,id',
             'assignee_ids' => 'nullable|array',
             'assignee_ids.*' => 'exists:users,id',
@@ -373,13 +372,13 @@ class FarmJobController extends Controller
         unset($validated['assignee_ids'], $validated['repeats'], $validated['interval'], $validated['starts_on'], $validated['checklist_template_ids']);
 
         $validated['job_status_id'] = $validated['job_status_id']
-            ?? JobStatus::where('property_id', $validated['property_id'])->where('is_default', true)->value('id');
+            ?? JobStatus::where('property_id', $farmJob->property_id)->where('is_default', true)->value('id');
 
         // Turn this existing job into the first instance of a new recurring
         // template — only possible if it isn't already part of one.
         if ($repeats && !$farmJob->recurring_job_id) {
             $recurringJob = RecurringJob::create([
-                'property_id' => $validated['property_id'],
+                'property_id' => $farmJob->property_id,
                 'zone_id' => $validated['zone_id'] ?? null,
                 'created_by' => Auth::id(),
                 'name' => $validated['name'],
