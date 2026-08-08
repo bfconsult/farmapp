@@ -15,6 +15,22 @@ function boundaryCenter(coordinates) {
     return { lat, lng };
 }
 
+/** Standard ray-casting point-in-polygon test, used to catch a device GPS
+ * fix that's nowhere near the property (e.g. the job was added from the
+ * office) - approximate accuracy is fine here, this only decides whether to
+ * fall back to the boundary's centre instead of the raw GPS position. */
+function isPointInPolygon(lat, lng, polygon) {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const [latI, lngI] = polygon[i];
+        const [latJ, lngJ] = polygon[j];
+        const intersects = (lngI > lng) !== (lngJ > lng)
+            && lat < (latJ - latI) * (lng - lngI) / (lngJ - lngI) + latI;
+        if (intersects) inside = !inside;
+    }
+    return inside;
+}
+
 export default function Create({ priorities, jobTypes, jobStatuses, currentProperty, checklistTemplates, assets, selectedAssetId }) {
     const defaultStatus = jobStatuses.find((status) => status.is_default);
 
@@ -80,10 +96,21 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
+                    const { latitude, longitude } = position.coords;
+                    // Off-property GPS (e.g. the job was added from the
+                    // office) makes for a useless starting pin and blows
+                    // out the map's initial zoom trying to fit both it and
+                    // the boundary - fall back to the boundary's centre
+                    // instead. A device location within the boundary, or no
+                    // boundary at all, is used as-is.
+                    const fallback = propertyBoundary && !isPointInPolygon(latitude, longitude, propertyBoundary)
+                        ? boundaryCenter(propertyBoundary)
+                        : null;
+
                     setData(data => ({
                         ...data,
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
+                        latitude: fallback ? fallback.lat : latitude,
+                        longitude: fallback ? fallback.lng : longitude,
                     }));
                     setLocationStatus('got');
                 },
