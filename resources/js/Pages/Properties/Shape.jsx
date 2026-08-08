@@ -540,6 +540,14 @@ export default function Shape({ property, shape, zones, notes }) {
                     pointer-events: none;
                     cursor: not-allowed;
                 }
+                /* Overrides the icon's own brightness(0) invert(1) (pure
+                   white) from above - a partial invert keeps it light grey
+                   instead, so the whole button reads as disabled rather
+                   than just its background. */
+                .has-shape:not(.zones-tab-active) .leaflet-buttons-control-button:has(.leaflet-pm-icon-polygon) .leaflet-pm-icon-polygon,
+                .has-zone .leaflet-buttons-control-button:has(.leaflet-pm-icon-circle) .leaflet-pm-icon-circle {
+                    filter: brightness(0) invert(0.75);
+                }
             `}</style>
 
             {/* Fixed to exactly the space between the top nav (h-14) and the
