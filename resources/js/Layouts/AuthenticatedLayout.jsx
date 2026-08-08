@@ -11,28 +11,37 @@ export default function AuthenticatedLayout({ title, children }) {
     // admin-only.
     const canAddProperty = !currentProperty || currentUserRole === 'admin';
 
-    const [showPropertyPicker, setShowPropertyPicker] = useState(false);
-    const propertyPickerRef = useRef(null);
+    const [showPropertyMenu, setShowPropertyMenu] = useState(false);
+    const [showChangeList, setShowChangeList] = useState(false);
+    const propertyMenuRef = useRef(null);
 
     useEffect(() => {
-        if (!showPropertyPicker) return undefined;
+        if (!showPropertyMenu) return undefined;
 
         const closeOnOutsideClick = (e) => {
-            if (propertyPickerRef.current && !propertyPickerRef.current.contains(e.target)) {
-                setShowPropertyPicker(false);
+            if (propertyMenuRef.current && !propertyMenuRef.current.contains(e.target)) {
+                setShowPropertyMenu(false);
+                setShowChangeList(false);
             }
         };
         document.addEventListener('mousedown', closeOnOutsideClick);
         return () => document.removeEventListener('mousedown', closeOnOutsideClick);
-    }, [showPropertyPicker]);
+    }, [showPropertyMenu]);
+
+    const togglePropertyMenu = () => {
+        setShowChangeList(false);
+        setShowPropertyMenu((v) => !v);
+    };
 
     const selectProperty = (propertyId) => {
-        setShowPropertyPicker(false);
+        setShowPropertyMenu(false);
+        setShowChangeList(false);
         router.post(route('property.select'), { property_id: propertyId });
     };
 
     const addProperty = () => {
-        setShowPropertyPicker(false);
+        setShowPropertyMenu(false);
+        setShowChangeList(false);
         router.post(route('properties.store'));
     };
 
@@ -49,62 +58,79 @@ export default function AuthenticatedLayout({ title, children }) {
                         )}
                     </div>
 
-                    {/* Right: property picker. The name (when there is a
-                        current property) is a plain link straight to that
-                        property's settings page - switching between
-                        properties, or adding a new one, only ever happens
-                        via the separate arrow's dropdown, so the two
-                        actions can't be hit by mistake. */}
+                    {/* Right: property picker. With only one property there's
+                        nothing to switch to, so the name is a plain link
+                        straight to its settings page. Otherwise it opens a
+                        small menu (Settings / Change) instead, since "go to
+                        settings" and "switch property" are both plausible
+                        things to want from tapping the name and a single
+                        link/arrow split was easy to hit by mistake. */}
                     {properties.length === 0 ? (
                         <button onClick={addProperty} className="text-sm text-green-600">
                             Add Property
                         </button>
+                    ) : properties.length === 1 && currentProperty ? (
+                        <Link
+                            href={route('properties.show', currentProperty.id)}
+                            className="text-sm font-medium text-green-700"
+                        >
+                            {currentProperty.name}
+                        </Link>
                     ) : (
-                        <div className="relative flex items-center" ref={propertyPickerRef}>
-                            {currentProperty ? (
-                                <Link
-                                    href={route('properties.show', currentProperty.id)}
-                                    className="text-sm font-medium text-green-700"
-                                >
-                                    {currentProperty.name}
-                                </Link>
-                            ) : (
-                                <span className="text-sm text-gray-500">Select Property</span>
-                            )}
+                        <div className="relative flex items-center" ref={propertyMenuRef}>
                             <button
                                 type="button"
-                                onClick={() => setShowPropertyPicker((v) => !v)}
-                                aria-label="Switch property"
-                                aria-expanded={showPropertyPicker}
-                                className={`px-1.5 py-1 text-xs ${currentProperty ? 'text-green-700' : 'text-gray-400'}`}
+                                onClick={togglePropertyMenu}
+                                aria-expanded={showPropertyMenu}
+                                className={`text-sm font-medium ${currentProperty ? 'text-green-700' : 'text-gray-500'}`}
                             >
-                                ▾
+                                {currentProperty ? currentProperty.name : 'Select Property'}
+                                <span className="ml-1 text-xs">▾</span>
                             </button>
 
-                            {showPropertyPicker && (
-                                <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                                    {properties.map((property) => (
-                                        <button
-                                            key={property.id}
-                                            type="button"
-                                            onClick={() => selectProperty(property.id)}
-                                            className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${
-                                                property.id === currentProperty?.id
-                                                    ? 'text-green-700 font-medium'
-                                                    : 'text-gray-700'
-                                            }`}
+                            {showPropertyMenu && (
+                                <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                                    {currentProperty && (
+                                        <Link
+                                            href={route('properties.show', currentProperty.id)}
+                                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                         >
-                                            {property.name}
-                                        </button>
-                                    ))}
-                                    {canAddProperty && (
-                                        <button
-                                            type="button"
-                                            onClick={addProperty}
-                                            className="block w-full text-left px-4 py-2 text-sm text-green-600 border-t border-gray-100 mt-1 pt-2"
-                                        >
-                                            + Add Property
-                                        </button>
+                                            Settings
+                                        </Link>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowChangeList((v) => !v)}
+                                        aria-expanded={showChangeList}
+                                        className="flex w-full items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                    >
+                                        Change
+                                        <span className="text-xs">{showChangeList ? '▴' : '▾'}</span>
+                                    </button>
+                                    {showChangeList && (
+                                        <div className="pb-1">
+                                            {properties
+                                                .filter((property) => property.id !== currentProperty?.id)
+                                                .map((property) => (
+                                                    <button
+                                                        key={property.id}
+                                                        type="button"
+                                                        onClick={() => selectProperty(property.id)}
+                                                        className="block w-full py-2 pl-8 pr-4 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                                    >
+                                                        {property.name}
+                                                    </button>
+                                                ))}
+                                            {canAddProperty && (
+                                                <button
+                                                    type="button"
+                                                    onClick={addProperty}
+                                                    className="block w-full py-2 pl-8 pr-4 text-left text-sm text-green-600"
+                                                >
+                                                    + Add Property
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
                             )}
