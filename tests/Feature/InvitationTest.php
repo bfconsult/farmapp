@@ -4,6 +4,7 @@ use App\Models\Invitation;
 use App\Models\Property;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\WorkSession;
 use Illuminate\Support\Facades\Mail;
 
 test('re-inviting the same email supersedes the previous invitation token', function () {
@@ -58,4 +59,71 @@ test('removing a team member deletes their pending invitation', function () {
         ->assertSessionHasNoErrors();
 
     expect(Invitation::find($invitation->id))->toBeNull();
+});
+
+test('an unclaimed member with a pending invitation still shows in the team list', function () {
+    Mail::fake();
+
+    $admin = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $admin->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('invitations.store-member'), ['name' => 'Casey Contractor', 'role' => 'worker'])
+        ->assertSessionHasNoErrors();
+    $member = User::where('name', 'Casey Contractor')->firstOrFail();
+    $role = Role::where('user_id', $member->id)->firstOrFail();
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('invitations.invite-member', $role->id), ['email' => 'casey@example.com'])
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->get(route('invitations.index'))
+        ->assertInertia(fn ($page) => $page
+            ->component('Invitations/Index')
+            ->has('roles', 2)
+            ->where('roles.1.user.id', $member->id));
+});
+
+test('removing an unclaimed member deletes their invitation but keeps their work sessions', function () {
+    $admin = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $admin->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('invitations.store-member'), ['name' => 'Casey Contractor', 'role' => 'worker'])
+        ->assertSessionHasNoErrors();
+    $member = User::where('name', 'Casey Contractor')->firstOrFail();
+    $role = Role::where('user_id', $member->id)->firstOrFail();
+
+    $invitation = Invitation::create([
+        'property_id' => $property->id,
+        'invited_by' => $admin->id,
+        'user_id' => $member->id,
+        'email' => 'casey@example.com',
+        'role' => Role::WORKER,
+    ]);
+
+    $session = WorkSession::create([
+        'property_id' => $property->id,
+        'user_id' => $member->id,
+        'created_by' => $admin->id,
+        'started_at' => now()->subHour(),
+        'ended_at' => now(),
+        'status' => WorkSession::DRAFT,
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->delete(route('invitations.destroy-role', $role))
+        ->assertSessionHasNoErrors();
+
+    expect(Invitation::find($invitation->id))->toBeNull();
+    expect(User::find($member->id))->not->toBeNull();
+    expect(WorkSession::find($session->id))->not->toBeNull();
 });

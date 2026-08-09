@@ -7,9 +7,12 @@ use App\Models\FarmJob;
 use App\Models\JobStatus;
 use App\Models\Property;
 use App\Models\RecurringJob;
+use App\Models\Role;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class WorkSessionController extends Controller
@@ -310,7 +313,7 @@ class WorkSessionController extends Controller
 
         $sessions = WorkSession::where('property_id', $currentPropertyId)
             ->whereBetween('started_at', [$dateFrom, $dateTo])
-            ->with(['farmJob', 'user'])
+            ->with(['farmJob', 'user', 'createdBy'])
             ->orderBy('started_at')
             ->get()
             ->map(function ($session) {
@@ -326,11 +329,94 @@ class WorkSessionController extends Controller
             ->sortBy(fn ($worker) => $worker['user']->name)
             ->values();
 
+        // For the "log time for a worker" form - everyone with a role here,
+        // not just people who already have sessions in this date range.
+        $teamMembers = Role::where('property_id', $currentPropertyId)
+            ->with('user')
+            ->get()
+            ->map(fn ($role) => ['id' => $role->user_id, 'name' => $role->user->name, 'type' => $role->type])
+            ->sortBy('name')
+            ->values();
+
         return Inertia::render('WorkSessions/Review', [
             'workers' => $workers,
+            'teamMembers' => $teamMembers,
+            'bookableJobs' => $this->propertyBookableJobs($currentPropertyId),
             'currentDateFrom' => $dateFrom->toDateString(),
             'currentDateTo' => $dateTo->toDateString(),
         ]);
+    }
+
+    /**
+     * Logs a complete (already-finished) work session on behalf of someone
+     * else - for a team member who may never use the app themselves, or
+     * just to fix up a missed entry. Deliberately separate from store():
+     * that hardcodes user_id to the actor, gates on the *actor's* own
+     * active session, and floors the start time to the *actor's* billing
+     * block - none of which is right here. Both start and end are always
+     * required (retroactive complete entries only, never "start tracking
+     * for someone else").
+     */
+    public function storeForWorker(Request $request)
+    {
+        $propertyId = (int) session('current_property_id');
+
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', Rule::exists('roles', 'user_id')->where('property_id', $propertyId)],
+            'farm_job_id' => ['nullable', Rule::exists('farm_jobs', 'id')->where('property_id', $propertyId)],
+            'asset_id' => ['nullable', Rule::exists('assets', 'id')->where('property_id', $propertyId)],
+            'description' => 'nullable|string',
+            'started_at' => 'required|date',
+            'ended_at' => 'required|date|after:started_at',
+        ]);
+
+        // A worker can't be in two places at once, and a session that
+        // overlaps an existing one could never be finalised anyway (see
+        // overlapsFinalisedSession()) - reject it now with a clear message
+        // rather than creating a draft that can never go anywhere.
+        if (WorkSession::overlapExistsFor($validated['user_id'], $validated['started_at'], $validated['ended_at'])) {
+            throw ValidationException::withMessages([
+                'started_at' => 'That time overlaps a session this person already has.',
+            ]);
+        }
+
+        $session = WorkSession::create([
+            ...$validated,
+            'property_id' => $propertyId,
+            'created_by' => Auth::id(),
+            'status' => WorkSession::DRAFT,
+            'source' => 'manual_on_behalf',
+            // A human deliberately entered this, authoritatively - there's
+            // nothing left to review the way an auto-tracked visit needs.
+            'reviewed_at' => now(),
+        ]);
+
+        if ($session->farm_job_id) {
+            $this->promoteJobToInProgress($session->farm_job_id);
+        }
+
+        return back()->with('success', 'Time logged.');
+    }
+
+    /**
+     * All bookable jobs on the property, for the "log time for a worker"
+     * form - unlike bookableJobs() (scoped to the current user's own
+     * assignments for self-service clocking in), a manager/admin/approver
+     * entering retroactive time is authoritative about what was worked on,
+     * so assignment isn't a restriction here.
+     */
+    private function propertyBookableJobs(int $propertyId)
+    {
+        return FarmJob::where('property_id', $propertyId)
+            ->where(function ($query) {
+                $query->whereHas('jobStatus', fn ($q) => $q->where('can_book_time', true))
+                    ->orWhereNull('job_status_id');
+            })
+            ->orderBy('name')
+            // FarmJob always appends effective_date on serialization, which
+            // falls back to created_at - selecting only id/name left that
+            // null and crashed the accessor, so it has to come along too.
+            ->get(['id', 'name', 'created_at']);
     }
 
     public function finaliseAndShare(Request $request)

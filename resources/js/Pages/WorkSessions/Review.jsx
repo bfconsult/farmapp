@@ -1,9 +1,14 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackLink from '@/Components/BackLink';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
-import { Head, Link, router } from '@inertiajs/react';
+import Modal from '@/Components/Modal';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { formatDate as formatDateDayFirst } from '@/dateInput';
+import {
+    formatDate as formatDateDayFirst,
+    fromLocalInputValue,
+    joinLocalValue,
+} from '@/dateInput';
 
 const STATUS_LABELS = {
     draft: 'Draft',
@@ -51,6 +56,9 @@ function SessionRow({ session }) {
                     {formatDateDayFirst(session.started_at)} · {formatTime(session.started_at)} — {formatTime(session.ended_at)}
                     {session.duration_in_hours && ` · ${session.duration_in_hours}h`}
                 </p>
+                {session.created_by && (
+                    <p className="text-xs text-gray-400 mt-0.5">Added by {session.created_by.name}</p>
+                )}
             </Link>
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                 <span className={`text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_COLORS[session.status]}`}>
@@ -66,9 +74,146 @@ function SessionRow({ session }) {
     );
 }
 
-export default function Review({ workers, currentDateFrom, currentDateTo }) {
+function LogTimeModal({ show, onClose, teamMembers, bookableJobs, initialUserId }) {
+    const { data, setData, post, processing, errors, reset, clearErrors, transform } = useForm({
+        user_id: initialUserId ?? '',
+        farm_job_id: '',
+        description: '',
+        date: '',
+        started_time: '',
+        ended_time: '',
+    });
+
+    const submit = (e) => {
+        e.preventDefault();
+        transform((data) => ({
+            ...data,
+            farm_job_id: data.farm_job_id || null,
+            started_at: fromLocalInputValue(joinLocalValue(data.date, data.started_time)),
+            ended_at: fromLocalInputValue(joinLocalValue(data.date, data.ended_time)),
+        }));
+        post(route('manage.work-sessions.store'), {
+            onSuccess: () => {
+                reset();
+                onClose();
+            },
+        });
+    };
+
+    const close = () => {
+        clearErrors();
+        reset();
+        onClose();
+    };
+
+    return (
+        <Modal show={show} onClose={close} maxWidth="md">
+            <form onSubmit={submit} className="p-6 space-y-4">
+                <h2 className="text-lg font-medium text-gray-900">Log Time for a Worker</h2>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Worker</label>
+                    <select
+                        value={data.user_id}
+                        onChange={(e) => setData('user_id', e.target.value)}
+                        className="w-full border-gray-300 rounded-lg p-3 text-sm"
+                        required
+                    >
+                        <option value="">Select a worker</option>
+                        {teamMembers.map((member) => (
+                            <option key={member.id} value={member.id}>{member.name}</option>
+                        ))}
+                    </select>
+                    {errors.user_id && <p className="mt-1 text-sm text-red-600">{errors.user_id}</p>}
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input
+                        type="date"
+                        value={data.date}
+                        onChange={(e) => setData('date', e.target.value)}
+                        className="w-full border-gray-300 rounded-lg p-3 text-sm"
+                        required
+                    />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Start</label>
+                        <input
+                            type="time"
+                            value={data.started_time}
+                            onChange={(e) => setData('started_time', e.target.value)}
+                            className="w-full border-gray-300 rounded-lg p-3 text-sm"
+                            required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">End</label>
+                        <input
+                            type="time"
+                            value={data.ended_time}
+                            onChange={(e) => setData('ended_time', e.target.value)}
+                            className="w-full border-gray-300 rounded-lg p-3 text-sm"
+                            required
+                        />
+                    </div>
+                </div>
+                {errors.started_at && <p className="text-sm text-red-600">{errors.started_at}</p>}
+                {errors.ended_at && <p className="text-sm text-red-600">{errors.ended_at}</p>}
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Job (optional)</label>
+                    <select
+                        value={data.farm_job_id}
+                        onChange={(e) => setData('farm_job_id', e.target.value)}
+                        className="w-full border-gray-300 rounded-lg p-3 text-sm"
+                    >
+                        <option value="">Ad-hoc work (no job)</option>
+                        {bookableJobs.map((job) => (
+                            <option key={job.id} value={job.id}>{job.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                    <textarea
+                        value={data.description}
+                        onChange={(e) => setData('description', e.target.value)}
+                        rows={2}
+                        className="w-full border-gray-300 rounded-lg p-3 text-sm"
+                    />
+                </div>
+
+                <div className="flex gap-3">
+                    <button
+                        type="button"
+                        onClick={close}
+                        className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg text-sm"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={processing}
+                        className="flex-1 py-3 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                    >
+                        Log Time
+                    </button>
+                </div>
+            </form>
+        </Modal>
+    );
+}
+
+export default function Review({ workers, teamMembers, bookableJobs, currentDateFrom, currentDateTo }) {
+    const { currentUserRole } = usePage().props;
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
+    const [logTimeFor, setLogTimeFor] = useState(null); // null = closed, '' = open with no worker preselected, or a user id
+    const canLogTime = ['admin', 'manager', 'approver'].includes(currentUserRole);
 
     const goTo = (overrides = {}) => {
         router.get(route('manage.work-sessions'), {
@@ -98,7 +243,17 @@ export default function Review({ workers, currentDateFrom, currentDateTo }) {
                     <BackLink href={route('manage.index')}>Manage</BackLink>
                 </div>
 
-                <h1 className="text-lg font-semibold text-gray-900">Work Sessions</h1>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-lg font-semibold text-gray-900">Work Sessions</h1>
+                    {canLogTime && (
+                        <button
+                            onClick={() => setLogTimeFor('')}
+                            className="text-sm text-green-600 font-medium"
+                        >
+                            + Log time for a worker
+                        </button>
+                    )}
+                </div>
 
                 <div className="flex items-center gap-2">
                     <button
@@ -144,8 +299,16 @@ export default function Review({ workers, currentDateFrom, currentDateTo }) {
                     <div className="space-y-4">
                         {workers.map((worker) => (
                             <div key={worker.user.id} className="bg-white rounded-lg shadow overflow-hidden">
-                                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                                     <p className="text-sm font-medium text-gray-900">{worker.user.name}</p>
+                                    {canLogTime && (
+                                        <button
+                                            onClick={() => setLogTimeFor(worker.user.id)}
+                                            className="text-xs text-green-600 font-medium"
+                                        >
+                                            + Add entry
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="divide-y divide-gray-100">
                                     {worker.sessions.map((session) => (
@@ -157,6 +320,17 @@ export default function Review({ workers, currentDateFrom, currentDateTo }) {
                     </div>
                 )}
             </div>
+
+            {canLogTime && (
+                <LogTimeModal
+                    key={logTimeFor ?? 'closed'}
+                    show={logTimeFor !== null}
+                    onClose={() => setLogTimeFor(null)}
+                    teamMembers={teamMembers}
+                    bookableJobs={bookableJobs}
+                    initialUserId={logTimeFor || ''}
+                />
+            )}
         </AuthenticatedLayout>
     );
 }

@@ -34,6 +34,7 @@ class User extends Authenticatable
         'hourly_rate',
         'current_property_id',
         'timezone',
+        'claimed_at',
     ];
 
     /**
@@ -55,6 +56,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'claimed_at' => 'datetime',
             'password' => 'hashed',
             'deleted' => 'boolean',
             'app_admin' => 'boolean',
@@ -122,6 +124,26 @@ class User extends Authenticatable
     public function displayTimezone(): string
     {
         return $this->timezone ?? config('app.timezone');
+    }
+
+    /**
+     * Whether this user has ever set their own password and logged in -
+     * false for a "shell" record a manager/admin added directly (just to
+     * log time against) that hasn't been invited/claimed yet.
+     */
+    public function isClaimed(): bool
+    {
+        return $this->claimed_at !== null;
+    }
+
+    /**
+     * Users it's actually possible to email - excludes shell records with
+     * no email on file and anyone who was added but never claimed their
+     * account, for anything that emails users in bulk (digests, reminders).
+     */
+    public function scopeContactable($query)
+    {
+        return $query->whereNotNull('email')->whereNotNull('claimed_at');
     }
 
     public function roleOn(Property $property): ?string

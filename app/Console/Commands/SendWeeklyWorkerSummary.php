@@ -31,7 +31,7 @@ class SendWeeklyWorkerSummary extends Command
     {
         $since = now()->subDays(7);
 
-        $users = User::whereHas(
+        $users = User::contactable()->whereHas(
             'workSessions',
             fn ($query) => $query
                 ->whereIn('status', [WorkSession::DRAFT, WorkSession::FINALISED])

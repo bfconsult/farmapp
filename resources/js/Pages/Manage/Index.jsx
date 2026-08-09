@@ -21,7 +21,7 @@ function HubCard({ href, icon, title, subtitle }) {
     );
 }
 
-export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, suppliersCount, canManage }) {
+export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, suppliersCount, canManage, canReviewWorkSessions }) {
     return (
         <AuthenticatedLayout title="Manage">
             <Head title="Manage" />
@@ -52,7 +52,7 @@ export default function Index({ metricsTracked, metricsDue, checklistTemplatesCo
                     />
                 )}
 
-                {canManage && (
+                {canReviewWorkSessions && (
                     <HubCard
                         href={route('manage.work-sessions')}
                         title="Work Sessions"

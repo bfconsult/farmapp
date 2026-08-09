@@ -54,7 +54,7 @@ class ProfileController extends Controller
         Auth::logout();
 
         $user->update([
-            'email' => $user->email . '.deleted',
+            'email' => $user->email ? $user->email . '.deleted' : null,
             'deleted' => true,
         ]);
 

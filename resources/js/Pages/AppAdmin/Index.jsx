@@ -46,7 +46,7 @@ export default function Index({ users }) {
                                 <tr key={user.id}>
                                     <td className="px-4 py-3">
                                         <p className="text-gray-900">{user.name}</p>
-                                        <p className="text-xs text-gray-400">{user.email}</p>
+                                        <p className="text-xs text-gray-400">{user.email ?? '—'}</p>
                                     </td>
                                     {COLUMNS.map((col) => (
                                         <td key={col.key} className="text-right px-4 py-3 text-gray-700 tabular-nums">

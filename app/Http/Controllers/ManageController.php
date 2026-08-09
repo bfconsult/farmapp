@@ -24,7 +24,12 @@ class ManageController extends Controller
     {
         $currentPropertyId = session('current_property_id');
         $currentProperty = $currentPropertyId ? Property::find($currentPropertyId) : null;
-        $canManage = in_array(Auth::user()->roleOn($currentProperty), ['admin', 'manager'], true);
+        $currentUserRole = Auth::user()->roleOn($currentProperty);
+        $canManage = in_array($currentUserRole, ['admin', 'manager'], true);
+        // Approver is otherwise read-only everywhere else, but they can log
+        // time on a worker's behalf - an explicit exception, not a general
+        // widening of what an approver can do.
+        $canReviewWorkSessions = in_array($currentUserRole, ['admin', 'manager', 'approver'], true);
 
         $metricsTracked = Metric::where('property_id', $currentPropertyId)->count();
         $metricsDue = Metric::where('property_id', $currentPropertyId)
@@ -52,6 +57,7 @@ class ManageController extends Controller
             'assetsOverdue' => $assetsOverdue,
             'suppliersCount' => $suppliersCount,
             'canManage' => $canManage,
+            'canReviewWorkSessions' => $canReviewWorkSessions,
         ]);
     }
 }

@@ -31,7 +31,7 @@ class SendWeeklyManagerSummary extends Command
      */
     public function handle(): void
     {
-        $managers = User::whereHas(
+        $managers = User::contactable()->whereHas(
             'roles',
             fn ($query) => $query->whereIn('type', [Role::ADMIN, Role::MANAGER])
         )->get();

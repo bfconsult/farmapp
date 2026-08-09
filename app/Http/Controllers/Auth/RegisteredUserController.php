@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Invitation;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -43,25 +44,14 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'claimed_at' => now(),
         ]);
 
         event(new Registered($user));
 
         Auth::login($user);
 
-        // Complete any pending invitation
-        if ($token = session('pending_invitation_token')) {
-            $invitation = \App\Models\Invitation::where('token', $token)->whereNull('accepted_at')->first();
-            if ($invitation && strtolower($invitation->email) === strtolower($user->email)) {
-                \App\Models\Role::create([
-                    'user_id' => $user->id,
-                    'property_id' => $invitation->property_id,
-                    'type' => $invitation->role,
-                ]);
-                $invitation->update(['accepted_at' => now()]);
-                session()->forget('pending_invitation_token');
-            }
-        }
+        Invitation::completePendingFor($user);
 
         return redirect(route('jobs.index', absolute: false));
     }

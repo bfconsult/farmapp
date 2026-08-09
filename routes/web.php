@@ -138,7 +138,6 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::patch('metrics/{metric}', [MetricController::class, 'update'])->name('metrics.update');
     Route::delete('metrics/{metric}', [MetricController::class, 'destroy'])->name('metrics.destroy');
     Route::get('manage/checklists', [ChecklistTemplateController::class, 'index'])->name('manage.checklists');
-    Route::get('manage/work-sessions', [WorkSessionController::class, 'reviewIndex'])->name('manage.work-sessions');
     Route::post('checklist-templates', [ChecklistTemplateController::class, 'store'])->name('checklist-templates.store');
     Route::patch('checklist-templates/{checklistTemplate}', [ChecklistTemplateController::class, 'update'])->name('checklist-templates.update');
     Route::delete('checklist-templates/{checklistTemplate}', [ChecklistTemplateController::class, 'destroy'])->name('checklist-templates.destroy');
@@ -159,6 +158,14 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::patch('notes/{note}', [NoteController::class, 'update'])->name('notes.update');
     Route::put('notes/{note}/location', [NoteController::class, 'updateLocation'])->name('notes.update-location');
     Route::delete('notes/{note}', [NoteController::class, 'destroy'])->name('notes.destroy');
+});
+
+// Approvers can review and log time on a worker's behalf - an explicit
+// exception to their otherwise read-only role, not a general widening of
+// what an approver can do (nothing else lives in this group).
+Route::middleware(['auth', 'property.role:admin,manager,approver'])->group(function () {
+    Route::get('manage/work-sessions', [WorkSessionController::class, 'reviewIndex'])->name('manage.work-sessions');
+    Route::post('manage/work-sessions', [WorkSessionController::class, 'storeForWorker'])->name('manage.work-sessions.store');
 });
 
 // Admin, Manager, and Worker can log measurements - approvers stay
@@ -304,6 +311,9 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
 // Invitation accept flow (no auth required to view, but process requires auth)
 Route::get('invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');
 Route::post('invitations/{token}', [InvitationController::class, 'process'])->name('invitations.process');
+// Claiming a team member who was already added directly (no auth required -
+// this IS how they get their first session) - see InvitationController::claim.
+Route::post('invitations/{token}/claim', [InvitationController::class, 'claim'])->name('invitations.claim');
 
 // Job share link (no auth required - the controller decides whether the
 // viewer sees the normal job page or a read-only share view)
@@ -336,6 +346,8 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
 Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::get('team', [InvitationController::class, 'index'])->name('invitations.index');
     Route::post('team/invite', [InvitationController::class, 'store'])->name('invitations.store');
+    Route::post('team/members', [InvitationController::class, 'storeMember'])->name('invitations.store-member');
+    Route::post('team/roles/{role}/invite', [InvitationController::class, 'inviteMember'])->name('invitations.invite-member');
     Route::patch('team/roles/{role}', [InvitationController::class, 'updateRole'])->name('invitations.update-role');
     Route::patch('team/roles/{role}/rate', [InvitationController::class, 'updateMemberRate'])->name('invitations.update-member-rate');
     Route::delete('team/roles/{role}', [InvitationController::class, 'destroyRole'])->name('invitations.destroy-role');

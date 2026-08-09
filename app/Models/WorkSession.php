@@ -18,6 +18,7 @@ class WorkSession extends Model
         'asset_id',
         'zone_id',
         'user_id',
+        'created_by',
         'description',
         'started_at',
         'ended_at',
@@ -63,6 +64,16 @@ class WorkSession extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Who entered this session, when that isn't the person it's booked
+     * against - set when a manager/admin/approver logs time on behalf of
+     * someone else. Null for the normal self-entered case.
+     */
+    public function createdBy()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function photos()
@@ -144,23 +155,42 @@ class WorkSession extends Model
     }
 
     /**
-     * Whether this session's time range overlaps another finalised/approved
-     * session belonging to the same user - a worker can't genuinely be doing
-     * two things at once, so finalising both would double-count hours and
-     * billing. Strict inequalities so two sessions that just touch end-to-
-     * end (one starts the instant the other ends) aren't flagged.
+     * Whether [$startedAt, $endedAt) collides with any of this user's other
+     * sessions. Static so it can be asked *before* a session is saved - an
+     * instance method can't do this on an unsaved model, since a
+     * `where('id', '!=', $this->id)` guard compares against null and MySQL
+     * treats `id != NULL` as unknown, matching zero rows (the check would
+     * silently always pass). Strict inequalities so two sessions that just
+     * touch end-to-end (one starts the instant the other ends) don't count
+     * as overlapping. A still-open session ($endedAt null on the OTHER
+     * session) counts as open-ended: anything that starts after it began
+     * always collides with it.
      */
-    public function overlapsFinalisedSession(): bool
+    public static function overlapExistsFor(int $userId, $startedAt, $endedAt, ?int $ignoreId = null, ?array $statuses = null): bool
     {
-        if (!$this->ended_at) {
+        if (!$endedAt) {
             return false;
         }
 
-        return static::where('user_id', $this->user_id)
-            ->where('id', '!=', $this->id)
-            ->whereIn('status', [self::FINALISED, self::APPROVED])
-            ->where('started_at', '<', $this->ended_at)
-            ->where('ended_at', '>', $this->started_at)
+        return static::where('user_id', $userId)
+            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+            ->when($statuses, fn ($q) => $q->whereIn('status', $statuses))
+            ->where('started_at', '<', $endedAt)
+            ->where(fn ($q) => $q->where('ended_at', '>', $startedAt)->orWhereNull('ended_at'))
             ->exists();
+    }
+
+    /**
+     * Whether this session's time range overlaps another finalised/approved
+     * session belonging to the same user - a worker can't genuinely be doing
+     * two things at once, so finalising both would double-count hours and
+     * billing.
+     */
+    public function overlapsFinalisedSession(): bool
+    {
+        return static::overlapExistsFor(
+            $this->user_id, $this->started_at, $this->ended_at,
+            $this->id, [self::FINALISED, self::APPROVED]
+        );
     }
 }

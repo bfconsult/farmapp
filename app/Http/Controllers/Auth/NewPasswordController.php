@@ -49,6 +49,11 @@ class NewPasswordController extends Controller
                 $user->forceFill([
                     'password' => Hash::make($request->password),
                     'remember_token' => Str::random(60),
+                    // Setting a password via a reset link sent to your own
+                    // address is itself a claim - without this, a team
+                    // member who resets rather than accepting an invite
+                    // would stay flagged "Unclaimed" forever.
+                    'claimed_at' => $user->claimed_at ?? now(),
                 ])->save();
 
                 event(new PasswordReset($user));

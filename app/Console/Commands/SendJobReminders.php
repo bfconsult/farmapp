@@ -48,7 +48,11 @@ class SendJobReminders extends Command
             ->with(['assignees', 'property'])
             ->get()
             ->each(function (FarmJob $job) {
-                foreach ($job->assignees as $user) {
+                // An assignee added directly (no invite yet) may have no
+                // email on file - nothing to mail them at.
+                $contactableAssignees = $job->assignees->filter(fn ($user) => $user->email && $user->isClaimed());
+
+                foreach ($contactableAssignees as $user) {
                     Mail::to($user->email)->send(new JobOverdueReminder($job));
                 }
 
@@ -57,7 +61,7 @@ class SendJobReminders extends Command
                     'sent_at' => now(),
                 ]);
 
-                $this->info("Sent overdue reminder for \"{$job->name}\" (job #{$job->id}) to {$job->assignees->count()} assignee(s).");
+                $this->info("Sent overdue reminder for \"{$job->name}\" (job #{$job->id}) to {$contactableAssignees->count()} assignee(s).");
             });
     }
 }
