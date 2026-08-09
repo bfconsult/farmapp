@@ -232,7 +232,7 @@ class WorkSessionController extends Controller
         return redirect()->route('work-sessions.show', $workSession);
     }
 
-    public function destroy(WorkSession $workSession)
+    public function destroy(Request $request, WorkSession $workSession)
     {
         if ($workSession->property_id !== (int) session('current_property_id')) {
             abort(404);
@@ -240,7 +240,13 @@ class WorkSessionController extends Controller
 
         $workSession->delete();
 
-        return redirect()->route('work-sessions.index');
+        // Unlike stop()/finalise() (back() to the same still-existing Show
+        // page), the session itself is gone here - there's no page left to
+        // return to, so route straight to whichever list "from" says this
+        // delete came from instead. See cameFromManage().
+        return $this->cameFromManage($request) === 'manage'
+            ? redirect()->route('manage.work-sessions')
+            : redirect()->route('work-sessions.index');
     }
 
     public function stop(WorkSession $workSession)

@@ -59,7 +59,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
 
     const destroy = () => {
         if (confirm('Are you sure you want to delete this work session?')) {
-            router.delete(route('work-sessions.destroy', session.id));
+            router.delete(route('work-sessions.destroy', from ? { work_session: session.id, from } : session.id));
         }
     };
 
