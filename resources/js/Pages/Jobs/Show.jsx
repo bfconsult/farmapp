@@ -15,6 +15,18 @@ const CHECKLIST_TYPE_LABELS = {
     at_completion: 'At Completion',
 };
 
+const SESSION_STATUS_LABELS = {
+    draft: 'Draft',
+    finalised: 'Finalised',
+    approved: 'Approved',
+};
+
+const SESSION_STATUS_COLORS = {
+    draft: 'bg-gray-100 text-gray-600',
+    finalised: 'bg-blue-100 text-blue-700',
+    approved: 'bg-green-100 text-green-700',
+};
+
 function Spinner({ className = 'h-4 w-4' }) {
     return (
         <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
@@ -146,7 +158,7 @@ function ExpenseRow({ expense, onEdit }) {
     );
 }
 
-export default function Show({ job, seenBy, checklistTemplates, suppliers }) {
+export default function Show({ job, seenBy, checklistTemplates, suppliers, labourTotal, labourEntries }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
     const { flash, currentUserRole } = usePage().props;
@@ -162,6 +174,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers }) {
     const [expenseForm, setExpenseForm] = useState({ name: '', description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
     const [creatingSupplier, setCreatingSupplier] = useState(false);
     const [newSupplierName, setNewSupplierName] = useState('');
+    const [showLabourDetail, setShowLabourDetail] = useState(false);
     const [showLocationModal, setShowLocationModal] = useState(false);
     const [editingLocation, setEditingLocation] = useState(false);
     const [pendingLocation, setPendingLocation] = useState(null);
@@ -687,6 +700,49 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers }) {
                         )}
                     </div>
                 </Modal>
+
+                {/* Labour - rolled-up actual time/cost, view only; editing a
+                    time entry still happens on its own Work Session page. */}
+                <div className="bg-white rounded-lg shadow p-4">
+                    <button
+                        onClick={() => setShowLabourDetail((v) => !v)}
+                        className="w-full flex items-center justify-between"
+                    >
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Labour</h2>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">${Number(labourTotal).toFixed(2)}</span>
+                            <span className="text-gray-400 text-xs">{showLabourDetail ? '▲' : '▼'}</span>
+                        </div>
+                    </button>
+
+                    {showLabourDetail && (
+                        labourEntries.length === 0 ? (
+                            <p className="text-sm text-gray-400 mt-3">No time logged yet.</p>
+                        ) : (
+                            <div className="mt-3 -mx-4 border-t border-gray-100 divide-y divide-gray-100">
+                                {labourEntries.map((entry) => (
+                                    <div key={entry.id} className="px-4 py-2.5 flex items-center justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <p className="text-sm text-gray-900 truncate">{entry.user_name}</p>
+                                                <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${SESSION_STATUS_COLORS[entry.status]}`}>
+                                                    {SESSION_STATUS_LABELS[entry.status]}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-500">
+                                                {formatDate(entry.started_at, { year: false })}
+                                                {entry.duration_in_hours && ` · ${entry.duration_in_hours}h`}
+                                            </p>
+                                        </div>
+                                        <span className="text-sm text-gray-900 flex-shrink-0">
+                                            {entry.amount != null ? `$${Number(entry.amount).toFixed(2)}` : '—'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    )}
+                </div>
 
                 {/* Expenses */}
                 <div className="bg-white rounded-lg shadow p-4">

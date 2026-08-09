@@ -270,6 +270,8 @@ class FarmJobController extends Controller
             ['viewed_at' => now()],
         );
 
+        $workSessions = $farmJob->workSessions()->with('user')->orderByDesc('started_at')->get();
+
         return Inertia::render('Jobs/Show', [
             'job' => $farmJob,
             'seenBy' => $farmJob->views()->with('user')->get()->map(fn ($view) => [
@@ -282,6 +284,18 @@ class FarmJobController extends Controller
                 ->orderBy('name')
                 ->get(),
             'suppliers' => Supplier::where('property_id', $farmJob->property_id)->orderBy('name')->get(),
+            // Rolled-up actual labour, view-only here - editing a time entry
+            // still happens on its own Work Session page, not from the job.
+            'labourTotal' => round($workSessions->sum('billing_amount'), 2),
+            'labourEntries' => $workSessions->map(fn ($session) => [
+                'id' => $session->id,
+                'user_name' => $session->user->name,
+                'status' => $session->status,
+                'started_at' => $session->started_at,
+                'ended_at' => $session->ended_at,
+                'duration_in_hours' => $session->duration_in_hours,
+                'amount' => $session->billing_amount,
+            ]),
         ]);
     }
 
