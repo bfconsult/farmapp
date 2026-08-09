@@ -35,6 +35,27 @@ class DiaryShareController extends Controller
             // and robots.txt directly from the app root; everything else in
             // public/ needs asset(), which redirects to the CDN-backed URL.
             'logoUrl' => asset('favicon.svg'),
+            'pdfUrl' => route('diary.share.pdf', $share->token),
         ]);
+    }
+
+    /**
+     * Same content as show(), as a PDF - public and unauthenticated like the
+     * share link itself, since the recipient may have no account.
+     */
+    public function downloadPdf(string $token)
+    {
+        $share = DiaryShare::where('token', $token)->with('property')->firstOrFail();
+
+        $dateFrom = $share->date_from->startOfDay();
+        $dateTo = $share->date_to->endOfDay();
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.diary', [
+            'property' => $share->property->only(['name']),
+            'dateFrom' => $share->date_from->toDateString(),
+            'dateTo' => $share->date_to->toDateString(),
+            'days' => WorkSession::diaryDays($share->property_id, $dateFrom, $dateTo),
+            'metrics' => Metric::forDiaryPeriodExport($share->property_id, $dateFrom, $dateTo),
+        ])->download("diary_{$share->date_from->toDateString()}_{$share->date_to->toDateString()}.pdf");
     }
 }

@@ -120,7 +120,37 @@ class ReportController extends Controller
                 'date_from' => $dateFrom->toDateString(),
                 'date_to' => $dateTo->toDateString(),
             ]),
+            'pdfUrl' => route('reports.diary-preview.pdf', [
+                'date_from' => $dateFrom->toDateString(),
+                'date_to' => $dateTo->toDateString(),
+            ]),
         ]);
+    }
+
+    /**
+     * PDF of the exact same content as previewDiary - same date range
+     * resolution, so the "Download PDF" link on Diary/SharedView can just
+     * carry the current date_from/date_to query params across unchanged.
+     */
+    public function downloadDiaryPdf(Request $request)
+    {
+        $currentPropertyId = session('current_property_id');
+        $property = Property::findOrFail($currentPropertyId);
+
+        $dateFrom = $request->date_from
+            ? \Carbon\Carbon::parse($request->date_from)->startOfDay()
+            : now()->startOfMonth();
+        $dateTo = $request->date_to
+            ? \Carbon\Carbon::parse($request->date_to)->endOfDay()
+            : now()->endOfMonth();
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.diary', [
+            'property' => $property->only(['name']),
+            'dateFrom' => $dateFrom->toDateString(),
+            'dateTo' => $dateTo->toDateString(),
+            'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo),
+            'metrics' => Metric::forDiaryPeriodExport($currentPropertyId, $dateFrom, $dateTo),
+        ])->download("diary_{$dateFrom->toDateString()}_{$dateTo->toDateString()}.pdf");
     }
 
     /**

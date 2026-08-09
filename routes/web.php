@@ -120,6 +120,7 @@ Route::middleware(['auth', 'property.role:admin,manager,approver'])->group(funct
 Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('reports/diary-share', [ReportController::class, 'storeDiaryShare'])->name('reports.diary-share.store');
     Route::get('reports/diary-preview', [ReportController::class, 'previewDiary'])->name('reports.diary-preview');
+    Route::get('reports/diary-preview/pdf', [ReportController::class, 'downloadDiaryPdf'])->name('reports.diary-preview.pdf');
     Route::get('recurring-jobs', [RecurringJobController::class, 'index'])->name('recurring-jobs.index');
     Route::patch('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'update'])->name('recurring-jobs.update');
     Route::delete('recurring-jobs/{recurringJob}', [RecurringJobController::class, 'destroy'])->name('recurring-jobs.destroy');
@@ -322,6 +323,7 @@ Route::get('share/jobs/{token}', [FarmJobController::class, 'share'])->name('job
 // Diary share link (no auth required - a public read-only day-by-day
 // activity report for an approver, see DiaryShareController)
 Route::get('share/diary/{token}', [DiaryShareController::class, 'show'])->name('diary.share');
+Route::get('share/diary/{token}/pdf', [DiaryShareController::class, 'downloadPdf'])->name('diary.share.pdf');
 
 // Admin and Manager can manage the property boundary
 Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {

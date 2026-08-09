@@ -80,6 +80,25 @@ class Metric extends Model
     }
 
     /**
+     * Same data as forDiaryPeriod(), flattened to plain arrays - a Blade PDF
+     * view works with the raw objects it's handed, so it can't rely on
+     * Inertia's camelCase-to-snake_case relation conversion the way
+     * latest_measurement is accessed in the frontend Diary views.
+     */
+    public static function forDiaryPeriodExport(int $propertyId, Carbon $dateFrom, Carbon $dateTo)
+    {
+        return static::forDiaryPeriod($propertyId, $dateFrom, $dateTo)->map(fn (self $metric) => [
+            'name' => $metric->name,
+            'measurement' => $metric->latestMeasurement ? [
+                'status' => $metric->latestMeasurement->status,
+                'answer_type' => $metric->latestMeasurement->answer_type,
+                'value_number' => $metric->latestMeasurement->value_number,
+                'value_text' => $metric->latestMeasurement->value_text,
+            ] : null,
+        ]);
+    }
+
+    /**
      * The end date of a period starting on the given date, per this metric's
      * reporting period - monthly/quarterly/yearly snap to calendar
      * boundaries, daily/weekly are fixed-length windows from $periodStart

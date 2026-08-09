@@ -8,19 +8,30 @@ function formatRangeHeading(dateStr) {
     return formatDate(dateStr, { year: 'numeric' });
 }
 
-export default function SharedView({ property, dateFrom, dateTo, days, metrics, logoUrl, backUrl }) {
+export default function SharedView({ property, dateFrom, dateTo, days, metrics, logoUrl, backUrl, pdfUrl }) {
     return (
         <>
             <Head title={`${property.name} — Activity Diary`} />
 
             <div className="min-h-screen bg-gray-100 flex justify-center p-4">
                 <div className="max-w-lg w-full space-y-4 mt-8">
-                    {/* Only set when this is the in-app preview (see
-                        ReportController::previewDiary) - absent on the real
-                        public share link, which has no app to return to. */}
-                    {backUrl && (
-                        <BackLink href={backUrl}>Back to Reports</BackLink>
-                    )}
+                    <div className="flex items-center justify-between">
+                        {/* Only set when this is the in-app preview (see
+                            ReportController::previewDiary) - absent on the
+                            real public share link, which has no app to
+                            return to. */}
+                        {backUrl ? (
+                            <BackLink href={backUrl}>Back to Reports</BackLink>
+                        ) : (
+                            <span />
+                        )}
+                        <a
+                            href={pdfUrl}
+                            className="text-sm text-green-600 font-medium"
+                        >
+                            Download PDF
+                        </a>
+                    </div>
 
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-sm mb-2">
                         <img src={logoUrl} className="w-5 h-5" alt="" />
