@@ -5,6 +5,16 @@ import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate as formatDateDayFirst } from '@/dateInput';
 
+const TYPE_LABELS = { expense: 'Expense', labour: 'Labour' };
+
+const STATUS_LABELS = { draft: 'Draft', finalised: 'Finalised', approved: 'Approved' };
+
+const STATUS_COLORS = {
+    draft: 'bg-gray-100 text-gray-600',
+    finalised: 'bg-blue-100 text-blue-700',
+    approved: 'bg-green-100 text-green-700',
+};
+
 function defaultRange() {
     const pad = (n) => String(n).padStart(2, '0');
     const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -14,26 +24,51 @@ function defaultRange() {
     return { from: toISO(from), to: toISO(to) };
 }
 
-function ExpenseRow({ expense }) {
+// Two kinds of transaction feed this list: Expenses logged directly against
+// the supplier, and work sessions belonging to a worker who bills through it
+// (see Role::supplier()) - both are shown, clearly labelled, in one list
+// rather than as separate sections, so the total actually reflects
+// everything billed through this supplier.
+function TransactionRow({ transaction }) {
+    const isLabour = transaction.type === 'labour';
+
     return (
         <div className="px-4 py-3">
             <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                    <p className="text-sm text-gray-900">{expense.name}</p>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] uppercase tracking-wide font-medium text-gray-400">
+                            {TYPE_LABELS[transaction.type]}
+                        </span>
+                        {isLabour && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[transaction.status]}`}>
+                                {STATUS_LABELS[transaction.status]}
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-sm text-gray-900">{transaction.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                        {formatDateDayFirst(expense.created_at)} · ${Number(expense.amount).toFixed(2)}
-                        {' '}({expense.gst_inclusive ? 'GST inc' : 'GST ex'})
+                        {formatDateDayFirst(transaction.date)}
+                        {isLabour ? (
+                            <>
+                                {transaction.duration_in_hours && ` · ${transaction.duration_in_hours}h`}
+                                {' · '}
+                                {transaction.amount != null ? `$${transaction.amount.toFixed(2)}` : 'Rate not set'}
+                            </>
+                        ) : (
+                            <> · ${transaction.amount.toFixed(2)} ({transaction.gst_inclusive ? 'GST inc' : 'GST ex'})</>
+                        )}
                     </p>
-                    {expense.farm_job && (
-                        <Link href={route('jobs.show', expense.farm_job.id)} className="text-xs text-green-600">
-                            {expense.farm_job.name}
+                    {transaction.farm_job && (
+                        <Link href={route('jobs.show', transaction.farm_job.id)} className="text-xs text-green-600">
+                            {transaction.farm_job.name}
                         </Link>
                     )}
-                    {expense.description && (
-                        <p className="text-sm text-gray-500 mt-1">{expense.description}</p>
+                    {transaction.description && (
+                        <p className="text-sm text-gray-500 mt-1">{transaction.description}</p>
                     )}
                 </div>
-                {expense.reimburse && (
+                {transaction.reimburse && (
                     <span className="text-xs px-2 py-1 rounded-full font-medium bg-amber-100 text-amber-700 flex-shrink-0">
                         Reimburse
                     </span>
@@ -43,7 +78,7 @@ function ExpenseRow({ expense }) {
     );
 }
 
-export default function Show({ supplier, expenses, currentDateFrom, currentDateTo }) {
+export default function Show({ supplier, transactions, total, currentDateFrom, currentDateTo }) {
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
 
@@ -65,8 +100,6 @@ export default function Show({ supplier, expenses, currentDateFrom, currentDateT
         const { from, to } = defaultRange();
         return currentDateFrom === from && currentDateTo === to;
     })();
-
-    const total = expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
 
     return (
         <AuthenticatedLayout title={supplier.name}>
@@ -133,12 +166,12 @@ export default function Show({ supplier, expenses, currentDateFrom, currentDateT
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Transactions</h2>
                         <span className="text-sm font-medium text-gray-900">${total.toFixed(2)}</span>
                     </div>
-                    {expenses.length === 0 ? (
+                    {transactions.length === 0 ? (
                         <p className="text-sm text-gray-400 p-4">No transactions in this date range.</p>
                     ) : (
                         <div className="divide-y divide-gray-100">
-                            {expenses.map((expense) => (
-                                <ExpenseRow key={expense.id} expense={expense} />
+                            {transactions.map((transaction) => (
+                                <TransactionRow key={`${transaction.type}-${transaction.id}`} transaction={transaction} />
                             ))}
                         </div>
                     )}

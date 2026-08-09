@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Role;
 use App\Models\Supplier;
+use App\Models\WorkSession;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -39,10 +41,14 @@ class SupplierController extends Controller
     }
 
     /**
-     * Read-only summary: this supplier's billing details plus every expense
-     * (job "transaction") logged against them in a date range - defaults to
-     * the past 3 months, same date-range-picker pattern as the Manage ->
-     * Work Sessions review list.
+     * Read-only summary: this supplier's billing details plus every
+     * "transaction" billed through them in a date range - defaults to the
+     * past 3 months, same date-range-picker pattern as the Manage -> Work
+     * Sessions review list. Two different kinds of transaction feed this,
+     * since a supplier can be a materials/hire supplier, a "labour
+     * supplier" a worker bills through (see Role::supplier()), or both:
+     * Expenses logged directly against the supplier, and work sessions
+     * belonging to any worker currently linked to it.
      */
     public function show(Request $request, Supplier $supplier)
     {
@@ -53,12 +59,45 @@ class SupplierController extends Controller
         $expenses = $supplier->expenses()
             ->whereBetween('created_at', [$dateFrom, $dateTo])
             ->with('farmJob')
-            ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(fn ($expense) => [
+                'type' => 'expense',
+                'id' => $expense->id,
+                'date' => $expense->created_at,
+                'name' => $expense->name,
+                'description' => $expense->description,
+                'amount' => (float) $expense->amount,
+                'gst_inclusive' => $expense->gst_inclusive,
+                'reimburse' => $expense->reimburse,
+                'farm_job' => $expense->farmJob ? ['id' => $expense->farmJob->id, 'name' => $expense->farmJob->name] : null,
+            ]);
+
+        $linkedUserIds = Role::where('property_id', $supplier->property_id)
+            ->where('supplier_id', $supplier->id)
+            ->pluck('user_id');
+
+        $workSessions = WorkSession::where('property_id', $supplier->property_id)
+            ->whereIn('user_id', $linkedUserIds)
+            ->whereBetween('started_at', [$dateFrom, $dateTo])
+            ->with(['user', 'farmJob'])
+            ->get()
+            ->map(fn ($session) => [
+                'type' => 'labour',
+                'id' => $session->id,
+                'date' => $session->started_at,
+                'name' => $session->user->name,
+                'status' => $session->status,
+                'duration_in_hours' => $session->duration_in_hours,
+                'amount' => $session->billing_amount ? (float) $session->billing_amount : null,
+                'farm_job' => $session->farmJob ? ['id' => $session->farmJob->id, 'name' => $session->farmJob->name] : null,
+            ]);
+
+        $transactions = $expenses->concat($workSessions)->sortByDesc('date')->values();
 
         return Inertia::render('Manage/Suppliers/Show', [
             'supplier' => $supplier,
-            'expenses' => $expenses,
+            'transactions' => $transactions,
+            'total' => round($transactions->sum('amount'), 2),
             'currentDateFrom' => $dateFrom->toDateString(),
             'currentDateTo' => $dateTo->toDateString(),
         ]);

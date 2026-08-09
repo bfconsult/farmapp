@@ -6,6 +6,7 @@ use App\Models\Property;
 use App\Models\Role;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Models\WorkSession;
 
 test('an admin can create a supplier with billing details', function () {
     $user = User::factory()->create();
@@ -93,8 +94,9 @@ test('the supplier summary page defaults to the past 3 months and totals in-rang
         ->get(route('manage.suppliers.show', $supplier->id))
         ->assertInertia(fn ($page) => $page
             ->component('Manage/Suppliers/Show')
-            ->has('expenses', 1)
-            ->where('expenses.0.name', 'Fence posts'));
+            ->has('transactions', 1)
+            ->where('transactions.0.name', 'Fence posts')
+            ->where('total', 150));
 });
 
 test('a custom date range on the supplier summary page includes transactions outside the default window', function () {
@@ -120,8 +122,51 @@ test('a custom date range on the supplier summary page includes transactions out
         ]))
         ->assertInertia(fn ($page) => $page
             ->component('Manage/Suppliers/Show')
-            ->has('expenses', 1)
-            ->where('expenses.0.name', 'Old wire'));
+            ->has('transactions', 1)
+            ->where('transactions.0.name', 'Old wire'));
+});
+
+test('the supplier summary page includes work sessions from workers linked to it as labour transactions', function () {
+    $admin = User::factory()->create();
+    $worker = User::factory()->create(['hourly_rate' => 40]);
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $admin->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'BFC Labour']);
+    Role::create(['user_id' => $worker->id, 'property_id' => $property->id, 'type' => Role::WORKER, 'supplier_id' => $supplier->id]);
+
+    // Linked worker's session in range - counts.
+    WorkSession::create([
+        'property_id' => $property->id, 'user_id' => $worker->id,
+        'started_at' => now()->subDays(3), 'ended_at' => now()->subDays(3)->addHours(2),
+        'status' => WorkSession::FINALISED,
+    ]);
+
+    // Out of range - excluded.
+    WorkSession::create([
+        'property_id' => $property->id, 'user_id' => $worker->id,
+        'started_at' => now()->subMonths(6), 'ended_at' => now()->subMonths(6)->addHours(2),
+        'status' => WorkSession::FINALISED,
+    ]);
+
+    // An unrelated worker with no supplier link - never counts.
+    $otherWorker = User::factory()->create(['hourly_rate' => 40]);
+    Role::create(['user_id' => $otherWorker->id, 'property_id' => $property->id, 'type' => Role::WORKER]);
+    WorkSession::create([
+        'property_id' => $property->id, 'user_id' => $otherWorker->id,
+        'started_at' => now()->subDays(2), 'ended_at' => now()->subDays(2)->addHours(2),
+        'status' => WorkSession::FINALISED,
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->get(route('manage.suppliers.show', $supplier->id))
+        ->assertInertia(fn ($page) => $page
+            ->component('Manage/Suppliers/Show')
+            ->has('transactions', 1)
+            ->where('transactions.0.type', 'labour')
+            ->where('transactions.0.name', $worker->name)
+            ->where('transactions.0.amount', 80)
+            ->where('total', 80));
 });
 
 test('a worker cannot reach the suppliers pages', function () {
