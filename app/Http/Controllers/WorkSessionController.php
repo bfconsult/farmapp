@@ -529,6 +529,27 @@ class WorkSessionController extends Controller
             'Contact' => $property?->billing_contact_name,
         ])->filter()->all();
 
+        // Who this timesheet is *from*, if the exporting worker bills
+        // through a linked Supplier (see Role::supplier()) rather than as an
+        // individual - the billing_* fields are preferred (same convention
+        // as $billingDetails above) but fall back to the supplier's plain
+        // name/street_address/phone, since a "labour supplier" added just to
+        // carry a name often never gets its dedicated billing fields filled
+        // in (see SupplierController@show's "Billing via" feature).
+        $exportingSupplier = Role::where('user_id', Auth::id())
+            ->where('property_id', $currentPropertyId)
+            ->first()?->supplier;
+
+        $fromLine = null;
+        if ($exportingSupplier) {
+            $fromParts = collect([
+                $exportingSupplier->billing_company_name ?: $exportingSupplier->name,
+                $exportingSupplier->billing_address ?: $exportingSupplier->street_address,
+                $exportingSupplier->billing_contact_name ?: ($exportingSupplier->billing_phone ?: $exportingSupplier->phone),
+            ])->filter()->implode(', ');
+            $fromLine = $fromParts ? "From: {$fromParts}" : null;
+        }
+
         $sessions = $this->exportableSessionsQuery($currentPropertyId, $dateFrom, $dateTo)->get();
 
         // started_at/ended_at are UTC in the DB. The React UI never needs an
@@ -560,6 +581,7 @@ class WorkSessionController extends Controller
                 'totalHours' => $totalHours,
                 'totalBilling' => $totalBilling,
                 'billingDetails' => $billingDetails,
+                'fromLine' => $fromLine,
             ])->download("{$filename}.pdf");
         }
 
@@ -574,7 +596,11 @@ class WorkSessionController extends Controller
             }
             $rowNumber++;
         }
-        if ($billingDetails) {
+        if ($fromLine) {
+            $sheet->setCellValue("A{$rowNumber}", $fromLine);
+            $rowNumber++;
+        }
+        if ($billingDetails || $fromLine) {
             $rowNumber++; // blank row separating the billing header from the table
         }
 

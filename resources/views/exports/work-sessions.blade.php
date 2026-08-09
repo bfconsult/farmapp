@@ -17,7 +17,7 @@
 </style>
 </head>
 <body>
-    @if ($billingDetails)
+    @if ($billingDetails || $fromLine)
         <div class="billing-header">
             @if (!empty($billingDetails['Company/Business Name']))
                 <p class="billing-name">{{ $billingDetails['Company/Business Name'] }}</p>
@@ -27,6 +27,9 @@
                     <p class="billing-line">{{ $label }}: {{ $value }}</p>
                 @endif
             @endforeach
+            @if ($fromLine)
+                <p class="billing-line">{{ $fromLine }}</p>
+            @endif
         </div>
     @endif
 
