@@ -147,7 +147,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('settings/asset-types', [SettingsController::class, 'storeAssetType'])->name('settings.asset-types.store');
     Route::patch('settings/asset-types/{assetType}', [SettingsController::class, 'updateAssetType'])->name('settings.asset-types.update');
     Route::delete('settings/asset-types/{assetType}', [SettingsController::class, 'destroyAssetType'])->name('settings.asset-types.destroy');
-    Route::resource('manage/suppliers', SupplierController::class)->names('manage.suppliers')->except(['show']);
+    Route::resource('manage/suppliers', SupplierController::class)->names('manage.suppliers');
     Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
     Route::patch('assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');

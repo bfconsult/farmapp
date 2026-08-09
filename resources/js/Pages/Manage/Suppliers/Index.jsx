@@ -28,11 +28,7 @@ export default function Index({ suppliers }) {
                 ) : (
                     <div className="bg-white rounded-lg shadow divide-y divide-gray-100 overflow-hidden">
                         {suppliers.map((supplier) => (
-                            <Link
-                                key={supplier.id}
-                                href={route('manage.suppliers.edit', supplier.id)}
-                                className="flex items-center justify-between gap-2 px-4 py-3 hover:bg-gray-50"
-                            >
+                            <div key={supplier.id} className="flex items-center justify-between gap-2 px-4 py-3">
                                 <div className="min-w-0">
                                     <p className="text-sm text-gray-900 truncate">{supplier.name}</p>
                                     {(supplier.phone || supplier.email) && (
@@ -41,8 +37,15 @@ export default function Index({ suppliers }) {
                                         </p>
                                     )}
                                 </div>
-                                <span className="text-gray-400 flex-shrink-0">›</span>
-                            </Link>
+                                <div className="flex items-center gap-3 flex-shrink-0 text-sm">
+                                    <Link href={route('manage.suppliers.show', supplier.id)} className="text-green-600 font-medium">
+                                        View
+                                    </Link>
+                                    <Link href={route('manage.suppliers.edit', supplier.id)} className="text-green-600 font-medium">
+                                        Edit
+                                    </Link>
+                                </div>
+                            </div>
                         ))}
                     </div>
                 )}
