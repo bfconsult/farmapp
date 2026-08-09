@@ -107,6 +107,27 @@ class PropertyController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'address' => 'required|string|max:255',
+        ]);
+
+        $property->update($validated);
+
+        return redirect()->route('properties.show', $property);
+    }
+
+    public function editBilling(Property $property)
+    {
+        abort_unless(Auth::user()->roleOn($property) === Role::ADMIN, 403);
+
+        return Inertia::render('Properties/Billing', [
+            'property' => $property,
+        ]);
+    }
+
+    public function updateBilling(Request $request, Property $property)
+    {
+        abort_unless(Auth::user()->roleOn($property) === Role::ADMIN, 403);
+
+        $validated = $request->validate([
             'billing_company_name' => 'nullable|string|max:255',
             'billing_abn' => 'nullable|string|max:255',
             'billing_address' => 'nullable|string|max:255',
@@ -116,7 +137,7 @@ class PropertyController extends Controller
 
         $property->update($validated);
 
-        return redirect()->route('properties.show', $property);
+        return redirect()->route('properties.show', $property)->with('success', 'Billing details saved.');
     }
 
     public function destroy(Property $property)

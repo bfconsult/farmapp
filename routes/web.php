@@ -104,6 +104,8 @@ Route::middleware(['auth', 'app.admin'])->group(function () {
 // Admin only routes
 Route::middleware(['auth', 'property.role:admin'])->group(function () {
     Route::resource('properties', PropertyController::class)->only(['edit', 'update', 'destroy']);
+    Route::get('properties/{property}/billing', [PropertyController::class, 'editBilling'])->name('properties.billing.edit');
+    Route::put('properties/{property}/billing', [PropertyController::class, 'updateBilling'])->name('properties.billing.update');
 });
 
 // Reports: admin/manager get the full ledger, approver gets a read-only

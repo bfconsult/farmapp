@@ -7,6 +7,13 @@ import { Head, Link, router } from '@inertiajs/react';
 export default function Show({ property, currentRole, canLeave }) {
     const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
     const isAdmin = currentRole === 'admin';
+    const hasBillingDetails = Boolean(
+        property.billing_company_name
+        || property.billing_abn
+        || property.billing_address
+        || property.billing_phone
+        || property.billing_contact_name
+    );
 
     const destroy = () => {
         if (confirm('Are you sure you want to delete this property?')) {
@@ -78,6 +85,25 @@ export default function Show({ property, currentRole, canLeave }) {
                                 <span className="text-gray-900">Custom settings</span>
                                 <span className="text-gray-400">›</span>
                             </Link>
+                        </div>
+                    )}
+
+                    {isAdminOrManager && (
+                        <div className="bg-white rounded-lg shadow p-6 mb-6">
+                            <div className="flex justify-between items-center mb-2">
+                                <h2 className="text-lg font-medium text-gray-900">Billing Details</h2>
+                                <Link
+                                    href={route('properties.billing.edit', property.id)}
+                                    className="text-sm text-green-600 hover:text-green-800"
+                                >
+                                    {hasBillingDetails ? 'Edit' : 'Add'}
+                                </Link>
+                            </div>
+                            <p className="text-sm text-gray-500">
+                                {hasBillingDetails
+                                    ? 'Shown at the top of Excel/PDF timesheet exports.'
+                                    : 'Not set - timesheet exports will have no billing header.'}
+                            </p>
                         </div>
                     )}
 
