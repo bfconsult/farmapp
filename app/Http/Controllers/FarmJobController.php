@@ -270,7 +270,16 @@ class FarmJobController extends Controller
             ['viewed_at' => now()],
         );
 
-        $workSessions = $farmJob->workSessions()->with('user')->orderByDesc('started_at')->get();
+        // Only confirmed time counts here - a draft session is still
+        // editable and its hours aren't settled yet, and one with neither a
+        // job rate nor a worker rate has no billing_amount to show at all.
+        $workSessions = $farmJob->workSessions()
+            ->with('user')
+            ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
+            ->orderByDesc('started_at')
+            ->get()
+            ->filter(fn ($session) => $session->billing_amount !== null)
+            ->values();
 
         return Inertia::render('Jobs/Show', [
             'job' => $farmJob,
@@ -290,9 +299,7 @@ class FarmJobController extends Controller
             'labourEntries' => $workSessions->map(fn ($session) => [
                 'id' => $session->id,
                 'user_name' => $session->user->name,
-                'status' => $session->status,
                 'started_at' => $session->started_at,
-                'ended_at' => $session->ended_at,
                 'duration_in_hours' => $session->duration_in_hours,
                 'amount' => $session->billing_amount,
             ]),
