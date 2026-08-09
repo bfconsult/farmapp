@@ -6,7 +6,6 @@ use App\Models\Priority;
 use App\Models\JobType;
 use App\Models\JobStatus;
 use App\Models\AssetType;
-use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,7 +29,6 @@ class SettingsController extends Controller
             'jobTypes' => JobType::where('property_id', $currentPropertyId)->orderBy('name')->get(),
             'jobStatuses' => JobStatus::where('property_id', $currentPropertyId)->orderBy('order')->get(),
             'assetTypes' => AssetType::where('property_id', $currentPropertyId)->orderBy('name')->get(),
-            'suppliers' => Supplier::where('property_id', $currentPropertyId)->orderBy('name')->get(),
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
             'billingBlockOptions' => User::BILLING_BLOCK_OPTIONS,
         ]);
@@ -151,47 +149,6 @@ class SettingsController extends Controller
         }
 
         $assetType->delete();
-        return back();
-    }
-
-    // Suppliers - scoped to the current property, same as Priorities.
-    public function storeSupplier(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'street_address' => 'nullable|string|max:255',
-            'phone' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
-        ]);
-        Supplier::create([...$validated, 'property_id' => session('current_property_id')]);
-        return back();
-    }
-
-    public function updateSupplier(Request $request, Supplier $supplier)
-    {
-        if ($supplier->property_id !== (int) session('current_property_id')) {
-            abort(404);
-        }
-
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'street_address' => 'nullable|string|max:255',
-            'phone' => 'nullable|string|max:255',
-            'email' => 'nullable|email|max:255',
-        ]);
-        $supplier->update($validated);
-        return back();
-    }
-
-    public function destroySupplier(Supplier $supplier)
-    {
-        if ($supplier->property_id !== (int) session('current_property_id')) {
-            abort(404);
-        }
-
-        $supplier->delete();
         return back();
     }
 

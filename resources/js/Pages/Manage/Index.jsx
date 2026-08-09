@@ -21,7 +21,7 @@ function HubCard({ href, icon, title, subtitle }) {
     );
 }
 
-export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, canManage }) {
+export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, suppliersCount, canManage }) {
     return (
         <AuthenticatedLayout title="Manage">
             <Head title="Manage" />
@@ -78,6 +78,19 @@ export default function Index({ metricsTracked, metricsDue, checklistTemplatesCo
                         </svg>
                     }
                 />
+
+                {canManage && (
+                    <HubCard
+                        href={route('manage.suppliers.index')}
+                        title="Suppliers"
+                        subtitle={`${suppliersCount} supplier${suppliersCount === 1 ? '' : 's'}`}
+                        icon={
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 11h.01M15 11h.01M9 15h.01M15 15h.01" />
+                            </svg>
+                        }
+                    />
+                )}
             </div>
         </AuthenticatedLayout>
     );

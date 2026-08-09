@@ -6,7 +6,19 @@ use Illuminate\Database\Eloquent\Model;
 
 class Supplier extends Model
 {
-    protected $fillable = ['property_id', 'name', 'description', 'street_address', 'phone', 'email'];
+    protected $fillable = [
+        'property_id',
+        'name',
+        'description',
+        'street_address',
+        'phone',
+        'email',
+        'billing_company_name',
+        'billing_abn',
+        'billing_address',
+        'billing_phone',
+        'billing_contact_name',
+    ];
 
     public function property()
     {
