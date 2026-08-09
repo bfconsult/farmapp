@@ -140,6 +140,35 @@ test('overlap is only checked against the same worker, not other workers', funct
         ->assertSessionHasNoErrors();
 });
 
+test('overlap is checked across every property a worker holds a role on, not just the current one', function () {
+    $admin = User::factory()->create();
+    $worker = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    $otherProperty = Property::create(['name' => 'Other Farm', 'address' => '2 Test Rd']);
+    Role::create(['user_id' => $admin->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    Role::create(['user_id' => $worker->id, 'property_id' => $property->id, 'type' => Role::WORKER]);
+    Role::create(['user_id' => $worker->id, 'property_id' => $otherProperty->id, 'type' => Role::WORKER]);
+
+    // Logged against the same worker, but on a property this admin has no
+    // access to - a real scenario for a contractor who works two farms.
+    WorkSession::create([
+        'property_id' => $otherProperty->id,
+        'user_id' => $worker->id,
+        'started_at' => '2026-06-15 09:00:00',
+        'ended_at' => '2026-06-15 12:00:00',
+        'status' => WorkSession::DRAFT,
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('manage.work-sessions.store'), [
+            'user_id' => $worker->id,
+            'started_at' => '2026-06-15 11:00:00',
+            'ended_at' => '2026-06-15 13:00:00',
+        ])
+        ->assertSessionHasErrors('started_at');
+});
+
 test('a worker or job from a different property is rejected', function () {
     $admin = User::factory()->create();
     $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);

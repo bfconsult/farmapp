@@ -74,6 +74,18 @@ function SessionRow({ session }) {
     );
 }
 
+// A manager retroactively logging someone else's time almost never knows
+// the exact clock-off time - they know when a job started and roughly how
+// long it took. Asking for start + duration instead of start + end matches
+// that, and as a side effect handles a shift that crosses midnight without
+// needing a second date picker.
+function addHours(localValue, hours) {
+    if (!localValue || !hours) return '';
+    const start = new Date(localValue);
+    if (Number.isNaN(start.getTime())) return '';
+    return new Date(start.getTime() + hours * 60 * 60 * 1000);
+}
+
 function LogTimeModal({ show, onClose, teamMembers, bookableJobs, initialUserId }) {
     const { data, setData, post, processing, errors, reset, clearErrors, transform } = useForm({
         user_id: initialUserId ?? '',
@@ -81,16 +93,19 @@ function LogTimeModal({ show, onClose, teamMembers, bookableJobs, initialUserId 
         description: '',
         date: '',
         started_time: '',
-        ended_time: '',
+        duration_hours: '',
     });
+
+    const startedLocal = joinLocalValue(data.date, data.started_time);
+    const computedEnd = addHours(startedLocal, parseFloat(data.duration_hours));
 
     const submit = (e) => {
         e.preventDefault();
         transform((data) => ({
             ...data,
             farm_job_id: data.farm_job_id || null,
-            started_at: fromLocalInputValue(joinLocalValue(data.date, data.started_time)),
-            ended_at: fromLocalInputValue(joinLocalValue(data.date, data.ended_time)),
+            started_at: fromLocalInputValue(startedLocal),
+            ended_at: computedEnd ? computedEnd.toISOString() : null,
         }));
         post(route('manage.work-sessions.store'), {
             onSuccess: () => {
@@ -150,16 +165,25 @@ function LogTimeModal({ show, onClose, teamMembers, bookableJobs, initialUserId 
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">End</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Duration (hours)</label>
                         <input
-                            type="time"
-                            value={data.ended_time}
-                            onChange={(e) => setData('ended_time', e.target.value)}
+                            type="number"
+                            step="0.25"
+                            min="0.25"
+                            placeholder="e.g. 2.5"
+                            value={data.duration_hours}
+                            onChange={(e) => setData('duration_hours', e.target.value)}
                             className="w-full border-gray-300 rounded-lg p-3 text-sm"
                             required
                         />
                     </div>
                 </div>
+                {computedEnd && (
+                    <p className="text-xs text-gray-500 -mt-2">
+                        Finishes at {computedEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {computedEnd.toDateString() !== new Date(startedLocal).toDateString() && ' (next day)'}
+                    </p>
+                )}
                 {errors.started_at && <p className="text-sm text-red-600">{errors.started_at}</p>}
                 {errors.ended_at && <p className="text-sm text-red-600">{errors.ended_at}</p>}
 
