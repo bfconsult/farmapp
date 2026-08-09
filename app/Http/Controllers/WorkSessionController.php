@@ -122,7 +122,7 @@ class WorkSessionController extends Controller
         return $timeWasAltered ? $redirect : $redirect->with('addPhoto', true);
     }
 
-    public function show(WorkSession $workSession)
+    public function show(Request $request, WorkSession $workSession)
     {
         if ($workSession->property_id !== (int) session('current_property_id')) {
             abort(404);
@@ -152,7 +152,17 @@ class WorkSessionController extends Controller
             'billingAmount' => $workSession->billing_amount,
             'waypoints' => $workSession->waypoints,
             'zones' => $workSession->property->zones,
+            // Reached via Manage -> Work Sessions rather than the self-service
+            // Work tab - carried through finalise/stop/revert's redirects (see
+            // redirectToSession() below) so "Back" keeps pointing at Manage
+            // instead of defaulting back to Work.
+            'from' => $this->cameFromManage($request),
         ]);
+    }
+
+    private function cameFromManage(Request $request): ?string
+    {
+        return $request->query('from') === 'manage' ? 'manage' : null;
     }
 
     public function edit(WorkSession $workSession)
@@ -241,7 +251,10 @@ class WorkSessionController extends Controller
 
         $workSession->update(['ended_at' => now()]);
 
-        return redirect()->route('work-sessions.show', $workSession);
+        // Only ever posted from the session's own Show page, so the browser's
+        // Referer (which back() reads) is always that same page - including
+        // its ?from=manage marker, if it has one. See show()/cameFromManage().
+        return back();
     }
 
     /**
@@ -280,10 +293,11 @@ class WorkSessionController extends Controller
 
         $workSession->update(['status' => WorkSession::FINALISED]);
 
-        return redirect()->route('work-sessions.show', $workSession);
+        // Only ever posted from the session's own Show page - see stop() above.
+        return back();
     }
 
-    public function revertToDraft(WorkSession $workSession)
+    public function revertToDraft(Request $request, WorkSession $workSession)
     {
         if ($workSession->property_id !== (int) session('current_property_id')) {
             abort(404);
@@ -296,7 +310,22 @@ class WorkSessionController extends Controller
 
         $workSession->update(['status' => WorkSession::DRAFT]);
 
-        return redirect()->route('work-sessions.show', $workSession);
+        // Unlike finalise()/stop(), this is also posted from the Manage review
+        // list (not just the session's own Show page) - deliberately *navigates
+        // to* Show either way, rather than back()'ing to wherever it was
+        // clicked from, so there's somewhere to add a note explaining the
+        // revert. Still needs from threaded through explicitly (not via
+        // Referer) so the Show page that results knows which Back it came
+        // from - see cameFromManage() and the two call sites in the frontend.
+        $from = $this->cameFromManage($request);
+
+        // work-sessions.show is the resource route, whose parameter is
+        // {work_session} (snake_case) - unlike the explicit routes above
+        // (finalise/stop/revert-to-draft itself), which all use {workSession}.
+        // The single-value form below sidesteps needing to know the name at
+        // all, but an associative array has to match it exactly or Laravel
+        // throws a missing-parameter exception.
+        return redirect()->route('work-sessions.show', $from ? ['work_session' => $workSession, 'from' => $from] : $workSession);
     }
 
     /**

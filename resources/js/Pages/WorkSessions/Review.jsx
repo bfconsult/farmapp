@@ -39,7 +39,7 @@ function currentMonthRange() {
 function SessionRow({ session }) {
     const unfinalise = () => {
         if (confirm(`Unfinalise this session? It will become editable again, so you'll want to add a note explaining why.`)) {
-            router.post(route('work-sessions.revert-to-draft', session.id));
+            router.post(route('work-sessions.revert-to-draft', { workSession: session.id, from: 'manage' }));
         }
     };
 
@@ -50,7 +50,7 @@ function SessionRow({ session }) {
 
     return (
         <div className="flex items-start justify-between gap-2 px-4 py-3">
-            <Link href={route('work-sessions.show', session.id)} className="min-w-0 flex-1">
+            <Link href={route('work-sessions.show', { work_session: session.id, from: 'manage' })} className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-900">{sessionLabel(session)}</p>
                 <p className="text-xs text-gray-500 mt-1">
                     {formatDateDayFirst(session.started_at)} · {formatTime(session.started_at)} — {formatTime(session.ended_at)}

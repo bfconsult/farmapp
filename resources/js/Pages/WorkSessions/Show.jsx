@@ -20,7 +20,7 @@ const STATUS_COLORS = {
     approved: 'bg-green-100 text-green-700',
 };
 
-export default function Show({ session, durationInHours, billingAmount, waypoints, zones }) {
+export default function Show({ session, durationInHours, billingAmount, waypoints, zones, from }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
     const { flash, currentUserRole } = usePage().props;
@@ -28,6 +28,12 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
     const canCreateNote = canManage || currentUserRole === 'worker';
     const [uploading, setUploading] = useState(false);
     const [addingNote, setAddingNote] = useState(false);
+
+    // Reached via Manage -> Work Sessions rather than the self-service Work
+    // tab (see WorkSessionController::cameFromManage()) - Back has to know
+    // this explicitly since the two entry points share this same page.
+    const backHref = from === 'manage' ? route('manage.work-sessions') : route('work-sessions.index');
+    const backLabel = from === 'manage' ? 'Manage' : 'Work';
 
     useEffect(() => {
         if (flash?.addPhoto && cameraInput.current) {
@@ -47,7 +53,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
 
     const revertToDraft = () => {
         if (confirm('Revert this session back to draft? It will become editable again.')) {
-            router.post(route('work-sessions.revert-to-draft', session.id));
+            router.post(route('work-sessions.revert-to-draft', from ? { workSession: session.id, from } : session.id));
         }
     };
 
@@ -98,7 +104,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
             <div className="max-w-lg mx-auto mt-2 space-y-4">
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                    <BackLink href={route('work-sessions.index')}>Work</BackLink>
+                    <BackLink href={backHref}>{backLabel}</BackLink>
                     {session.status === 'draft' && (
                         <Link
                             href={route('work-sessions.edit', session.id)}
