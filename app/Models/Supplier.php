@@ -29,4 +29,13 @@ class Supplier extends Model
     {
         return $this->hasMany(Expense::class);
     }
+
+    /**
+     * Team members who bill through this supplier rather than as
+     * individuals - see Role::supplier().
+     */
+    public function roles()
+    {
+        return $this->hasMany(Role::class);
+    }
 }

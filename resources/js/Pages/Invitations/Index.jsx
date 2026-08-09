@@ -18,7 +18,7 @@ const ROLE_COLORS = {
 
 const ALL_ROLE_TYPES = ['admin', 'manager', 'worker', 'approver'];
 
-export default function Index({ property, roles, pendingInvitations, currentUserRole }) {
+export default function Index({ property, roles, suppliers, pendingInvitations, currentUserRole }) {
     const { auth } = usePage().props;
     // null | 'add' | 'invite' - only one of the two "bring someone onto the
     // team" forms is ever open at a time, in the same slot below.
@@ -124,6 +124,10 @@ export default function Index({ property, roles, pendingInvitations, currentUser
 
     const updateRate = (roleId, value) => {
         router.patch(route('invitations.update-member-rate', roleId), { hourly_rate: value || null }, { preserveScroll: true });
+    };
+
+    const updateSupplier = (roleId, value) => {
+        router.patch(route('invitations.update-member-supplier', roleId), { supplier_id: value || null }, { preserveScroll: true });
     };
 
     const cancelInvitation = (invitationId) => {
@@ -259,18 +263,64 @@ export default function Index({ property, roles, pendingInvitations, currentUser
                                     )}
 
                                     {(currentUserRole === 'admin' || currentUserRole === 'manager') && (
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <label className="text-xs text-gray-500">Default rate ($/hr)</label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                placeholder="Not set"
-                                                defaultValue={role.user.hourly_rate ?? ''}
-                                                onBlur={(e) => updateRate(role.id, e.target.value)}
-                                                disabled={!canEditRate(role)}
-                                                className="w-24 text-sm border-gray-300 rounded-lg px-2 py-1 disabled:bg-gray-50 disabled:text-gray-400"
-                                            />
+                                        <div className="mt-2 pt-2 border-t border-gray-50 space-y-1.5">
+                                            <div className="flex items-center gap-2">
+                                                <label className="text-xs text-gray-500 w-16 flex-shrink-0">Rate ($/hr)</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    placeholder="Not set"
+                                                    defaultValue={role.user.hourly_rate ?? ''}
+                                                    onBlur={(e) => updateRate(role.id, e.target.value)}
+                                                    disabled={!canEditRate(role)}
+                                                    className="w-24 text-sm border-gray-300 rounded-lg px-2 py-1 disabled:bg-gray-50 disabled:text-gray-400"
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <label
+                                                    className="text-xs text-gray-500 w-16 flex-shrink-0"
+                                                    title="Bills through this supplier's company details (name, ABN, invoice address) instead of their own."
+                                                >
+                                                    Billing via
+                                                </label>
+                                                <select
+                                                    value={role.supplier_id ?? ''}
+                                                    onChange={(e) => updateSupplier(role.id, e.target.value)}
+                                                    disabled={!canEditRate(role)}
+                                                    className="flex-1 min-w-0 text-sm border-gray-300 rounded-lg px-2 py-1 disabled:bg-gray-50 disabled:text-gray-400"
+                                                >
+                                                    <option value="">Bills as an individual</option>
+                                                    {suppliers.map((s) => (
+                                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            {role.supplier && (
+                                                <p className="text-xs text-gray-400 pl-[4.5rem]">
+                                                    Company/ABN/invoice details come from{' '}
+                                                    <a
+                                                        href={route('manage.suppliers.edit', role.supplier.id)}
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        className="text-green-600 underline"
+                                                    >
+                                                        {role.supplier.name}
+                                                    </a>.
+                                                </p>
+                                            )}
+                                            {canEditRate(role) && (
+                                                <p className="text-xs pl-[4.5rem]">
+                                                    <a
+                                                        href={route('manage.suppliers.create')}
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        className="text-green-600"
+                                                    >
+                                                        + New supplier
+                                                    </a>
+                                                </p>
+                                            )}
                                         </div>
                                     )}
                                 </div>

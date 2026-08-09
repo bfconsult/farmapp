@@ -350,6 +350,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('team/roles/{role}/invite', [InvitationController::class, 'inviteMember'])->name('invitations.invite-member');
     Route::patch('team/roles/{role}', [InvitationController::class, 'updateRole'])->name('invitations.update-role');
     Route::patch('team/roles/{role}/rate', [InvitationController::class, 'updateMemberRate'])->name('invitations.update-member-rate');
+    Route::patch('team/roles/{role}/supplier', [InvitationController::class, 'updateMemberSupplier'])->name('invitations.update-member-supplier');
     Route::delete('team/roles/{role}', [InvitationController::class, 'destroyRole'])->name('invitations.destroy-role');
     Route::delete('team/invitations/{invitation}', [InvitationController::class, 'destroyInvitation'])->name('invitations.destroy-invitation');
 });

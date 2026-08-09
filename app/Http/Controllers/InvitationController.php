@@ -6,6 +6,7 @@ use App\Mail\PropertyInvitation;
 use App\Models\Invitation;
 use App\Models\Property;
 use App\Models\Role;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,7 +37,7 @@ class InvitationController extends Controller
             ->filter()
             ->map(fn ($email) => strtolower($email));
 
-        $roles = $property->roles()->with('user')->get()
+        $roles = $property->roles()->with(['user', 'supplier'])->get()
             ->reject(fn ($role) => $role->user->email
                 && $emailOnlyPendingEmails->contains(strtolower($role->user->email)))
             ->values();
@@ -44,6 +45,7 @@ class InvitationController extends Controller
         return Inertia::render('Invitations/Index', [
             'property' => $property,
             'roles' => $roles,
+            'suppliers' => Supplier::where('property_id', $propertyId)->orderBy('name')->get(),
             'pendingInvitations' => $pendingInvitations,
             'currentUserRole' => Auth::user()->roleOn($property),
         ]);
@@ -324,6 +326,31 @@ class InvitationController extends Controller
         $role->user->update(['hourly_rate' => $validated['hourly_rate']]);
 
         return back()->with('success', 'Hourly rate updated.');
+    }
+
+    /**
+     * Links (or unlinks) this role to a Supplier they bill through - see
+     * Role::supplier(). Same permission shape as updateMemberRate: this is
+     * "billing configuration" for the role, not a role-type change.
+     */
+    public function updateMemberSupplier(Request $request, Role $role)
+    {
+        $currentUserRole = Auth::user()->roleOn($role->property);
+
+        $allowed = $currentUserRole === Role::ADMIN
+            || ($currentUserRole === Role::MANAGER && ($role->type === Role::WORKER || $role->user_id === Auth::id()));
+
+        if (!$allowed) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'supplier_id' => ['nullable', Rule::exists('suppliers', 'id')->where('property_id', $role->property_id)],
+        ]);
+
+        $role->update(['supplier_id' => $validated['supplier_id'] ?? null]);
+
+        return back()->with('success', 'Billing link updated.');
     }
 
     public function destroyRole(Role $role)
