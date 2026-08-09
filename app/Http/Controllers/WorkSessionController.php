@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Asset;
 use App\Models\FarmJob;
 use App\Models\JobStatus;
+use App\Models\Property;
 use App\Models\RecurringJob;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
@@ -392,6 +393,21 @@ class WorkSessionController extends Controller
         [$dateFrom, $dateTo] = $this->parseDateRange($request);
         $rateMode = $request->rate === 'billing' ? 'billing' : 'time';
 
+        $property = $currentPropertyId ? Property::find($currentPropertyId) : null;
+
+        // Filtered down to only the fields actually filled in, so both the
+        // PDF view and the Excel header below can just print whatever's
+        // here without each needing their own blank-field handling - a
+        // property with none of this set (the common case, since it's all
+        // optional) ends up with an empty array and no header block at all.
+        $billingDetails = collect([
+            'Company/Business Name' => $property?->billing_company_name,
+            'ABN' => $property?->billing_abn,
+            'Address' => $property?->billing_address,
+            'Phone' => $property?->billing_phone,
+            'Contact' => $property?->billing_contact_name,
+        ])->filter()->all();
+
         $sessions = $this->exportableSessionsQuery($currentPropertyId, $dateFrom, $dateTo)->get();
 
         // started_at/ended_at are UTC in the DB. The React UI never needs an
@@ -422,19 +438,32 @@ class WorkSessionController extends Controller
                 'dateTo' => $dateTo->toDateString(),
                 'totalHours' => $totalHours,
                 'totalBilling' => $totalBilling,
+                'billingDetails' => $billingDetails,
             ])->download("{$filename}.pdf");
         }
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
+        $rowNumber = 1;
+        foreach ($billingDetails as $label => $value) {
+            $sheet->setCellValue("A{$rowNumber}", "{$label}: {$value}");
+            if ($label === 'Company/Business Name') {
+                $sheet->getStyle("A{$rowNumber}")->getFont()->setBold(true)->setSize(14);
+            }
+            $rowNumber++;
+        }
+        if ($billingDetails) {
+            $rowNumber++; // blank row separating the billing header from the table
+        }
+
         $headers = ['Date', 'Job', 'Start', 'End', 'Hours'];
         if ($rateMode === 'billing') {
             $headers[] = 'Amount (Ex GST)';
         }
-        $sheet->fromArray($headers, null, 'A1');
+        $sheet->fromArray($headers, null, "A{$rowNumber}");
+        $rowNumber++;
 
-        $rowNumber = 2;
         foreach ($rows as $row) {
             $line = [$row['date'], $row['job'], $row['start'], $row['end'], $row['duration']];
             if ($rateMode === 'billing') {

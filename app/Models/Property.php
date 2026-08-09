@@ -12,6 +12,11 @@ class Property extends Model
         'non_working_zone_center_lat',
         'non_working_zone_center_lng',
         'non_working_zone_radius_meters',
+        'billing_company_name',
+        'billing_abn',
+        'billing_address',
+        'billing_phone',
+        'billing_contact_name',
     ];
 
     public function shape()

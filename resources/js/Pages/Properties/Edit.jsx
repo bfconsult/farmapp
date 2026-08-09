@@ -10,6 +10,11 @@ export default function Edit({ property }) {
     const { data, setData, patch, processing, errors } = useForm({
         name: property.name,
         address: property.address,
+        billing_company_name: property.billing_company_name ?? '',
+        billing_abn: property.billing_abn ?? '',
+        billing_address: property.billing_address ?? '',
+        billing_phone: property.billing_phone ?? '',
+        billing_contact_name: property.billing_contact_name ?? '',
     });
 
     const submit = (e) => {
@@ -73,6 +78,88 @@ export default function Edit({ property }) {
                                 {errors.address && (
                                     <p className="mt-1 text-sm text-red-600">{errors.address}</p>
                                 )}
+                            </div>
+
+                            <div className="mb-6 border-t border-gray-200 pt-6">
+                                <h2 className="text-sm font-medium text-gray-700 mb-1">Billing Details</h2>
+                                <p className="text-xs text-gray-500 mb-4">
+                                    Shown at the top of Excel/PDF timesheet exports. All optional.
+                                </p>
+
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Company/Business Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.billing_company_name}
+                                        onChange={(e) => setData('billing_company_name', e.target.value)}
+                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                    />
+                                    {errors.billing_company_name && (
+                                        <p className="mt-1 text-sm text-red-600">{errors.billing_company_name}</p>
+                                    )}
+                                </div>
+
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        ABN
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.billing_abn}
+                                        onChange={(e) => setData('billing_abn', e.target.value)}
+                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                    />
+                                    {errors.billing_abn && (
+                                        <p className="mt-1 text-sm text-red-600">{errors.billing_abn}</p>
+                                    )}
+                                </div>
+
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Billing Address
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.billing_address}
+                                        onChange={(e) => setData('billing_address', e.target.value)}
+                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                    />
+                                    {errors.billing_address && (
+                                        <p className="mt-1 text-sm text-red-600">{errors.billing_address}</p>
+                                    )}
+                                </div>
+
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Phone
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.billing_phone}
+                                        onChange={(e) => setData('billing_phone', e.target.value)}
+                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                    />
+                                    {errors.billing_phone && (
+                                        <p className="mt-1 text-sm text-red-600">{errors.billing_phone}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Billing Contact Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={data.billing_contact_name}
+                                        onChange={(e) => setData('billing_contact_name', e.target.value)}
+                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                    />
+                                    {errors.billing_contact_name && (
+                                        <p className="mt-1 text-sm text-red-600">{errors.billing_contact_name}</p>
+                                    )}
+                                </div>
                             </div>
 
                             <PropertyBoundaryPicker property={property} onRefineClick={goToBoundaryEditor} />

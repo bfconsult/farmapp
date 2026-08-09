@@ -11,9 +11,25 @@
     th { background-color: #f9fafb; font-size: 11px; text-transform: uppercase; color: #6b7280; }
     td.amount, th.amount { text-align: right; }
     tfoot td { font-weight: bold; border-top: 2px solid #1f2937; }
+    .billing-header { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
+    .billing-name { font-size: 16px; font-weight: bold; margin: 0 0 4px; }
+    .billing-line { margin: 0; color: #4b5563; }
 </style>
 </head>
 <body>
+    @if ($billingDetails)
+        <div class="billing-header">
+            @if (!empty($billingDetails['Company/Business Name']))
+                <p class="billing-name">{{ $billingDetails['Company/Business Name'] }}</p>
+            @endif
+            @foreach ($billingDetails as $label => $value)
+                @if ($label !== 'Company/Business Name')
+                    <p class="billing-line">{{ $label }}: {{ $value }}</p>
+                @endif
+            @endforeach
+        </div>
+    @endif
+
     <h1>Work Sessions</h1>
     <p class="subtitle">{{ $dateFrom }} &rarr; {{ $dateTo }}</p>
 

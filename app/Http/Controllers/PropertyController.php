@@ -107,6 +107,11 @@ class PropertyController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'address' => 'required|string|max:255',
+            'billing_company_name' => 'nullable|string|max:255',
+            'billing_abn' => 'nullable|string|max:255',
+            'billing_address' => 'nullable|string|max:255',
+            'billing_phone' => 'nullable|string|max:255',
+            'billing_contact_name' => 'nullable|string|max:255',
         ]);
 
         $property->update($validated);
