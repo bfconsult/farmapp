@@ -6,10 +6,11 @@ export default function AuthenticatedLayout({ title, children }) {
     const { auth, properties, currentProperty, currentUserRole, hasIncompleteMetrics, flash } = usePage().props;
     const canViewReports = currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserRole === 'approver';
     const canViewMetrics = currentUserRole === 'admin' || currentUserRole === 'manager' || currentUserRole === 'worker' || currentUserRole === 'approver';
-    // Same as Profile/Edit's old "can add another property" rule: always
-    // available with no current property to fall back to, otherwise
-    // admin-only.
-    const canAddProperty = !currentProperty || currentUserRole === 'admin';
+    // Always available with no current property to fall back to. Otherwise
+    // admin or approver - an approver is often a relatively hands-off
+    // owner rather than a day-to-day worker, and needing a second account
+    // just to add another property they own had no real reason behind it.
+    const canAddProperty = !currentProperty || currentUserRole === 'admin' || currentUserRole === 'approver';
 
     const [showPropertyMenu, setShowPropertyMenu] = useState(false);
     const [showChangeList, setShowChangeList] = useState(false);
