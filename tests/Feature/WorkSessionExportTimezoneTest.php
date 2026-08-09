@@ -29,7 +29,7 @@ test('exported work session times are converted to the user\'s timezone, not lef
     $response->assertOk();
 
     $tmpFile = tempnam(sys_get_temp_dir(), 'export').'.xlsx';
-    file_put_contents($tmpFile, $response->streamedContent());
+    file_put_contents($tmpFile, $response->getContent());
 
     $sheet = (new \PhpOffice\PhpSpreadsheet\Reader\Xlsx())->load($tmpFile)->getActiveSheet();
     unlink($tmpFile);

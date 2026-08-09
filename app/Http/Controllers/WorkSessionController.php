@@ -452,10 +452,23 @@ class WorkSessionController extends Controller
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 
-        return response()->streamDownload(function () use ($writer) {
-            $writer->save('php://output');
-        }, "{$filename}.xlsx", [
+        // Not streamDownload(): that returns a StreamedResponse, which
+        // needs to progressively write its body during the request - a
+        // model Lambda can't actually support (the whole response has to
+        // go back as one payload regardless), and Vapor's runtime bridge
+        // for it was failing outright in production with a bare
+        // {"message":"Internal server error"} from API Gateway, never even
+        // reaching Laravel's own error handling. The PDF export already
+        // works precisely because dompdf's download() returns a plain,
+        // fully-buffered response instead. Buffering the writer's output
+        // into a string first and returning it the same way fixes this.
+        ob_start();
+        $writer->save('php://output');
+        $contents = ob_get_clean();
+
+        return response($contents, 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => "attachment; filename=\"{$filename}.xlsx\"",
         ]);
     }
 
