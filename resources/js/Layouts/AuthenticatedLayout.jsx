@@ -39,6 +39,28 @@ export default function AuthenticatedLayout({ title, children }) {
     const selectProperty = (propertyId) => {
         setShowPropertyMenu(false);
         setShowChangeList(false);
+
+        // Edit/Settings are pinned to a specific property by URL, not to
+        // whichever one is "current" (correct - you shouldn't get yanked
+        // onto a different property's data mid-edit just because the nav
+        // switched) - but leaving it at that meant the nav showed the newly
+        // selected property while the page underneath kept showing the old
+        // one. Jump to the same kind of page for the new property instead.
+        // Edit requires admin, which this user may not have there, so fall
+        // back to Settings (open to any role) rather than a 403.
+        const onPropertyPage = route().current('properties.edit') || route().current('properties.show');
+        if (onPropertyPage) {
+            const isAdminOnTarget = properties.find((p) => p.id === propertyId)?.pivot?.type === 'admin';
+            const targetRoute = route().current('properties.edit') && isAdminOnTarget
+                ? 'properties.edit'
+                : 'properties.show';
+
+            router.post(route('property.select'), { property_id: propertyId }, {
+                onSuccess: () => router.visit(route(targetRoute, propertyId)),
+            });
+            return;
+        }
+
         router.post(route('property.select'), { property_id: propertyId });
     };
 
