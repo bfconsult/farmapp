@@ -57,6 +57,14 @@ class WorkSessionController extends Controller
                 ->whereNull('ended_at')
                 ->with('farmJob')
                 ->first(),
+            // Property-wide, not scoped by the date/status filters below -
+            // distinguishes "never logged a session here" from "none match
+            // the current filter", same as FarmJobController's hasAnyJobs.
+            'hasAnySessions' => Auth::user()->workSessions()
+                ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
+                    $query->where('property_id', $currentPropertyId);
+                })
+                ->exists(),
             'currentDateFrom' => $dateFrom->toDateString(),
             'currentDateTo' => $dateTo->toDateString(),
             'currentStatusDraft' => $showDraft,

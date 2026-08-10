@@ -34,7 +34,7 @@ function currentMonthRange() {
     return { from, to };
 }
 
-export default function Index({ sessions, activeSession, currentDateFrom, currentDateTo, currentStatusDraft, currentStatusFinalised }) {
+export default function Index({ sessions, activeSession, currentDateFrom, currentDateTo, currentStatusDraft, currentStatusFinalised, hasAnySessions }) {
     const { currentProperty } = usePage().props;
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
@@ -125,16 +125,18 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
 
                 {/* Filters / Finalise & share / export */}
                 <div className="flex items-center justify-between gap-2 mb-3">
-                    <button
-                        onClick={() => setShowFilters((v) => !v)}
-                        className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
-                    >
-                        <span>Filter</span>
-                        {(!isThisMonth || !currentStatusDraft || !currentStatusFinalised) && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
-                        )}
-                        <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
-                    </button>
+                    {hasAnySessions ? (
+                        <button
+                            onClick={() => setShowFilters((v) => !v)}
+                            className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
+                        >
+                            <span>Filter</span>
+                            {(!isThisMonth || !currentStatusDraft || !currentStatusFinalised) && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-600" />
+                            )}
+                            <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
+                        </button>
+                    ) : <span />}
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1 px-3 py-2 bg-white rounded-lg shadow">
                             <Link
@@ -154,7 +156,7 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                     </div>
                 </div>
 
-                {showFilters && (
+                {showFilters && hasAnySessions && (
                     <div className="bg-white rounded-lg shadow p-4 mb-4 space-y-4">
                         <div>
                             <div className="flex items-center justify-between mb-2">
@@ -207,9 +209,20 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
 
                 {/* Sessions list */}
                 {sessions.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-                        No work sessions in this date range.
-                    </div>
+                    hasAnySessions ? (
+                        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                            No work sessions in this date range.
+                        </div>
+                    ) : (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                            <h2 className="text-base font-semibold text-gray-900 mb-1">Track your first work session</h2>
+                            <p className="text-sm text-gray-600 mb-4">
+                                Work sessions log the hours you spend on a job - start one when
+                                you begin work and stop it when you're done, or add a completed
+                                session after the fact.
+                            </p>
+                        </div>
+                    )
                 ) : (
                     <div className="space-y-3">
                         {sessions.map((session) => (
