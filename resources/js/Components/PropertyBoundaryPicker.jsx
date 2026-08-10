@@ -92,7 +92,10 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
                 shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
             });
 
-            const map = L.map(mapRef.current);
+            // fadeAnimation off - its tile fade-in relies on requestAnimationFrame,
+            // which stalls if the tab loses focus/visibility mid-fade, leaving tiles
+            // (and everything else) permanently stuck at opacity 0.
+            const map = L.map(mapRef.current, { fadeAnimation: false });
             mapInstance.current = map;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

@@ -125,7 +125,10 @@ export default function Map({
                 center = [jobsWithLocation[0].latitude, jobsWithLocation[0].longitude];
             }
 
-            const map = L.map(mapRef.current).setView(center, zoom);
+            // fadeAnimation off - its tile fade-in relies on requestAnimationFrame,
+            // which stalls if the tab loses focus/visibility mid-fade, leaving tiles
+            // (and everything else) permanently stuck at opacity 0.
+            const map = L.map(mapRef.current, { fadeAnimation: false }).setView(center, zoom);
             mapInstance.current = map;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

@@ -24,7 +24,10 @@ export default function WaypointTrail({ waypoints, zones, workSessionId }) {
         import('leaflet').then(async (L) => {
             await import('leaflet/dist/leaflet.css');
 
-            const map = L.map(mapRef.current);
+            // fadeAnimation off - its tile fade-in relies on requestAnimationFrame,
+            // which stalls if the tab loses focus/visibility mid-fade, leaving tiles
+            // (and everything else) permanently stuck at opacity 0.
+            const map = L.map(mapRef.current, { fadeAnimation: false });
             mapInstance.current = map;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

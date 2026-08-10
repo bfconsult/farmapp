@@ -58,6 +58,9 @@ export default function LocationMap({
                 doubleClickZoom: interactive,
                 boxZoom: interactive,
                 keyboard: interactive,
+                // Its tile fade-in relies on requestAnimationFrame, which stalls if the
+                // tab loses focus/visibility mid-fade, leaving tiles stuck at opacity 0.
+                fadeAnimation: false,
             });
             mapInstance.current = map;
 

@@ -67,6 +67,9 @@ function LocationThumbnail({ asset, propertyBoundary }) {
                 boxZoom: false,
                 keyboard: false,
                 touchZoom: false,
+                // Its tile fade-in relies on requestAnimationFrame, which stalls if the
+                // tab loses focus/visibility mid-fade, leaving tiles stuck at opacity 0.
+                fadeAnimation: false,
             });
             mapInstance.current = map;
 
@@ -137,7 +140,10 @@ function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved 
         ]).then(([L]) => {
             if (mapInstance.current) return;
 
-            const map = L.map(mapRef.current).setView([-37.8136, 144.9631], 15);
+            // fadeAnimation off - its tile fade-in relies on requestAnimationFrame,
+            // which stalls if the tab loses focus/visibility mid-fade, leaving tiles
+            // (and everything else) permanently stuck at opacity 0.
+            const map = L.map(mapRef.current, { fadeAnimation: false }).setView([-37.8136, 144.9631], 15);
             mapInstance.current = map;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

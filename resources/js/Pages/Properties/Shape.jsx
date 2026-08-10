@@ -130,7 +130,10 @@ export default function Shape({ property, shape, zones, notes }) {
                     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
             });
 
-            const map = L.map(mapRef.current, { maxZoom: 22 }).setView([-37.8136, 144.9631], 15);
+            // fadeAnimation off - its tile fade-in relies on requestAnimationFrame,
+            // which stalls if the tab loses focus/visibility mid-fade, leaving tiles
+            // (and everything else) permanently stuck at opacity 0.
+            const map = L.map(mapRef.current, { maxZoom: 22, fadeAnimation: false }).setView([-37.8136, 144.9631], 15);
             mapInstance.current = map;
 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
