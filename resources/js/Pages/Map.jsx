@@ -596,7 +596,20 @@ export default function Map({
                     </div>
                 )}
                 <div className="relative">
-                    <div className="absolute right-4 top-4 z-[1000]">
+                    <div className="absolute right-4 top-4 z-[1000] flex items-start gap-2">
+                        {currentProperty && shape && isAdminOrManager && (
+                            <Link
+                                href={route('shape.edit', currentProperty.id)}
+                                className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md text-sm font-medium text-gray-700"
+                            >
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                                Edit boundary
+                            </Link>
+                        )}
+                    <div>
                         <button
                             type="button"
                             onClick={() => setShowFiltersPanel((v) => !v)}
@@ -733,6 +746,7 @@ export default function Map({
                                 </div>
                             </div>
                         )}
+                    </div>
                     </div>
 
                     {canCreateNote && !creatingNote && !editingLocationNoteId && (
