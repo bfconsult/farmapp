@@ -42,6 +42,12 @@ environments:
             APP_ENV: production
             APP_DEBUG: false
             APP_URL: https://fieldwerkz.com
+            # Vite env vars not declared here don't survive into the local
+            # npm run build step (confirmed 2026-08-10 - VITE_CLARITY_PROJECT_ID
+            # was set in the local .env only and got silently tree-shaken out
+            # of the shipped bundle, since Vapor's build environment for that
+            # step is populated from this block, not the raw local .env).
+            VITE_CLARITY_PROJECT_ID: y03oojw78u
             LOG_CHANNEL: stderr
             LOG_LEVEL: error
             DB_CONNECTION: mysql
