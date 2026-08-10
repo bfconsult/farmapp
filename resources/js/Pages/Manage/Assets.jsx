@@ -150,11 +150,27 @@ export default function Assets({ assets, assetTypes, canManage }) {
 
                 <h1 className="text-lg font-semibold text-gray-900">Assets</h1>
 
-                <p className="text-sm text-gray-500">
-                    Assets are property equipment, plant, and stock. Each can have maintenance items that turn into a job when due.
-                </p>
+                {canManage && assets.length === 0 && !adding ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                        <h2 className="text-base font-semibold text-gray-900 mb-1">Add your first asset</h2>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Assets are property equipment, plant, and stock. Each can have
+                            maintenance items that turn into a job automatically when due.
+                        </p>
+                        <button
+                            onClick={() => setAdding(true)}
+                            className="inline-block px-6 py-3 bg-green-600 text-white rounded-lg font-medium"
+                        >
+                            + Add Asset
+                        </button>
+                    </div>
+                ) : (
+                    <p className="text-sm text-gray-500">
+                        Assets are property equipment, plant, and stock. Each can have maintenance items that turn into a job when due.
+                    </p>
+                )}
 
-                {canManage && (
+                {canManage && (assets.length > 0 || adding) && (
                     adding ? (
                         <div className="bg-white rounded-lg shadow p-4 space-y-3">
                             <AssetFields values={values} setValues={setValues} assetTypes={assetTypes} />
@@ -174,9 +190,11 @@ export default function Assets({ assets, assetTypes, canManage }) {
                 )}
 
                 {assets.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-                        No assets set up yet.
-                    </div>
+                    canManage ? null : (
+                        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                            No assets set up yet.
+                        </div>
+                    )
                 ) : (
                     <div className="space-y-4">
                         {grouped.map((group) => (

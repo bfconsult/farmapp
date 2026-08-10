@@ -279,32 +279,47 @@ export default function Checklists({ checklistTemplates }) {
 
                 <h1 className="text-lg font-semibold text-gray-900">Checklists</h1>
 
-                <p className="text-sm text-gray-500">
-                    Checklist templates get attached to a job - their items are copied onto a fresh checklist each time, so editing a template later doesn't change checklists already in progress.
-                </p>
-
-                {adding ? (
-                    <div className="bg-white rounded-lg shadow p-4 space-y-3">
-                        <ChecklistTemplateFields values={values} setValues={setValues} />
-                        <div className="flex gap-2">
-                            <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Template</button>
-                            <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
-                        </div>
+                {checklistTemplates.length === 0 && !adding ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                        <h2 className="text-base font-semibold text-gray-900 mb-1">Create your first checklist</h2>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Checklist templates get attached to a job - their items are copied
+                            onto a fresh checklist each time, so editing a template later doesn't
+                            change checklists already in progress.
+                        </p>
+                        <button
+                            onClick={() => setAdding(true)}
+                            className="inline-block px-6 py-3 bg-green-600 text-white rounded-lg font-medium"
+                        >
+                            + Add Checklist Template
+                        </button>
                     </div>
                 ) : (
-                    <button
-                        onClick={() => setAdding(true)}
-                        className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
-                    >
-                        + Add Checklist Template
-                    </button>
+                    <p className="text-sm text-gray-500">
+                        Checklist templates get attached to a job - their items are copied onto a fresh checklist each time, so editing a template later doesn't change checklists already in progress.
+                    </p>
                 )}
 
-                {checklistTemplates.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-                        No checklist templates set up yet.
-                    </div>
-                ) : (
+                {(checklistTemplates.length > 0 || adding) && (
+                    adding ? (
+                        <div className="bg-white rounded-lg shadow p-4 space-y-3">
+                            <ChecklistTemplateFields values={values} setValues={setValues} />
+                            <div className="flex gap-2">
+                                <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Template</button>
+                                <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => setAdding(true)}
+                            className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
+                        >
+                            + Add Checklist Template
+                        </button>
+                    )
+                )}
+
+                {checklistTemplates.length === 0 ? null : (
                     <div className="space-y-4">
                         {TYPE_ORDER
                             .map((type) => ({
