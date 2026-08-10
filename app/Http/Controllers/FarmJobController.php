@@ -272,7 +272,7 @@ class FarmJobController extends Controller
 
     public function show(FarmJob $farmJob)
     {
-        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset', 'expenses.supplier', 'expenses.photos', 'expenses.createdBy', 'notes.photos', 'notes.createdBy', 'notes.views']);
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset', 'expenses.supplier', 'expenses.photos', 'expenses.createdBy', 'quotes.supplier', 'notes.photos', 'notes.createdBy', 'notes.views']);
         $farmJob->notes->each(fn ($note) => $note->is_unread = $note->isUnreadBy(Auth::id()));
 
         // Logs (or refreshes) that the current user has seen this job - one

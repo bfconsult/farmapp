@@ -146,6 +146,39 @@ function ExpenseRow({ expense, onEdit }) {
     );
 }
 
+const QUOTE_STATUS_LABELS = { invited: 'Invited', accepted: 'Accepted', declined: 'Declined' };
+const QUOTE_STATUS_COLORS = {
+    invited: 'bg-gray-100 text-gray-600',
+    accepted: 'bg-green-100 text-green-700',
+    declined: 'bg-red-100 text-red-500',
+};
+
+function QuoteRow({ quote, canManage, onAccept, onDecline, onDestroy }) {
+    return (
+        <div className="px-4 py-3">
+            <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                    <p className="text-sm text-gray-900 truncate">{quote.supplier?.name ?? 'Removed supplier'}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                        {quote.requires_quote ? 'Quote requested' : 'Do-and-charge'}
+                        {quote.amount && ` · $${Number(quote.amount).toFixed(2)}`}
+                    </p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${QUOTE_STATUS_COLORS[quote.status]}`}>
+                    {QUOTE_STATUS_LABELS[quote.status]}
+                </span>
+            </div>
+            {canManage && quote.status === 'invited' && (
+                <div className="flex gap-3 mt-2 text-xs">
+                    <button onClick={() => onAccept(quote)} className="text-green-600 font-medium">Accept</button>
+                    <button onClick={() => onDecline(quote)} className="text-gray-500">Decline</button>
+                    <button onClick={() => onDestroy(quote)} className="text-red-500">Remove</button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function Show({ job, seenBy, checklistTemplates, suppliers, labourTotal, labourEntries }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
@@ -162,6 +195,11 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const [expenseForm, setExpenseForm] = useState({ name: '', description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
     const [creatingSupplier, setCreatingSupplier] = useState(false);
     const [newSupplierName, setNewSupplierName] = useState('');
+    const [showQuoteModal, setShowQuoteModal] = useState(false);
+    const [quoteForm, setQuoteForm] = useState({ supplier_id: '', requires_quote: true, message: '' });
+    const [showAcceptModal, setShowAcceptModal] = useState(false);
+    const [acceptingQuote, setAcceptingQuote] = useState(null);
+    const [acceptAmount, setAcceptAmount] = useState('');
     const [showLabourDetail, setShowLabourDetail] = useState(false);
     const [showLocationModal, setShowLocationModal] = useState(false);
     const [editingLocation, setEditingLocation] = useState(false);
@@ -169,6 +207,8 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const [copied, setCopied] = useState(false);
 
     const hasIncompleteChecklists = (job.checklists ?? []).some((c) => c.status === 'incomplete');
+    const hasAcceptedQuote = (job.quotes ?? []).some((q) => q.status === 'accepted');
+    const hasOtherInvitedQuotes = (job.quotes ?? []).some((q) => q.status === 'invited');
 
     useEffect(() => {
         if (flash?.addPhoto && cameraInput.current) {
@@ -314,6 +354,57 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                 setNewSupplierName('');
             },
         });
+    };
+
+    const openInviteSupplier = () => {
+        setQuoteForm({ supplier_id: '', requires_quote: true, message: '' });
+        setShowQuoteModal(true);
+    };
+
+    const closeQuoteModal = () => setShowQuoteModal(false);
+
+    const sendQuoteInvite = () => {
+        router.post(route('quotes.store', job.id), quoteForm, {
+            preserveScroll: true,
+            onSuccess: closeQuoteModal,
+        });
+    };
+
+    const openAccept = (quote) => {
+        setAcceptingQuote(quote);
+        setAcceptAmount(quote.amount ?? '');
+        setShowAcceptModal(true);
+    };
+
+    const closeAccept = () => {
+        setShowAcceptModal(false);
+        setAcceptingQuote(null);
+        setAcceptAmount('');
+    };
+
+    const confirmAccept = () => {
+        router.patch(route('quotes.accept', acceptingQuote.id), { amount: acceptAmount || null }, {
+            preserveScroll: true,
+            onSuccess: closeAccept,
+        });
+    };
+
+    const declineQuote = (quote) => {
+        if (confirm(`Mark ${quote.supplier?.name ?? 'this supplier'}'s quote as declined?`)) {
+            router.patch(route('quotes.decline', quote.id), {}, { preserveScroll: true });
+        }
+    };
+
+    const destroyQuote = (quote) => {
+        if (confirm(`Remove the invitation sent to ${quote.supplier?.name ?? 'this supplier'}?`)) {
+            router.delete(route('quotes.destroy', quote.id), { preserveScroll: true });
+        }
+    };
+
+    const notifyOtherSuppliers = () => {
+        if (confirm('Notify all other invited suppliers that this job has been given to someone else?')) {
+            router.post(route('quotes.notify-others', job.id), {}, { preserveScroll: true });
+        }
     };
 
     const destroyPhoto = (photoId) => {
@@ -864,6 +955,164 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                                 {editingExpense ? 'Save' : 'Add'}
                             </button>
                             <button onClick={closeExpenseModal} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+
+                {/* Suppliers */}
+                {(canManage || (job.quotes && job.quotes.length > 0)) && (
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Suppliers</h2>
+                            {canManage && (
+                                <div className="flex items-center gap-3">
+                                    {hasAcceptedQuote && hasOtherInvitedQuotes && (
+                                        <button onClick={notifyOtherSuppliers} className="text-xs text-gray-500">
+                                            Notify others it's let
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={openInviteSupplier}
+                                        className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
+                                    >
+                                        + Invite Supplier
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {job.quotes && job.quotes.length > 0 ? (
+                            <div className="divide-y divide-gray-100">
+                                {job.quotes.map((quote) => (
+                                    <QuoteRow
+                                        key={quote.id}
+                                        quote={quote}
+                                        canManage={canManage}
+                                        onAccept={openAccept}
+                                        onDecline={declineQuote}
+                                        onDestroy={destroyQuote}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500 px-4 py-3">
+                                No suppliers invited yet.
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                <Modal show={showQuoteModal} onClose={closeQuoteModal} maxWidth="lg">
+                    <div className="p-4 space-y-3">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-sm font-medium text-gray-700">Invite Supplier</h3>
+                            <button onClick={closeQuoteModal} className="text-sm text-gray-500">Close</button>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Supplier</label>
+                            <select
+                                value={quoteForm.supplier_id}
+                                onChange={(e) => setQuoteForm({ ...quoteForm, supplier_id: e.target.value })}
+                                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                            >
+                                <option value="">Select a supplier</option>
+                                {suppliers.map((supplier) => (
+                                    <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                                ))}
+                            </select>
+                            {suppliers.length === 0 && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    No suppliers set up yet - add one from Manage → Suppliers first.
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                                <input
+                                    type="radio"
+                                    name="requires_quote"
+                                    checked={quoteForm.requires_quote}
+                                    onChange={() => setQuoteForm({ ...quoteForm, requires_quote: true })}
+                                    className="text-green-600 focus:ring-green-500"
+                                />
+                                Request a quote
+                            </label>
+                            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                                <input
+                                    type="radio"
+                                    name="requires_quote"
+                                    checked={!quoteForm.requires_quote}
+                                    onChange={() => setQuoteForm({ ...quoteForm, requires_quote: false })}
+                                    className="text-green-600 focus:ring-green-500"
+                                />
+                                Do-and-charge
+                            </label>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Message (optional)</label>
+                            <textarea
+                                value={quoteForm.message}
+                                onChange={(e) => setQuoteForm({ ...quoteForm, message: e.target.value })}
+                                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                rows={3}
+                                placeholder="Any extra detail for the supplier..."
+                            />
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                            This sends {quoteForm.supplier_id ? suppliers.find((s) => String(s.id) === String(quoteForm.supplier_id))?.name : 'the supplier'} an email with a link to view this job.
+                        </p>
+
+                        <div className="flex gap-2 pt-2">
+                            <button
+                                onClick={sendQuoteInvite}
+                                disabled={!quoteForm.supplier_id}
+                                className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                            >
+                                Send Invite
+                            </button>
+                            <button onClick={closeQuoteModal} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+
+                <Modal show={showAcceptModal} onClose={closeAccept} maxWidth="sm">
+                    <div className="p-4 space-y-3">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-sm font-medium text-gray-700">Accept {acceptingQuote?.supplier?.name}'s Quote</h3>
+                            <button onClick={closeAccept} className="text-sm text-gray-500">Close</button>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">
+                                Agreed amount {acceptingQuote?.requires_quote ? '' : '(optional)'}
+                            </label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={acceptAmount}
+                                onChange={(e) => setAcceptAmount(e.target.value)}
+                                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                            />
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                            <button
+                                onClick={confirmAccept}
+                                disabled={acceptingQuote?.requires_quote && !acceptAmount}
+                                className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                            >
+                                Confirm
+                            </button>
+                            <button onClick={closeAccept} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
                                 Cancel
                             </button>
                         </div>

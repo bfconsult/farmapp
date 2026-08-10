@@ -30,6 +30,11 @@ class Supplier extends Model
         return $this->hasMany(Expense::class);
     }
 
+    public function quotes()
+    {
+        return $this->hasMany(Quote::class);
+    }
+
     /**
      * Team members who bill through this supplier rather than as
      * individuals - see Role::supplier().

@@ -29,6 +29,7 @@ use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\AppAdminController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\QuoteController;
 
 
 
@@ -151,6 +152,11 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::patch('settings/asset-types/{assetType}', [SettingsController::class, 'updateAssetType'])->name('settings.asset-types.update');
     Route::delete('settings/asset-types/{assetType}', [SettingsController::class, 'destroyAssetType'])->name('settings.asset-types.destroy');
     Route::resource('manage/suppliers', SupplierController::class)->names('manage.suppliers');
+    Route::post('jobs/{farmJob}/quotes', [QuoteController::class, 'store'])->name('quotes.store');
+    Route::patch('quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
+    Route::patch('quotes/{quote}/decline', [QuoteController::class, 'decline'])->name('quotes.decline');
+    Route::delete('quotes/{quote}', [QuoteController::class, 'destroy'])->name('quotes.destroy');
+    Route::post('jobs/{farmJob}/quotes/notify-others', [QuoteController::class, 'notifyOthers'])->name('quotes.notify-others');
     Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
     Route::patch('assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');

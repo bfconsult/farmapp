@@ -159,6 +159,11 @@ class FarmJob extends Model
         return $this->hasMany(Expense::class);
     }
 
+    public function quotes()
+    {
+        return $this->hasMany(Quote::class);
+    }
+
     public function notes()
     {
         return $this->hasMany(Note::class, 'job_id')->latest();
