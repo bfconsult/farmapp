@@ -15,6 +15,22 @@ use Inertia\Inertia;
 class PropertyController extends Controller
 {
     /**
+     * Landing spot for a user with no properties at all - was previously
+     * profile.edit (Account Settings), which has nothing on it about
+     * properties and left brand-new users with no obvious next step. A user
+     * who already has at least one property has no reason to be here (they
+     * already have a working nav/property picker), so send them on instead.
+     */
+    public function create()
+    {
+        if (Auth::user()->properties()->exists()) {
+            return redirect()->route('jobs.index');
+        }
+
+        return Inertia::render('Properties/GetStarted');
+    }
+
+    /**
      * Creates a property with a placeholder name and no other details, gives
      * the creator an admin role on it, and switches the session to it -
      * there's no form here, so the real name/address get filled in on the

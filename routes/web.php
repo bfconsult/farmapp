@@ -203,6 +203,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
 
     // All authenticated users with a property
     Route::middleware(['auth'])->group(function () {
+    Route::get('properties/create', [PropertyController::class, 'create'])->name('properties.create');
     Route::post('properties', [PropertyController::class, 'store'])->name('properties.store');
     Route::get('properties/{property}', [PropertyController::class, 'show'])->name('properties.show');
     Route::delete('properties/{property}/leave', [PropertyController::class, 'leave'])->name('properties.leave');

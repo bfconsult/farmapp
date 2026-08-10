@@ -25,7 +25,7 @@ class FarmJobController extends Controller
     public function index(Request $request)
     {
         if (Auth::user()->properties()->doesntExist()) {
-            return redirect()->route('profile.edit');
+            return redirect()->route('properties.create');
         }
 
         $currentPropertyId = session('current_property_id');
