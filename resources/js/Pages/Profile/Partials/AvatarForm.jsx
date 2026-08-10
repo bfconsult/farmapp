@@ -1,25 +1,36 @@
 import Avatar from '@/Components/Avatar';
+import AvatarCropModal from '@/Components/AvatarCropModal';
 import { router, usePage } from '@inertiajs/react';
 import { useRef, useState } from 'react';
-import { compressImageFile } from '@/imageCompression';
 
 export default function AvatarForm() {
     const user = usePage().props.auth.user;
     const fileInput = useRef(null);
+    const [imageSrc, setImageSrc] = useState(null);
     const [uploading, setUploading] = useState(false);
 
     const pickFile = () => fileInput.current?.click();
 
-    const upload = async (e) => {
+    const selectFile = (e) => {
         const file = e.target.files?.[0];
         e.target.value = '';
         if (!file) return;
 
+        setImageSrc(URL.createObjectURL(file));
+    };
+
+    const cancelCrop = () => {
+        if (imageSrc) URL.revokeObjectURL(imageSrc);
+        setImageSrc(null);
+    };
+
+    const upload = (croppedFile) => {
+        if (imageSrc) URL.revokeObjectURL(imageSrc);
+        setImageSrc(null);
         setUploading(true);
-        const compressed = await compressImageFile(file, { maxDimension: 512 });
 
         const formData = new FormData();
-        formData.append('avatar', compressed);
+        formData.append('avatar', croppedFile);
 
         router.post(route('profile.avatar.update'), formData, {
             forceFormData: true,
@@ -61,9 +72,13 @@ export default function AvatarForm() {
                 ref={fileInput}
                 type="file"
                 accept="image/*"
-                onChange={upload}
+                onChange={selectFile}
                 className="hidden"
             />
+
+            {imageSrc && (
+                <AvatarCropModal imageSrc={imageSrc} onCancel={cancelCrop} onCropped={upload} />
+            )}
         </section>
     );
 }
