@@ -54,6 +54,14 @@ function layerToCoordinates(layer) {
  * since the square would vanish into the static preview before it could
  * be dragged straight).
  *
+ * Draw mode is armed automatically as soon as the map loads, rather than
+ * behind a toolbar button the user has to find first (real user testing
+ * showed the button - Geoman's stock circle-tool icon - wasn't recognised
+ * as a starting point at all). A translucent pin follows the cursor before
+ * the first click as a hint of what clicking does; on touch devices, where
+ * there's no hover to show it, tapping still works immediately since draw
+ * mode is already active.
+ *
  * Once a boundary exists (from here or from Shape.jsx), this renders a
  * static preview instead of the draw tool, so it can never accidentally
  * clobber a boundary someone has since carefully refined in the full editor.
@@ -62,6 +70,8 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const squareLayer = useRef(null);
+    const hoverMarker = useRef(null);
+    const startDrawingRef = useRef(null);
     const [hasDrawn, setHasDrawn] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -90,6 +100,15 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
                 maxZoom: 19,
             }).addTo(map);
 
+            // Geolocation is async and can take up to its 10s timeout to
+            // resolve either way - the map needs *a* view synchronously
+            // before that, both so it isn't blank the whole time and
+            // because Geoman's enableDraw() below calls getCenter()
+            // internally and throws ("Set map center and zoom first") on a
+            // map with no view yet. Geolocation, if it resolves, refines
+            // this immediately after.
+            map.setView(FALLBACK_CENTER, FALLBACK_ZOOM);
+
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
@@ -97,28 +116,44 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
                         const { latitude, longitude } = position.coords;
                         map.fitBounds(L.latLng(latitude, longitude).toBounds(20000));
                     },
-                    () => {
-                        if (!cancelled) map.setView(FALLBACK_CENTER, FALLBACK_ZOOM);
-                    },
+                    () => {},
                     { timeout: 10000, enableHighAccuracy: true }
                 );
-            } else {
-                map.setView(FALLBACK_CENTER, FALLBACK_ZOOM);
             }
 
-            map.pm.addControls({
-                position: 'topleft',
-                drawMarker: false,
-                drawCircleMarker: false,
-                drawPolyline: false,
-                drawPolygon: false,
-                drawRectangle: false,
-                drawCircle: true,
-                drawText: false,
-                editMode: false,
-                dragMode: false,
-                cutPolygon: false,
-                removalMode: false,
+            // A translucent pin that tracks the cursor - shows what clicking
+            // will do before the user commits to it. Desktop-only (no hover
+            // on touch), which is fine: draw mode is already armed below, so
+            // a tap places the boundary immediately either way.
+            map.on('mousemove', (e) => {
+                if (squareLayer.current) return;
+                if (hoverMarker.current) {
+                    hoverMarker.current.setLatLng(e.latlng);
+                } else {
+                    hoverMarker.current = L.marker(e.latlng, {
+                        opacity: 0.6,
+                        interactive: false,
+                        keyboard: false,
+                    }).addTo(map);
+                }
+            });
+            map.on('mouseout', () => {
+                hoverMarker.current?.remove();
+                hoverMarker.current = null;
+            });
+
+            const startDrawing = () => {
+                // cursorMarker: false - Geoman shows its own small dot at the
+                // cursor during an active draw mode by default, which would
+                // otherwise sit right on top of (and visually compete with)
+                // our own pin below.
+                map.pm.enableDraw('Circle', { continueDrawing: false, tooltips: false, cursorMarker: false });
+            };
+            startDrawingRef.current = startDrawing;
+
+            map.on('pm:drawstart', () => {
+                hoverMarker.current?.remove();
+                hoverMarker.current = null;
             });
 
             map.on('pm:create', (e) => {
@@ -131,9 +166,9 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
 
                 const coordinates = squareFromCircle(center.lat, center.lng, radius);
 
-                // Removing the old square (if the user drew a second circle
-                // to start over) also tears down its rotate handle - Geoman
-                // disables rotate mode automatically on layer removal.
+                // Removing the old square (if the user started over) also
+                // tears down its rotate handle - Geoman disables rotate mode
+                // automatically on layer removal.
                 if (squareLayer.current) squareLayer.current.remove();
                 squareLayer.current = L.polygon(coordinates, {
                     color: BOUNDARY_COLOR,
@@ -144,6 +179,8 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
 
                 setHasDrawn(true);
             });
+
+            startDrawing();
         });
 
         return () => {
@@ -164,6 +201,15 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
             preserveState: true,
             onFinish: () => setSaving(false),
         });
+    };
+
+    const startOver = () => {
+        if (squareLayer.current) {
+            squareLayer.current.remove();
+            squareLayer.current = null;
+        }
+        setHasDrawn(false);
+        startDrawingRef.current?.();
     };
 
     if (hasShape) {
@@ -194,32 +240,39 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
 
     return (
         <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Property boundary</label>
+            <h2 className="text-base font-semibold text-gray-900">Locate Your Property</h2>
+            <p className="text-sm text-gray-700 mt-0.5 mb-2">
+                {hasDrawn
+                    ? (saving ? 'Saving…' : 'Drag the handle to rotate the square, then save.')
+                    : 'Tap where your property is, then drag outward to size the boundary.'}
+            </p>
             <div className="rounded-lg border border-gray-200 overflow-hidden">
                 <div ref={mapRef} style={{ height: '280px' }} />
             </div>
-            {hasDrawn ? (
-                <div className="mt-1 flex items-center justify-between gap-3">
-                    <p className="text-xs text-gray-500">
-                        {saving
-                            ? 'Saving…'
-                            : 'Drag the handle to rotate the square, then save.'}
-                    </p>
-                    <button
-                        type="button"
-                        onClick={saveBoundary}
-                        disabled={saving}
-                        className="shrink-0 px-3 py-1 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
-                    >
-                        Save boundary
-                    </button>
-                </div>
-            ) : (
-                <p className="mt-1 text-xs text-gray-500">
-                    Drop a pin and drag out a rough square boundary for your property
-                    — you can refine the exact shape anytime from the Boundary page.
+            <div className="mt-1 flex items-center justify-between gap-3">
+                <p className="text-xs text-gray-500">
+                    You can refine the exact shape anytime from the Boundary page.
                 </p>
-            )}
+                {hasDrawn && (
+                    <div className="flex items-center gap-3 shrink-0">
+                        <button
+                            type="button"
+                            onClick={startOver}
+                            className="text-sm text-gray-500 hover:text-gray-700"
+                        >
+                            Start over
+                        </button>
+                        <button
+                            type="button"
+                            onClick={saveBoundary}
+                            disabled={saving}
+                            className="px-3 py-1 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                        >
+                            Save boundary
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
