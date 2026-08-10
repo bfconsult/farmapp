@@ -157,6 +157,13 @@ class FarmJobController extends Controller
             'jobStatuses' => JobStatus::where('property_id', $currentPropertyId)->orderBy('order')->get(),
             'calendarJobs' => $calendarJobs,
             'calendarMonth' => $calendarMonth,
+            // Unscoped by assignee/date/status - literally "does this
+            // property have a single job on it yet". A first-time visitor
+            // with zero jobs gets a plain "create your first job" banner
+            // instead of the normal filter UI (real user testing showed the
+            // filter panel - full of checkboxes for statuses with nothing in
+            // them - was actively confusing with nothing yet to filter).
+            'hasAnyJobs' => FarmJob::where('property_id', $currentPropertyId)->exists(),
         ]);
     }
 

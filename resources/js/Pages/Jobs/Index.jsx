@@ -216,7 +216,7 @@ function JobsCalendar({ month, jobs, onMonthChange }) {
     );
 }
 
-export default function Index({ jobs, counts, currentStatusIds, currentOrder, currentDateFrom, currentDateTo, jobStatuses, calendarJobs, calendarMonth }) {
+export default function Index({ jobs, counts, currentStatusIds, currentOrder, currentDateFrom, currentDateTo, jobStatuses, calendarJobs, calendarMonth, hasAnyJobs }) {
     const { currentUserRole } = usePage().props;
     const canManageRecurring = currentUserRole === 'admin' || currentUserRole === 'manager';
     const [showFilters, setShowFilters] = useState(false);
@@ -276,7 +276,7 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
 
                 {/* Filters + view toggle + order */}
                 <div className="flex items-center justify-between mb-3 gap-2">
-                    {view === 'list' ? (
+                    {view === 'list' && hasAnyJobs ? (
                         <button
                             onClick={() => setShowFilters((v) => !v)}
                             className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-gray-700"
@@ -353,7 +353,7 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
                 {view === 'list' && (
                 <>
 
-                {showFilters && (
+                {showFilters && hasAnyJobs && (
                     <div className="bg-white rounded-lg shadow p-4 mb-4 space-y-4">
                         <div>
                             <div className="flex items-center justify-between mb-2">
@@ -421,23 +421,41 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
                 )}
 
                 {/* Jobs list */}
-                <Link
-                    href={route('jobs.create')}
-                    className="block w-full py-2 mb-3 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
-                >
-                    + Add Job
-                </Link>
-
-                {jobs.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-                        No jobs match the current filters.
+                {!hasAnyJobs ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                        <h2 className="text-base font-semibold text-gray-900 mb-1">Create your first job</h2>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Jobs are how you track work on this property — what needs doing,
+                            who's doing it, and the hours and costs that go into it.
+                        </p>
+                        <Link
+                            href={route('jobs.create')}
+                            className="inline-block px-6 py-3 bg-green-600 text-white rounded-lg font-medium"
+                        >
+                            + Add Job
+                        </Link>
                     </div>
                 ) : (
-                    <div className="space-y-3">
-                        {jobs.map((job) => (
-                            <JobCard key={job.id} job={job} />
-                        ))}
-                    </div>
+                    <>
+                        <Link
+                            href={route('jobs.create')}
+                            className="block w-full py-2 mb-3 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
+                        >
+                            + Add Job
+                        </Link>
+
+                        {jobs.length === 0 ? (
+                            <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                                No jobs match the current filters.
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {jobs.map((job) => (
+                                    <JobCard key={job.id} job={job} />
+                                ))}
+                            </div>
+                        )}
+                    </>
                 )}
                 </>
                 )}
