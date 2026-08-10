@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
+import Avatar from '@/Components/Avatar';
 import SiteNotice from '@/Components/SiteNotice';
 
 export default function AuthenticatedLayout({ title, children }) {
@@ -97,6 +98,7 @@ export default function AuthenticatedLayout({ title, children }) {
                         settings" and "switch property" are both plausible
                         things to want from tapping the name and a single
                         link/arrow split was easy to hit by mistake. */}
+                    <div className="flex items-center gap-3">
                     {properties.length === 0 ? (
                         <button onClick={addProperty} className="text-sm text-green-600">
                             Add Property
@@ -168,6 +170,11 @@ export default function AuthenticatedLayout({ title, children }) {
                             )}
                         </div>
                     )}
+
+                    <Link href={route('profile.edit')} aria-label="Account">
+                        <Avatar user={auth.user} size="sm" />
+                    </Link>
+                    </div>
                 </div>
             </nav>
 

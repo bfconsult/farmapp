@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import AvatarForm from './Partials/AvatarForm';
 import DeleteUserForm from './Partials/DeleteUserForm';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
@@ -38,6 +39,9 @@ export default function Edit({ mustVerifyEmail, status }) {
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Account</h2>
                     </div>
                     <div className="divide-y divide-gray-100">
+                        <div className="px-4 py-4">
+                            <AvatarForm />
+                        </div>
                         <div className="px-4 py-4">
                             <UpdateProfileInformationForm
                                 mustVerifyEmail={mustVerifyEmail}

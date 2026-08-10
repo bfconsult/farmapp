@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Role;
 
@@ -35,6 +36,7 @@ class User extends Authenticatable
         'current_property_id',
         'timezone',
         'claimed_at',
+        'avatar',
     ];
 
     /**
@@ -46,6 +48,12 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
+
+    /**
+     * Not the raw storage path - lets the frontend always just render
+     * avatar_url (null when no avatar is set) without knowing about disks.
+     */
+    protected $appends = ['avatar_url'];
 
     /**
      * Get the attributes that should be cast.
@@ -61,6 +69,22 @@ class User extends Authenticatable
             'deleted' => 'boolean',
             'app_admin' => 'boolean',
         ];
+    }
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        if (!$this->avatar) {
+            return null;
+        }
+
+        $disk = Storage::disk(config('filesystems.default'));
+
+        // S3 buckets aren't necessarily public-readable, so use a signed URL
+        // rather than assuming a public ACL/bucket policy is in place -
+        // same reasoning as Photo::getUrlAttribute().
+        return config('filesystems.default') === 's3'
+            ? $disk->temporaryUrl($this->avatar, now()->addHour())
+            : $disk->url($this->avatar);
     }
 
     public function roles()
