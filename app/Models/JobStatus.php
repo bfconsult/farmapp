@@ -40,7 +40,7 @@ class JobStatus extends Model
     {
         static::create([
             'property_id' => $propertyId,
-            'name' => 'Backlog',
+            'name' => 'Planned',
             'order' => 0,
             'can_book_time' => true,
         ])->forceFill(['is_default' => true, 'is_protected' => true])->save();
