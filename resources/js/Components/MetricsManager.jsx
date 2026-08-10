@@ -171,10 +171,16 @@ export default function MetricsManager({ metrics }) {
         ...(canManage ? [{ id: 'manage', label: 'Manage' }] : []),
     ];
     // Lets a caller (e.g. submitting a measurement) land back on a specific
-    // tab via ?tab=measure, rather than always resetting to View.
+    // tab via ?tab=measure, rather than always resetting to View. A property
+    // with no metrics at all opens straight on Manage instead - View's "no
+    // metrics set up yet" dead end left a first-time admin/manager with no
+    // obvious way to discover that creating one happens on a different tab
+    // entirely. Only applies if they can actually reach Manage - a worker/
+    // approver with nothing to view yet has no create action to jump to.
+    const defaultTab = (metrics.length === 0 && canManage) ? 'manage' : tabs[0].id;
     const [activeTab, setActiveTab] = useState(() => {
         const requested = new URLSearchParams(window.location.search).get('tab');
-        return tabs.some((tab) => tab.id === requested) ? requested : tabs[0].id;
+        return tabs.some((tab) => tab.id === requested) ? requested : defaultTab;
     });
 
     const [adding, setAdding] = useState(false);
@@ -238,11 +244,28 @@ export default function MetricsManager({ metrics }) {
 
             {activeTab === 'manage' && (
                 <>
-                    <p className="text-sm text-gray-500">
-                        Metrics track property-level figures over time - tractor hours, water storage, hay bales on hand. Each metric opens a new measurement automatically at the start of every period.
-                    </p>
+                    {metrics.length === 0 && !adding ? (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                            <h2 className="text-base font-semibold text-gray-900 mb-1">Create your first metric</h2>
+                            <p className="text-sm text-gray-600 mb-4">
+                                Metrics are used to track important data over time — tractor hours, water
+                                storage, hay bales on hand. Each metric creates a new reminder to record a
+                                measurement at the interval you define.
+                            </p>
+                            <button
+                                onClick={() => setAdding(true)}
+                                className="inline-block px-6 py-3 bg-green-600 text-white rounded-lg font-medium"
+                            >
+                                + Add Metric
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-gray-500">
+                            Metrics track property-level figures over time - tractor hours, water storage, hay bales on hand. Each metric opens a new measurement automatically at the start of every period.
+                        </p>
+                    )}
 
-                    {adding ? (
+                    {(metrics.length > 0 || adding) && (adding ? (
                         <div className="bg-white rounded-lg shadow p-4 space-y-3">
                             <MetricFields values={values} setValues={setValues} />
                             <div className="flex gap-2">
@@ -257,13 +280,9 @@ export default function MetricsManager({ metrics }) {
                         >
                             + Add Metric
                         </button>
-                    )}
+                    ))}
 
-                    {metrics.length === 0 ? (
-                        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-                            No metrics set up yet.
-                        </div>
-                    ) : (
+                    {metrics.length === 0 ? null : (
                         <div className="space-y-4">
                             {REPORTING_PERIOD_ORDER
                                 .map((period) => ({
