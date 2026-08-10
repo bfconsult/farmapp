@@ -36,13 +36,19 @@ class HandleInertiaRequests extends Middleware
 
     $currentPropertyId = session('current_property_id');
 
-    // Auto-select property if none set - the session itself only lasts
-    // SESSION_LIFETIME minutes (2 hours in production), so an idle mobile
-    // PWA left backgrounded longer than that gets a fresh empty session on
-    // its next request. Prefer the user's own last explicit selection
-    // (persisted on the User model, so it survives that reset) over the
-    // job-count heuristic below, as long as they still belong to it.
-    if (!$currentPropertyId && $properties->count() > 0) {
+    // Auto-select (or re-select) a property if none is set, *or* the one in
+    // session no longer belongs to this user - e.g. they were removed from
+    // it, or it was deleted, since the id was stashed. Controllers that read
+    // session('current_property_id') directly (not everything goes through
+    // $currentProperty below) trust it to be a property they can actually
+    // access; leaving a stale id in place crashes anything downstream that
+    // assumes Property::find() on it returns something. The session itself
+    // also only lasts SESSION_LIFETIME minutes (2 hours in production), so
+    // an idle mobile PWA left backgrounded longer than that gets a fresh
+    // empty session on its next request. Prefer the user's own last explicit
+    // selection (persisted on the User model, so it survives that reset)
+    // over the job-count heuristic below, as long as they still belong to it.
+    if (!($currentPropertyId && $properties->contains('id', $currentPropertyId)) && $properties->count() > 0) {
         if ($user->current_property_id && $properties->contains('id', $user->current_property_id)) {
             $currentPropertyId = $user->current_property_id;
         } elseif ($properties->count() === 1) {
@@ -58,6 +64,11 @@ class HandleInertiaRequests extends Middleware
         }
         session(['current_property_id' => $currentPropertyId]);
         $user->update(['current_property_id' => $currentPropertyId]);
+    } elseif ($currentPropertyId && !$properties->contains('id', $currentPropertyId)) {
+        // No properties left to fall back to either - clear it out so
+        // nothing downstream mistakes a stale id for a valid selection.
+        $currentPropertyId = null;
+        session(['current_property_id' => null]);
     }
 
     $currentProperty = $user && $currentPropertyId

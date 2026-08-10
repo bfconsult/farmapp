@@ -32,9 +32,14 @@ class FarmJobController extends Controller
 
         // An approver reviews everyone's work without being added to the
         // team on individual jobs - see everything on the property instead
-        // of only jobs they're personally assigned to.
-        $isApprover = $currentPropertyId
-            && Auth::user()->roleOn(Property::find($currentPropertyId)) === Role::APPROVER;
+        // of only jobs they're personally assigned to. Property::find() can
+        // still come back null here even though HandleInertiaRequests
+        // re-validates current_property_id on every request - this route
+        // isn't gated by the property.role middleware other property-scoped
+        // routes are, so nothing guarantees that repair ran before this
+        // controller does.
+        $currentProperty = $currentPropertyId ? Property::find($currentPropertyId) : null;
+        $isApprover = $currentProperty && Auth::user()->roleOn($currentProperty) === Role::APPROVER;
         $scopeToAssignee = fn ($query) => $isApprover
             ? $query
             : $query->whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()));
