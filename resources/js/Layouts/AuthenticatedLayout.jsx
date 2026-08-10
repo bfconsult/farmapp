@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
+import SiteNotice from '@/Components/SiteNotice';
 
 export default function AuthenticatedLayout({ title, children }) {
     const { auth, properties, currentProperty, currentUserRole, hasIncompleteMetrics, flash } = usePage().props;
@@ -172,6 +173,8 @@ export default function AuthenticatedLayout({ title, children }) {
 
             {/* Main content */}
             <main className="pt-14 px-4 pb-4">
+                <SiteNotice className="-mx-4 mb-4" />
+
                 {flash?.error && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                         {flash.error}

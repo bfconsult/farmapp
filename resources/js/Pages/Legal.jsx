@@ -33,7 +33,7 @@ export default function Legal() {
 
                 <main className="mx-auto max-w-3xl px-6 py-12 bg-white sm:rounded-lg sm:shadow sm:my-8">
                     <h1 className="text-3xl font-bold text-gray-900 mb-1">Privacy Policy</h1>
-                    <p className="text-sm text-gray-400 mb-8">Last updated: 7 August 2026</p>
+                    <p className="text-sm text-gray-400 mb-8">Last updated: 10 August 2026</p>
 
                     <Section title="Who we are">
                         <p>
@@ -53,10 +53,16 @@ export default function Legal() {
 
                     <Section title="Cookies">
                         <p>
-                            FieldWerkz only uses cookies that are strictly necessary for the site to work: a
-                            session cookie that keeps you logged in, and a CSRF cookie that protects your account
-                            from cross-site request forgery. We do not use advertising cookies, third-party
-                            analytics/tracking cookies, or sell any cookie data.
+                            FieldWerkz uses cookies that are strictly necessary for the site to work: a session
+                            cookie that keeps you logged in, and a CSRF cookie that protects your account from
+                            cross-site request forgery.
+                        </p>
+                        <p>
+                            With your permission — asked for via the banner shown the first time you visit — we
+                            also use Microsoft Clarity to record anonymised sessions (clicks, scrolling, page
+                            navigation) so we can spot and fix usability issues. You can decline this at any time
+                            with no effect on how FieldWerkz works; your choice is stored in your browser. We don't
+                            use advertising cookies, and we don't sell any cookie or analytics data.
                         </p>
                     </Section>
 
@@ -101,6 +107,7 @@ export default function Legal() {
                         <ul className="list-disc list-inside space-y-1">
                             <li>Other members of your property's team, based on their assigned role.</li>
                             <li>Service providers who help us run FieldWerkz — currently our hosting/storage provider (AWS) and our transactional email provider (Resend), used only to deliver the service, not for marketing.</li>
+                            <li>Microsoft Clarity, our session-recording and analytics provider — only if you've given consent (see Cookies above), and used only to help us understand and improve FieldWerkz, never for advertising.</li>
                         </ul>
                     </Section>
 
