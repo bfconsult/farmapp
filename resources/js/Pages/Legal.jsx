@@ -59,10 +59,11 @@ export default function Legal() {
                         </p>
                         <p>
                             With your permission — asked for via the banner shown the first time you visit — we
-                            also use Microsoft Clarity to record anonymised sessions (clicks, scrolling, page
-                            navigation) so we can spot and fix usability issues. You can decline this at any time
-                            with no effect on how FieldWerkz works; your choice is stored in your browser. We don't
-                            use advertising cookies, and we don't sell any cookie or analytics data.
+                            also use Microsoft Clarity and Google Analytics to record anonymised usage (clicks,
+                            scrolling, page navigation) so we can spot and fix usability issues, and Google Ads to
+                            measure how well our own advertising performs. You can decline this at any time with no
+                            effect on how FieldWerkz works; your choice is stored in your browser. We don't sell any
+                            cookie or analytics data.
                         </p>
                     </Section>
 
@@ -102,12 +103,12 @@ export default function Legal() {
 
                     <Section title="Sharing your information">
                         <p>
-                            We don't sell your information or use it for advertising. We share it only with:
+                            We don't sell your information. We share it only with:
                         </p>
                         <ul className="list-disc list-inside space-y-1">
                             <li>Other members of your property's team, based on their assigned role.</li>
                             <li>Service providers who help us run FieldWerkz — currently our hosting/storage provider (AWS) and our transactional email provider (Resend), used only to deliver the service, not for marketing.</li>
-                            <li>Microsoft Clarity, our session-recording and analytics provider — only if you've given consent (see Cookies above), and used only to help us understand and improve FieldWerkz, never for advertising.</li>
+                            <li>Microsoft Clarity and Google Analytics, our analytics providers, and Google Ads, our advertising provider — only if you've given consent (see Cookies above). Clarity and Google Analytics are used only to help us understand and improve FieldWerkz; Google Ads is used only to measure how well our own advertising performs, not to sell your information or build profiles for other advertisers.</li>
                         </ul>
                     </Section>
 

@@ -43,8 +43,9 @@ export default function SiteNotice({ className = '' }) {
         >
             <p className="text-sm flex-1 text-center sm:text-left">
                 FieldWerkz uses essential cookies to keep you logged in, and — with your
-                permission — Microsoft Clarity to record anonymised sessions so we can spot
-                and fix usability issues.{' '}
+                permission — analytics and advertising tools (Microsoft Clarity, Google
+                Analytics, Google Ads) to understand how the app is used and measure our
+                own advertising.{' '}
                 <Link href={route('privacy-policy')} className="underline">Learn more</Link>
             </p>
             <div className="flex gap-2 flex-shrink-0">
