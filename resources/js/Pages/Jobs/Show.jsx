@@ -179,6 +179,36 @@ function QuoteRow({ quote, canManage, onAccept, onDecline, onDestroy }) {
     );
 }
 
+/**
+ * A half-width, compact stand-in for a section card with nothing in it yet -
+ * keeps the empty section discoverable (still has its own tappable "+")
+ * without costing a full card's worth of vertical space. Two land side by
+ * side automatically since each takes one column of the parent grid; a
+ * section with content still renders its normal full-width card instead
+ * (col-span-2), so this is only ever seen for genuinely empty sections.
+ */
+function EmptySectionTile({ label, actionLabel, onAction }) {
+    if (!actionLabel) {
+        return (
+            <div className="bg-white rounded-lg shadow p-3 flex flex-col items-center justify-center gap-1 text-center h-20">
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</span>
+                <span className="text-xs text-gray-400">None yet</span>
+            </div>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onAction}
+            className="bg-white rounded-lg shadow p-3 flex flex-col items-center justify-center gap-1 text-center h-20 hover:bg-gray-50"
+        >
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
+            <span className="text-xs text-green-600 font-medium">{actionLabel}</span>
+        </button>
+    );
+}
+
 export default function Show({ job, seenBy, checklistTemplates, suppliers, labourTotal, labourEntries }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
@@ -209,6 +239,11 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const hasIncompleteChecklists = (job.checklists ?? []).some((c) => c.status === 'incomplete');
     const hasAcceptedQuote = (job.quotes ?? []).some((q) => q.status === 'accepted');
     const hasOtherInvitedQuotes = (job.quotes ?? []).some((q) => q.status === 'invited');
+    const hasPhotos = job.photos && job.photos.length > 0;
+    const hasChecklists = job.checklists && job.checklists.length > 0;
+    const hasExpenses = job.expenses && job.expenses.length > 0;
+    const hasQuotes = job.quotes && job.quotes.length > 0;
+    const hasNotes = job.notes && job.notes.length > 0;
 
     useEffect(() => {
         if (flash?.addPhoto && cameraInput.current) {
@@ -642,108 +677,150 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                     </Modal>
                 )}
 
-                {/* Photos */}
+                {/* Labour - rolled-up actual time/cost, view only; editing a
+                    time entry still happens on its own Work Session page. Sits
+                    above the empty-tile grid (not inside it) since it always has
+                    a $ total to show and is never tile-eligible - keeping it out
+                    lets the tile-eligible sections below pair up with no gaps. */}
                 <div className="bg-white rounded-lg shadow p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Photos</h2>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => cameraInput.current.click()}
-                                disabled={uploading}
-                                aria-label="Take photo"
-                                className="p-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                            </button>
-                            <button
-                                onClick={() => galleryInput.current.click()}
-                                disabled={uploading}
-                                aria-label="Choose from gallery"
-                                className="p-2 bg-white border border-gray-300 text-gray-700 rounded-lg disabled:opacity-50"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
-                                </svg>
-                            </button>
+                    <button
+                        onClick={() => setShowLabourDetail((v) => !v)}
+                        className="w-full flex items-center justify-between"
+                    >
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Labour</h2>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">${Number(labourTotal).toFixed(2)}</span>
+                            <span className="text-gray-400 text-xs">{showLabourDetail ? '▲' : '▼'}</span>
                         </div>
-                        <input
-                            ref={cameraInput}
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            onChange={uploadPhotos}
-                            className="hidden"
-                        />
-                        <input
-                            ref={galleryInput}
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            onChange={uploadPhotos}
-                            className="hidden"
-                        />
-                    </div>
+                    </button>
 
-                    {job.photos && job.photos.length > 0 && (
-                        <div className="grid grid-cols-3 gap-2">
-                            {job.photos.map((photo) => (
-                                <div key={photo.id} className="relative">
-                                    <img
-                                        src={photo.url}
-                                        className="w-full h-24 object-cover rounded-lg"
-                                    />
+                    {showLabourDetail && (
+                        labourEntries.length === 0 ? (
+                            <p className="text-sm text-gray-400 mt-3">No time logged yet.</p>
+                        ) : (
+                            <div className="mt-3 -mx-4 border-t border-gray-100 divide-y divide-gray-100">
+                                {labourEntries.map((entry) => (
+                                    <div key={entry.id} className="px-4 py-2 flex items-center justify-between gap-2">
+                                        <p className="text-sm text-gray-900 truncate">
+                                            {entry.user_name} · {formatDate(entry.started_at, { year: false })} · {entry.duration_in_hours}h
+                                        </p>
+                                        <span className="text-sm text-gray-900 flex-shrink-0">
+                                            ${Number(entry.amount).toFixed(2)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Photos */}
+                    {hasPhotos ? (
+                        <div className="col-span-2 bg-white rounded-lg shadow p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Photos</h2>
+                                <div className="flex gap-2">
                                     <button
-                                        onClick={() => destroyPhoto(photo.id)}
-                                        className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                                        onClick={() => cameraInput.current.click()}
+                                        disabled={uploading}
+                                        aria-label="Take photo"
+                                        className="p-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
                                     >
-                                        ×
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        onClick={() => galleryInput.current.click()}
+                                        disabled={uploading}
+                                        aria-label="Choose from gallery"
+                                        className="p-2 bg-white border border-gray-300 text-gray-700 rounded-lg disabled:opacity-50"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
+                                        </svg>
                                     </button>
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                            </div>
 
-                {/* Checklists */}
-                <div className="bg-white rounded-lg shadow p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Checklists</h2>
-                        <button
-                            onClick={() => setShowChecklistPicker(true)}
-                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
-                        >
-                            + Add Checklist
-                        </button>
-                    </div>
-
-                    {job.checklists && job.checklists.length > 0 && (
-                        <div className="space-y-2">
-                            {job.checklists.map((checklist) => {
-                                const checkedCount = checklist.items.filter((item) => item.is_checked).length;
-                                return (
-                                    <Link
-                                        key={checklist.id}
-                                        href={route('checklists.show', checklist.id)}
-                                        className="flex items-center justify-between gap-2 border border-gray-200 rounded-lg p-3 hover:bg-gray-50"
-                                    >
-                                        <div className="min-w-0">
-                                            <p className="text-sm text-gray-900">{checklist.name}</p>
-                                            <p className="text-xs text-gray-500 mt-0.5">{CHECKLIST_TYPE_LABELS[checklist.type]}</p>
-                                        </div>
-                                        <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${
-                                            checklist.status === 'complete' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                        }`}>
-                                            {checkedCount}/{checklist.items.length} checked
-                                        </span>
-                                    </Link>
-                                );
-                            })}
+                            <div className="grid grid-cols-3 gap-2">
+                                {job.photos.map((photo) => (
+                                    <div key={photo.id} className="relative">
+                                        <img
+                                            src={photo.url}
+                                            className="w-full h-24 object-cover rounded-lg"
+                                        />
+                                        <button
+                                            onClick={() => destroyPhoto(photo.id)}
+                                            className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
+                    ) : (
+                        <EmptySectionTile label="Photos" actionLabel="+ Add" onAction={() => galleryInput.current.click()} />
                     )}
-                </div>
+                    <input
+                        ref={cameraInput}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={uploadPhotos}
+                        className="hidden"
+                    />
+                    <input
+                        ref={galleryInput}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={uploadPhotos}
+                        className="hidden"
+                    />
+
+                    {/* Checklists */}
+                    {hasChecklists ? (
+                        <div className="col-span-2 bg-white rounded-lg shadow p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Checklists</h2>
+                                <button
+                                    onClick={() => setShowChecklistPicker(true)}
+                                    className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
+                                >
+                                    + Add Checklist
+                                </button>
+                            </div>
+
+                            <div className="space-y-2">
+                                {job.checklists.map((checklist) => {
+                                    const checkedCount = checklist.items.filter((item) => item.is_checked).length;
+                                    return (
+                                        <Link
+                                            key={checklist.id}
+                                            href={route('checklists.show', checklist.id)}
+                                            className="flex items-center justify-between gap-2 border border-gray-200 rounded-lg p-3 hover:bg-gray-50"
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="text-sm text-gray-900">{checklist.name}</p>
+                                                <p className="text-xs text-gray-500 mt-0.5">{CHECKLIST_TYPE_LABELS[checklist.type]}</p>
+                                            </div>
+                                            <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${
+                                                checklist.status === 'complete' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                            }`}>
+                                                {checkedCount}/{checklist.items.length} checked
+                                            </span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        <EmptySectionTile label="Checklists" actionLabel="+ Add" onAction={() => setShowChecklistPicker(true)} />
+                    )}
 
                 <Modal show={showChecklistPicker} onClose={() => setShowChecklistPicker(false)} maxWidth="lg">
                     <div className="p-4">
@@ -780,60 +857,28 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                     </div>
                 </Modal>
 
-                {/* Labour - rolled-up actual time/cost, view only; editing a
-                    time entry still happens on its own Work Session page. */}
-                <div className="bg-white rounded-lg shadow p-4">
-                    <button
-                        onClick={() => setShowLabourDetail((v) => !v)}
-                        className="w-full flex items-center justify-between"
-                    >
-                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Labour</h2>
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">${Number(labourTotal).toFixed(2)}</span>
-                            <span className="text-gray-400 text-xs">{showLabourDetail ? '▲' : '▼'}</span>
-                        </div>
-                    </button>
+                    {/* Expenses */}
+                    {hasExpenses ? (
+                        <div className="col-span-2 bg-white rounded-lg shadow p-4">
+                            <div className="flex items-center justify-between mb-3">
+                                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Expenses</h2>
+                                <button
+                                    onClick={openAddExpense}
+                                    className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
+                                >
+                                    + Add Expense
+                                </button>
+                            </div>
 
-                    {showLabourDetail && (
-                        labourEntries.length === 0 ? (
-                            <p className="text-sm text-gray-400 mt-3">No time logged yet.</p>
-                        ) : (
-                            <div className="mt-3 -mx-4 border-t border-gray-100 divide-y divide-gray-100">
-                                {labourEntries.map((entry) => (
-                                    <div key={entry.id} className="px-4 py-2 flex items-center justify-between gap-2">
-                                        <p className="text-sm text-gray-900 truncate">
-                                            {entry.user_name} · {formatDate(entry.started_at, { year: false })} · {entry.duration_in_hours}h
-                                        </p>
-                                        <span className="text-sm text-gray-900 flex-shrink-0">
-                                            ${Number(entry.amount).toFixed(2)}
-                                        </span>
-                                    </div>
+                            <div className="space-y-2">
+                                {job.expenses.map((expense) => (
+                                    <ExpenseRow key={expense.id} expense={expense} onEdit={openEditExpense} />
                                 ))}
                             </div>
-                        )
-                    )}
-                </div>
-
-                {/* Expenses */}
-                <div className="bg-white rounded-lg shadow p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Expenses</h2>
-                        <button
-                            onClick={openAddExpense}
-                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
-                        >
-                            + Add Expense
-                        </button>
-                    </div>
-
-                    {job.expenses && job.expenses.length > 0 && (
-                        <div className="space-y-2">
-                            {job.expenses.map((expense) => (
-                                <ExpenseRow key={expense.id} expense={expense} onEdit={openEditExpense} />
-                            ))}
                         </div>
+                    ) : (
+                        <EmptySectionTile label="Expenses" actionLabel="+ Add" onAction={openAddExpense} />
                     )}
-                </div>
 
                 <Modal show={showExpenseModal} onClose={closeExpenseModal} maxWidth="lg">
                     <div className="p-4 space-y-3">
@@ -961,48 +1006,46 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                     </div>
                 </Modal>
 
-                {/* Suppliers */}
-                {(canManage || (job.quotes && job.quotes.length > 0)) && (
-                    <div className="bg-white rounded-lg shadow overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
-                            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Suppliers</h2>
-                            {canManage && (
-                                <div className="flex items-center gap-3">
-                                    {hasAcceptedQuote && hasOtherInvitedQuotes && (
-                                        <button onClick={notifyOtherSuppliers} className="text-xs text-gray-500">
-                                            Notify others it's let
-                                        </button>
+                    {/* Suppliers */}
+                    {(canManage || hasQuotes) && (
+                        hasQuotes ? (
+                            <div className="col-span-2 bg-white rounded-lg shadow overflow-hidden">
+                                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                                    <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Suppliers</h2>
+                                    {canManage && (
+                                        <div className="flex items-center gap-3">
+                                            {hasAcceptedQuote && hasOtherInvitedQuotes && (
+                                                <button onClick={notifyOtherSuppliers} className="text-xs text-gray-500">
+                                                    Notify others it's let
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={openInviteSupplier}
+                                                className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
+                                            >
+                                                + Invite Supplier
+                                            </button>
+                                        </div>
                                     )}
-                                    <button
-                                        onClick={openInviteSupplier}
-                                        className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
-                                    >
-                                        + Invite Supplier
-                                    </button>
                                 </div>
-                            )}
-                        </div>
 
-                        {job.quotes && job.quotes.length > 0 ? (
-                            <div className="divide-y divide-gray-100">
-                                {job.quotes.map((quote) => (
-                                    <QuoteRow
-                                        key={quote.id}
-                                        quote={quote}
-                                        canManage={canManage}
-                                        onAccept={openAccept}
-                                        onDecline={declineQuote}
-                                        onDestroy={destroyQuote}
-                                    />
-                                ))}
+                                <div className="divide-y divide-gray-100">
+                                    {job.quotes.map((quote) => (
+                                        <QuoteRow
+                                            key={quote.id}
+                                            quote={quote}
+                                            canManage={canManage}
+                                            onAccept={openAccept}
+                                            onDecline={declineQuote}
+                                            onDestroy={destroyQuote}
+                                        />
+                                    ))}
+                                </div>
                             </div>
                         ) : (
-                            <p className="text-sm text-gray-500 px-4 py-3">
-                                No suppliers invited yet.
-                            </p>
-                        )}
-                    </div>
-                )}
+                            <EmptySectionTile label="Suppliers" actionLabel="+ Invite" onAction={openInviteSupplier} />
+                        )
+                    )}
 
                 <Modal show={showQuoteModal} onClose={closeQuoteModal} maxWidth="lg">
                     <div className="p-4 space-y-3">
@@ -1125,27 +1168,32 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                     </div>
                 </Modal>
 
-                {/* Notes */}
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
-                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
-                        {canCreateNote && !addingNote && (
-                            <button onClick={() => setAddingNote(true)} className="text-xs text-green-600 font-medium">
-                                + Add
-                            </button>
-                        )}
-                    </div>
-                    {job.notes && job.notes.length > 0 ? (
-                        <div className="divide-y divide-gray-100">
-                            {job.notes.map((note) => (
-                                <NoteRow key={note.id} note={note} canManage={canManage} canCreate={canCreateNote} />
-                            ))}
+                    {/* Notes - the inline add-note form (not a Modal) needs full
+                        width to render, so it also forces the full card even
+                        while there are still no notes yet. */}
+                    {(hasNotes || addingNote) ? (
+                        <div className="col-span-2 bg-white rounded-lg shadow overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
+                                {canCreateNote && !addingNote && (
+                                    <button onClick={() => setAddingNote(true)} className="text-xs text-green-600 font-medium">
+                                        + Add
+                                    </button>
+                                )}
+                            </div>
+                            {hasNotes && (
+                                <div className="divide-y divide-gray-100">
+                                    {job.notes.map((note) => (
+                                        <NoteRow key={note.id} note={note} canManage={canManage} canCreate={canCreateNote} />
+                                    ))}
+                                </div>
+                            )}
+                            {addingNote && (
+                                <AddNoteForm parentField="job_id" parentId={job.id} onClose={() => setAddingNote(false)} />
+                            )}
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-400 p-4">No notes yet.</p>
-                    )}
-                    {addingNote && (
-                        <AddNoteForm parentField="job_id" parentId={job.id} onClose={() => setAddingNote(false)} />
+                        <EmptySectionTile label="Notes" actionLabel={canCreateNote ? '+ Add' : null} onAction={() => setAddingNote(true)} />
                     )}
                 </div>
 
