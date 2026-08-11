@@ -668,6 +668,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                                     latitude={job.latitude}
                                     longitude={job.longitude}
                                     propertyBoundary={job.property?.shape?.coordinates}
+                                    zones={job.zones}
                                     editable={editingLocation}
                                     onDragEnd={(lat, lng) => setPendingLocation({ lat, lng })}
                                 />

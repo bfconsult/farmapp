@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 
 const PROPERTY_BOUNDARY_COLOR = '#ca8a04';
 const PROPERTY_BOUNDARY_FILL = '#fef08a';
+const ZONE_COLOR = '#7c3aed';
 
 function loadLeaflet() {
     return Promise.all([
@@ -20,17 +21,20 @@ function loadLeaflet() {
 
 /**
  * A Leaflet map showing a pin (if latitude/longitude are set) in the context
- * of a property's boundary. When `editable`, the pin can be dragged and
- * reports its new position via `onDragEnd`. `interactive={false}` disables
- * the map's own pan/zoom (but not marker dragging) for use as a static-
- * looking thumbnail preview. Renders nothing itself if there's neither a
- * pin position nor a boundary to show - the caller should show its own
- * placeholder for that case rather than mounting an empty map.
+ * of a property's boundary, and optionally shaded `zones` (violet, same
+ * styling as the Map/Shape/Asset pages) - typically a job's related zones.
+ * When `editable`, the pin can be dragged and reports its new position via
+ * `onDragEnd`. `interactive={false}` disables the map's own pan/zoom (but
+ * not marker dragging) for use as a static-looking thumbnail preview.
+ * Renders nothing itself if there's no pin, boundary, or zone to show - the
+ * caller should show its own placeholder for that case rather than mounting
+ * an empty map.
  */
 export default function LocationMap({
     latitude,
     longitude,
     propertyBoundary,
+    zones,
     editable = false,
     onDragEnd,
     height = '300px',
@@ -41,9 +45,10 @@ export default function LocationMap({
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const hasPin = latitude != null && longitude != null;
+    const hasZones = zones && zones.length > 0;
 
     useEffect(() => {
-        if (!hasPin && !propertyBoundary) return undefined;
+        if (!hasPin && !propertyBoundary && !hasZones) return undefined;
 
         let cancelled = false;
 
@@ -81,6 +86,19 @@ export default function LocationMap({
                     interactive: false,
                 }).addTo(map);
                 bounds.extend(boundary.getBounds());
+            }
+
+            if (hasZones) {
+                zones.forEach((zone) => {
+                    const polygon = L.polygon(zone.coordinates, {
+                        color: ZONE_COLOR,
+                        weight: 2,
+                        fillColor: ZONE_COLOR,
+                        fillOpacity: 0.15,
+                        interactive: false,
+                    }).bindTooltip(zone.name, { permanent: true, direction: 'center' }).addTo(map);
+                    bounds.extend(polygon.getBounds());
+                });
             }
 
             if (hasPin) {
@@ -128,7 +146,7 @@ export default function LocationMap({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    if (!hasPin && !propertyBoundary) return null;
+    if (!hasPin && !propertyBoundary && !hasZones) return null;
 
     return <div ref={mapRef} style={{ height }} />;
 }
