@@ -10,6 +10,7 @@ export default function Edit({ property }) {
     const { data, setData, patch, processing, errors } = useForm({
         name: property.name,
         address: property.address,
+        email: property.email ?? '',
     });
 
     const submit = (e) => {
@@ -72,6 +73,25 @@ export default function Edit({ property }) {
                                 />
                                 {errors.address && (
                                     <p className="mt-1 text-sm text-red-600">{errors.address}</p>
+                                )}
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Email
+                                </label>
+                                <input
+                                    type="email"
+                                    value={data.email}
+                                    onChange={(e) => setData('email', e.target.value)}
+                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                    placeholder="office@yourfarm.com"
+                                />
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Used as the reply-to address when contacting suppliers - required before you can invite one to a job.
+                                </p>
+                                {errors.email && (
+                                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
                                 )}
                             </div>
 

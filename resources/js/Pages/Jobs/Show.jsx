@@ -182,7 +182,7 @@ function QuoteRow({ quote, canManage, onAccept, onDecline, onDestroy }) {
 export default function Show({ job, seenBy, checklistTemplates, suppliers, labourTotal, labourEntries }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
-    const { flash, currentUserRole } = usePage().props;
+    const { flash, currentUserRole, errors } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canCreateNote = canManage || currentUserRole === 'worker';
     const [uploading, setUploading] = useState(false);
@@ -1067,6 +1067,12 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                         <p className="text-xs text-gray-500">
                             This sends {quoteForm.supplier_id ? suppliers.find((s) => String(s.id) === String(quoteForm.supplier_id))?.name : 'the supplier'} an email with a link to view this job.
                         </p>
+
+                        {errors.supplier_id && (
+                            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
+                                {errors.supplier_id}
+                            </p>
+                        )}
 
                         <div className="flex gap-2 pt-2">
                             <button

@@ -16,6 +16,12 @@ class QuoteController extends Controller
 {
     public function store(Request $request, FarmJob $farmJob)
     {
+        // Blocks the whole process rather than sending from a blank reply-to -
+        // a supplier's reply needs somewhere real to land.
+        if (!$farmJob->property->email) {
+            return back()->withErrors(['supplier_id' => "{$farmJob->property->name} has no email on file - add one from the property's Edit page before inviting a supplier."]);
+        }
+
         $validated = $request->validate([
             'supplier_id' => ['required', Rule::exists('suppliers', 'id')->where('property_id', $farmJob->property_id)],
             'requires_quote' => 'required|boolean',

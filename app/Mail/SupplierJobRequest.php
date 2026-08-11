@@ -22,6 +22,7 @@ class SupplierJobRequest extends Mailable
     {
         return new Envelope(
             subject: "{$this->quote->farmJob->property->name} has a job for you",
+            replyTo: array_filter([$this->quote->farmJob->property->email]),
         );
     }
 

@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Mail;
 function createJobAndAdmin(): array
 {
     $admin = User::factory()->create();
-    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd', 'email' => 'farm@example.test']);
     Role::create(['user_id' => $admin->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
     $job = FarmJob::create(['name' => 'Fence the north paddock', 'property_id' => $property->id, 'user_id' => $admin->id]);
 
@@ -40,7 +40,31 @@ test('inviting a supplier creates an invited quote and emails them', function ()
     expect($quote->requires_quote)->toBeTrue();
     expect($quote->invited_at)->not->toBeNull();
 
-    Mail::assertSent(SupplierJobRequest::class, fn ($mail) => $mail->hasTo($supplier->email) && $mail->quote->id === $quote->id);
+    Mail::assertSent(SupplierJobRequest::class, function ($mail) use ($supplier, $quote, $property) {
+        return $mail->hasTo($supplier->email)
+            && $mail->quote->id === $quote->id
+            && $mail->envelope()->replyTo[0]->address === $property->email;
+    });
+});
+
+test('inviting a supplier is blocked when the property has no email on file', function () {
+    Mail::fake();
+    $admin = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $admin->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $job = FarmJob::create(['name' => 'Fence the north paddock', 'property_id' => $property->id, 'user_id' => $admin->id]);
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'quotes@acmefencing.test']);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('quotes.store', $job->id), [
+            'supplier_id' => $supplier->id,
+            'requires_quote' => true,
+        ])
+        ->assertSessionHasErrors('supplier_id');
+
+    expect(Quote::count())->toBe(0);
+    Mail::assertNothingSent();
 });
 
 test('inviting a supplier with no email on file is rejected', function () {
@@ -179,6 +203,7 @@ test('notifying other suppliers declines every still-invited quote and emails th
     Mail::assertSent(SupplierJobLet::class, 2);
     Mail::assertSent(SupplierJobLet::class, fn ($mail) => $mail->hasTo($loserA->email));
     Mail::assertSent(SupplierJobLet::class, fn ($mail) => $mail->hasTo($loserB->email));
+    Mail::assertSent(SupplierJobLet::class, fn ($mail) => $mail->envelope()->replyTo[0]->address === $property->email);
 });
 
 test('a quote can be removed while still invited', function () {
