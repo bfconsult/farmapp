@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
+import PhotoLightbox from '@/Components/PhotoLightbox';
 import LocationMap from '@/Components/LocationMap';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
@@ -231,6 +232,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const [acceptingQuote, setAcceptingQuote] = useState(null);
     const [acceptAmount, setAcceptAmount] = useState('');
     const [showLabourDetail, setShowLabourDetail] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState(null);
     const [showLocationModal, setShowLocationModal] = useState(false);
     const [editingLocation, setEditingLocation] = useState(false);
     const [pendingLocation, setPendingLocation] = useState(null);
@@ -745,11 +747,12 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                             </div>
 
                             <div className="grid grid-cols-3 gap-2">
-                                {job.photos.map((photo) => (
+                                {job.photos.map((photo, i) => (
                                     <div key={photo.id} className="relative">
                                         <img
                                             src={photo.url}
-                                            className="w-full h-24 object-cover rounded-lg"
+                                            onClick={() => setLightboxIndex(i)}
+                                            className="w-full h-24 object-cover rounded-lg cursor-pointer"
                                         />
                                         <button
                                             onClick={() => destroyPhoto(photo.id)}
@@ -1256,6 +1259,15 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                     </div>
                 )}
             </div>
+
+            {job.photos && job.photos.length > 0 && (
+                <PhotoLightbox
+                    photos={job.photos}
+                    index={lightboxIndex}
+                    onClose={() => setLightboxIndex(null)}
+                    onIndexChange={setLightboxIndex}
+                />
+            )}
 
             {showDeleteOptions && (
                 <div
