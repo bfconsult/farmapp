@@ -18,6 +18,7 @@ use App\Models\WorkSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class FarmJobController extends Controller
@@ -85,7 +86,7 @@ class FarmJobController extends Controller
                 $query->where('property_id', $currentPropertyId);
             })
             ->when($dateFrom && $dateTo, fn ($query) => $query->whereBetween('created_at', [$dateFrom, $dateTo]))
-            ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zone', 'workSessions.user', 'expenses', 'notes.views'])
+            ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zones', 'workSessions.user', 'expenses', 'notes.views'])
             ->withCount('incompleteChecklists')
             ->whereIn('job_status_id', $statusIds);
 
@@ -209,7 +210,8 @@ class FarmJobController extends Controller
             'priority_id' => 'nullable|exists:priorities,id',
             'job_type_id' => 'nullable|exists:job_types,id',
             'job_status_id' => 'nullable|exists:job_statuses,id',
-            'zone_id' => 'nullable|exists:zones,id',
+            'zone_ids' => 'nullable|array',
+            'zone_ids.*' => Rule::exists('zones', 'id')->where('property_id', session('current_property_id')),
             'asset_id' => 'nullable|exists:assets,id',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
@@ -225,14 +227,14 @@ class FarmJobController extends Controller
         $intent = $validated['intent'] ?? 'camera';
         $repeats = $validated['repeats'] ?? false;
         $checklistTemplateIds = $validated['checklist_template_ids'] ?? [];
-        unset($validated['intent'], $validated['repeats'], $validated['checklist_template_ids']);
+        $zoneIds = $validated['zone_ids'] ?? [];
+        unset($validated['intent'], $validated['repeats'], $validated['checklist_template_ids'], $validated['zone_ids']);
 
         // A repeating job's first instance is created immediately, in the
         // same action, rather than waiting for the scheduler to pick it up.
         if ($repeats) {
             $recurringJob = RecurringJob::create([
                 'property_id' => session('current_property_id'),
-                'zone_id' => $validated['zone_id'] ?? null,
                 'created_by' => Auth::id(),
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
@@ -246,6 +248,7 @@ class FarmJobController extends Controller
                 'is_active' => true,
             ]);
             $recurringJob->checklistTemplates()->attach($checklistTemplateIds);
+            $recurringJob->zones()->sync($zoneIds);
 
             $farmJob = $recurringJob->createInstance($recurringJob->starts_on);
 
@@ -258,6 +261,7 @@ class FarmJobController extends Controller
             ?? JobStatus::where('property_id', $validated['property_id'])->where('is_default', true)->value('id');
 
         $farmJob = FarmJob::create($validated);
+        $farmJob->zones()->sync($zoneIds);
         $this->attachChecklistTemplates($farmJob, $checklistTemplateIds, $request->user());
 
         $teamUserIds = Role::where('property_id', $farmJob->property_id)->pluck('user_id');
@@ -272,7 +276,7 @@ class FarmJobController extends Controller
 
     public function show(FarmJob $farmJob)
     {
-        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zone', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset', 'expenses.supplier', 'expenses.photos', 'expenses.createdBy', 'quotes.supplier', 'notes.photos', 'notes.createdBy', 'notes.views']);
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property.shape', 'zones', 'photos', 'user', 'checklists.items', 'maintenanceItem.asset', 'asset', 'expenses.supplier', 'expenses.photos', 'expenses.createdBy', 'quotes.supplier', 'notes.photos', 'notes.createdBy', 'notes.views']);
         $farmJob->notes->each(fn ($note) => $note->is_unread = $note->isUnreadBy(Auth::id()));
 
         // Logs (or refreshes) that the current user has seen this job - one
@@ -359,7 +363,7 @@ class FarmJobController extends Controller
 
     public function edit(FarmJob $farmJob)
     {
-        $farmJob->load('assignees', 'checklists');
+        $farmJob->load('assignees', 'checklists', 'zones');
 
         return Inertia::render('Jobs/Edit', [
             'job' => $farmJob,
@@ -386,7 +390,8 @@ class FarmJobController extends Controller
             'priority_id' => 'nullable|exists:priorities,id',
             'job_type_id' => 'nullable|exists:job_types,id',
             'job_status_id' => 'nullable|exists:job_statuses,id',
-            'zone_id' => 'nullable|exists:zones,id',
+            'zone_ids' => 'nullable|array',
+            'zone_ids.*' => Rule::exists('zones', 'id')->where('property_id', $farmJob->property_id),
             'assignee_ids' => 'nullable|array',
             'assignee_ids.*' => 'exists:users,id',
             'repeats' => 'boolean',
@@ -402,7 +407,8 @@ class FarmJobController extends Controller
         $interval = $validated['interval'] ?? null;
         $startsOn = $validated['starts_on'] ?? null;
         $checklistTemplateIds = $validated['checklist_template_ids'] ?? [];
-        unset($validated['assignee_ids'], $validated['repeats'], $validated['interval'], $validated['starts_on'], $validated['checklist_template_ids']);
+        $zoneIds = $validated['zone_ids'] ?? [];
+        unset($validated['assignee_ids'], $validated['repeats'], $validated['interval'], $validated['starts_on'], $validated['checklist_template_ids'], $validated['zone_ids']);
 
         $validated['job_status_id'] = $validated['job_status_id']
             ?? JobStatus::where('property_id', $farmJob->property_id)->where('is_default', true)->value('id');
@@ -412,7 +418,6 @@ class FarmJobController extends Controller
         if ($repeats && !$farmJob->recurring_job_id) {
             $recurringJob = RecurringJob::create([
                 'property_id' => $farmJob->property_id,
-                'zone_id' => $validated['zone_id'] ?? null,
                 'created_by' => Auth::id(),
                 'name' => $validated['name'],
                 'description' => $validated['description'] ?? null,
@@ -426,6 +431,7 @@ class FarmJobController extends Controller
                 'is_active' => true,
             ]);
             $recurringJob->checklistTemplates()->attach($checklistTemplateIds);
+            $recurringJob->zones()->sync($zoneIds);
 
             $periodStart = \Carbon\Carbon::parse($startsOn);
             $validated['recurring_job_id'] = $recurringJob->id;
@@ -434,6 +440,7 @@ class FarmJobController extends Controller
         }
 
         $farmJob->update($validated);
+        $farmJob->zones()->sync($zoneIds);
         $farmJob->assignees()->sync($assigneeIds);
 
         // Only attach templates not already on this job - editing never

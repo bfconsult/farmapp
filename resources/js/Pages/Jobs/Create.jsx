@@ -43,7 +43,7 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
         priority_id: '',
         job_type_id: '',
         job_status_id: defaultStatus ? String(defaultStatus.id) : '',
-        zone_id: '',
+        zone_ids: [],
         asset_id: selectedAssetId ? String(selectedAssetId) : '',
         latitude: '',
         longitude: '',
@@ -59,6 +59,14 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
             data.checklist_template_ids.includes(templateId)
                 ? data.checklist_template_ids.filter((id) => id !== templateId)
                 : [...data.checklist_template_ids, templateId]
+        );
+    };
+
+    const toggleZone = (zoneId) => {
+        setData('zone_ids',
+            data.zone_ids.includes(zoneId)
+                ? data.zone_ids.filter((id) => id !== zoneId)
+                : [...data.zone_ids, zoneId]
         );
     };
 
@@ -146,19 +154,22 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                 {currentProperty.zones && currentProperty.zones.length > 0 && (
                     <div className="mb-4">
                         <label className="block text-xs text-gray-500 mb-1">
-                            Zone <span className="text-gray-400">optional</span>
+                            Zones <span className="text-gray-400">optional</span>
                         </label>
-                        <select
-                            value={data.zone_id}
-                            onChange={(e) => setData('zone_id', e.target.value)}
-                            className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
-                        >
-                            <option value="">No specific zone</option>
+                        <div className="space-y-1 border border-gray-200 rounded-lg divide-y divide-gray-100">
                             {currentProperty.zones.map((zone) => (
-                                <option key={zone.id} value={zone.id}>{zone.name}</option>
+                                <label key={zone.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={data.zone_ids.includes(zone.id)}
+                                        onChange={() => toggleZone(zone.id)}
+                                        className="rounded text-green-600 focus:ring-green-500"
+                                    />
+                                    <span className="text-sm text-gray-900">{zone.name}</span>
+                                </label>
                             ))}
-                        </select>
-                        {errors.zone_id && <p className="mt-1 text-sm text-red-600">{errors.zone_id}</p>}
+                        </div>
+                        {errors.zone_ids && <p className="mt-1 text-sm text-red-600">{errors.zone_ids}</p>}
                     </div>
                 )}
 

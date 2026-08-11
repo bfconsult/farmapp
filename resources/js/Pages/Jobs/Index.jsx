@@ -86,9 +86,9 @@ function JobCard({ job }) {
                 </div>
             )}
 
-            {(job.zone || job.user) && (
+            {((job.zones && job.zones.length > 0) || job.user) && (
                 <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-gray-400">{job.zone?.name}</span>
+                    <span className="text-xs text-gray-400">{job.zones?.map((z) => z.name).join(', ')}</span>
                     {job.user && (
                         <span className="text-xs text-gray-400">Created by {job.user.name}</span>
                     )}

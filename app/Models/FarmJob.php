@@ -22,7 +22,6 @@ class FarmJob extends Model
         'job_status_id',
         'user_id',
         'property_id',
-        'zone_id',
         'recurring_job_id',
         'maintenance_item_id',
         'asset_id',
@@ -114,9 +113,9 @@ class FarmJob extends Model
         return $this->belongsTo(Property::class);
     }
 
-    public function zone()
+    public function zones()
     {
-        return $this->belongsTo(Zone::class);
+        return $this->belongsToMany(Zone::class);
     }
 
     public function views()

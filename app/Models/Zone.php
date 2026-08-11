@@ -24,6 +24,6 @@ class Zone extends Model
 
     public function farmJobs()
     {
-        return $this->hasMany(FarmJob::class);
+        return $this->belongsToMany(FarmJob::class);
     }
 }

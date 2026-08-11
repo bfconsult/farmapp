@@ -32,7 +32,7 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
         priority_id: job.priority_id ?? '',
         job_type_id: job.job_type_id ?? '',
         job_status_id: job.job_status_id ?? '',
-        zone_id: job.zone_id ?? '',
+        zone_ids: (job.zones ?? []).map((zone) => zone.id),
         assignee_ids: job.assignees.map((user) => user.id),
         repeats: false,
         interval: 'monthly',
@@ -57,6 +57,14 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
     const submit = (e) => {
         e.preventDefault();
         patch(route('jobs.update', job.id));
+    };
+
+    const toggleZone = (zoneId) => {
+        setData('zone_ids',
+            data.zone_ids.includes(zoneId)
+                ? data.zone_ids.filter((id) => id !== zoneId)
+                : [...data.zone_ids, zoneId]
+        );
     };
 
     const toggleAssignee = (userId) => {
@@ -154,21 +162,25 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                             </div>
 
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Zone</label>
-                                <select
-                                    value={data.zone_id}
-                                    onChange={(e) => setData('zone_id', e.target.value)}
-                                    disabled={zonesForJobProperty.length === 0}
-                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 disabled:bg-gray-50 disabled:text-gray-400"
-                                >
-                                    <option value="">
-                                        {zonesForJobProperty.length === 0 ? 'No zones on this property' : 'No specific zone'}
-                                    </option>
-                                    {zonesForJobProperty.map((zone) => (
-                                        <option key={zone.id} value={zone.id}>{zone.name}</option>
-                                    ))}
-                                </select>
-                                {errors.zone_id && <p className="mt-1 text-sm text-red-600">{errors.zone_id}</p>}
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Zones</label>
+                                {zonesForJobProperty.length === 0 ? (
+                                    <p className="text-sm text-gray-400">No zones on this property.</p>
+                                ) : (
+                                    <div className="space-y-1 border border-gray-200 rounded-md divide-y divide-gray-100">
+                                        {zonesForJobProperty.map((zone) => (
+                                            <label key={zone.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={data.zone_ids.includes(zone.id)}
+                                                    onChange={() => toggleZone(zone.id)}
+                                                    className="rounded text-green-600 focus:ring-green-500"
+                                                />
+                                                <span className="text-sm text-gray-900">{zone.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                )}
+                                {errors.zone_ids && <p className="mt-1 text-sm text-red-600">{errors.zone_ids}</p>}
                             </div>
 
                             <div className="grid grid-cols-3 gap-4 mb-6">

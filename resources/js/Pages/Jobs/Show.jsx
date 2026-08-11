@@ -623,7 +623,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Location</span>
                                 <span className="text-sm text-gray-900">
-                                    {job.zone && `${job.zone.name} — `}
+                                    {job.zones && job.zones.length > 0 && `${job.zones.map((z) => z.name).join(', ')} — `}
                                     <button
                                         type="button"
                                         onClick={() => setShowLocationModal(true)}

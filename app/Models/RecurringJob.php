@@ -15,7 +15,6 @@ class RecurringJob extends Model
 
     protected $fillable = [
         'property_id',
-        'zone_id',
         'created_by',
         'name',
         'description',
@@ -39,9 +38,9 @@ class RecurringJob extends Model
         return $this->belongsTo(Property::class);
     }
 
-    public function zone()
+    public function zones()
     {
-        return $this->belongsTo(Zone::class);
+        return $this->belongsToMany(Zone::class);
     }
 
     public function createdBy()
@@ -125,11 +124,12 @@ class RecurringJob extends Model
             'job_status_id' => JobStatus::where('property_id', $this->property_id)->where('is_default', true)->value('id'),
             'user_id' => $this->created_by,
             'property_id' => $this->property_id,
-            'zone_id' => $this->zone_id,
             'recurring_job_id' => $this->id,
             'period_start' => $periodStart,
             'period_end' => $this->periodEndFor($periodStart),
         ]);
+
+        $job->zones()->sync($this->zones->pluck('id'));
 
         $teamUserIds = Role::where('property_id', $job->property_id)->pluck('user_id');
         $job->assignees()->attach($teamUserIds);
