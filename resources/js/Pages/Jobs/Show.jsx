@@ -714,10 +714,9 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                     )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                    {/* Photos */}
-                    {hasPhotos ? (
-                        <div className="col-span-2 bg-white rounded-lg shadow p-4">
+                {(() => {
+                    const photosCard = hasPhotos ? (
+                        <div key="photos" className="col-span-2 bg-white rounded-lg shadow p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Photos</h2>
                                 <div className="flex gap-2">
@@ -763,28 +762,11 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                             </div>
                         </div>
                     ) : (
-                        <EmptySectionTile label="Photos" actionLabel="+ Add" onAction={() => galleryInput.current.click()} />
-                    )}
-                    <input
-                        ref={cameraInput}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={uploadPhotos}
-                        className="hidden"
-                    />
-                    <input
-                        ref={galleryInput}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        onChange={uploadPhotos}
-                        className="hidden"
-                    />
+                        <EmptySectionTile key="photos" label="Photos" actionLabel="+ Add" onAction={() => galleryInput.current.click()} />
+                    );
 
-                    {/* Checklists */}
-                    {hasChecklists ? (
-                        <div className="col-span-2 bg-white rounded-lg shadow p-4">
+                    const checklistsCard = hasChecklists ? (
+                        <div key="checklists" className="col-span-2 bg-white rounded-lg shadow p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Checklists</h2>
                                 <button
@@ -819,47 +801,11 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                             </div>
                         </div>
                     ) : (
-                        <EmptySectionTile label="Checklists" actionLabel="+ Add" onAction={() => setShowChecklistPicker(true)} />
-                    )}
+                        <EmptySectionTile key="checklists" label="Checklists" actionLabel="+ Add" onAction={() => setShowChecklistPicker(true)} />
+                    );
 
-                <Modal show={showChecklistPicker} onClose={() => setShowChecklistPicker(false)} maxWidth="lg">
-                    <div className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-medium text-gray-700">Checklists</h3>
-                            <button onClick={() => setShowChecklistPicker(false)} className="text-sm text-gray-500">Close</button>
-                        </div>
-                        {checklistTemplates && checklistTemplates.length > 0 ? (
-                            <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                                {checklistTemplates.map((template) => {
-                                    const attached = attachedChecklistFor(template.id);
-                                    return (
-                                        <label key={template.id} className="flex items-center gap-3 px-3 py-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={Boolean(attached)}
-                                                onChange={() => toggleChecklistTemplate(template)}
-                                                className="rounded text-green-600 focus:ring-green-500"
-                                            />
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-sm text-gray-900">{template.name}</p>
-                                                <p className="text-xs text-gray-500">{CHECKLIST_TYPE_LABELS[template.type]}</p>
-                                            </div>
-                                        </label>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <p className="text-sm text-gray-400">
-                                No checklist templates yet. Add one from{' '}
-                                <Link href={route('manage.index')} className="text-green-600">Manage</Link>.
-                            </p>
-                        )}
-                    </div>
-                </Modal>
-
-                    {/* Expenses */}
-                    {hasExpenses ? (
-                        <div className="col-span-2 bg-white rounded-lg shadow p-4">
+                    const expensesCard = hasExpenses ? (
+                        <div key="expenses" className="col-span-2 bg-white rounded-lg shadow p-4">
                             <div className="flex items-center justify-between mb-3">
                                 <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Expenses</h2>
                                 <button
@@ -877,10 +823,146 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                             </div>
                         </div>
                     ) : (
-                        <EmptySectionTile label="Expenses" actionLabel="+ Add" onAction={openAddExpense} />
-                    )}
+                        <EmptySectionTile key="expenses" label="Expenses" actionLabel="+ Add" onAction={openAddExpense} />
+                    );
 
-                <Modal show={showExpenseModal} onClose={closeExpenseModal} maxWidth="lg">
+                    const suppliersCard = hasQuotes ? (
+                        <div key="suppliers" className="col-span-2 bg-white rounded-lg shadow overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Suppliers</h2>
+                                {canManage && (
+                                    <div className="flex items-center gap-3">
+                                        {hasAcceptedQuote && hasOtherInvitedQuotes && (
+                                            <button onClick={notifyOtherSuppliers} className="text-xs text-gray-500">
+                                                Notify others it's let
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={openInviteSupplier}
+                                            className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
+                                        >
+                                            + Invite Supplier
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="divide-y divide-gray-100">
+                                {job.quotes.map((quote) => (
+                                    <QuoteRow
+                                        key={quote.id}
+                                        quote={quote}
+                                        canManage={canManage}
+                                        onAccept={openAccept}
+                                        onDecline={declineQuote}
+                                        onDestroy={destroyQuote}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <EmptySectionTile key="suppliers" label="Suppliers" actionLabel="+ Invite" onAction={openInviteSupplier} />
+                    );
+
+                    const notesCard = (hasNotes || addingNote) ? (
+                        <div key="notes" className="col-span-2 bg-white rounded-lg shadow overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
+                                {canCreateNote && !addingNote && (
+                                    <button onClick={() => setAddingNote(true)} className="text-xs text-green-600 font-medium">
+                                        + Add
+                                    </button>
+                                )}
+                            </div>
+                            {hasNotes && (
+                                <div className="divide-y divide-gray-100">
+                                    {job.notes.map((note) => (
+                                        <NoteRow key={note.id} note={note} canManage={canManage} canCreate={canCreateNote} />
+                                    ))}
+                                </div>
+                            )}
+                            {addingNote && (
+                                <AddNoteForm parentField="job_id" parentId={job.id} onClose={() => setAddingNote(false)} />
+                            )}
+                        </div>
+                    ) : (
+                        <EmptySectionTile key="notes" label="Notes" actionLabel={canCreateNote ? '+ Add' : null} onAction={() => setAddingNote(true)} />
+                    );
+
+                    // Full cards (col-span-2, already have content) are grouped first so
+                    // the still-empty tiles that follow are never split apart by a full
+                    // card landing in the middle of the pack - that's what the user asked
+                    // to fix after inviting a supplier turned "Suppliers" into a full card
+                    // sitting between two tile pairs.
+                    const sections = [
+                        { hasContent: hasPhotos, node: photosCard },
+                        { hasContent: hasChecklists, node: checklistsCard },
+                        { hasContent: hasExpenses, node: expensesCard },
+                        ...(canManage || hasQuotes ? [{ hasContent: hasQuotes, node: suppliersCard }] : []),
+                        { hasContent: hasNotes || addingNote, node: notesCard },
+                    ];
+                    const orderedSections = [
+                        ...sections.filter((s) => s.hasContent),
+                        ...sections.filter((s) => !s.hasContent),
+                    ];
+
+                    return (
+                        <div className="grid grid-cols-2 gap-3">
+                            {orderedSections.map((s) => s.node)}
+
+                            <input
+                                ref={cameraInput}
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={uploadPhotos}
+                                className="hidden"
+                            />
+                            <input
+                                ref={galleryInput}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={uploadPhotos}
+                                className="hidden"
+                            />
+
+                            <Modal show={showChecklistPicker} onClose={() => setShowChecklistPicker(false)} maxWidth="lg">
+                                <div className="p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="text-sm font-medium text-gray-700">Checklists</h3>
+                                        <button onClick={() => setShowChecklistPicker(false)} className="text-sm text-gray-500">Close</button>
+                                    </div>
+                                    {checklistTemplates && checklistTemplates.length > 0 ? (
+                                        <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                                            {checklistTemplates.map((template) => {
+                                                const attached = attachedChecklistFor(template.id);
+                                                return (
+                                                    <label key={template.id} className="flex items-center gap-3 px-3 py-3 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={Boolean(attached)}
+                                                            onChange={() => toggleChecklistTemplate(template)}
+                                                            className="rounded text-green-600 focus:ring-green-500"
+                                                        />
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-sm text-gray-900">{template.name}</p>
+                                                            <p className="text-xs text-gray-500">{CHECKLIST_TYPE_LABELS[template.type]}</p>
+                                                        </div>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-gray-400">
+                                            No checklist templates yet. Add one from{' '}
+                                            <Link href={route('manage.index')} className="text-green-600">Manage</Link>.
+                                        </p>
+                                    )}
+                                </div>
+                            </Modal>
+
+                            <Modal show={showExpenseModal} onClose={closeExpenseModal} maxWidth="lg">
                     <div className="p-4 space-y-3">
                         <div className="flex items-center justify-between mb-1">
                             <h3 className="text-sm font-medium text-gray-700">{editingExpense ? 'Edit Expense' : 'Add Expense'}</h3>
@@ -1006,48 +1088,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                     </div>
                 </Modal>
 
-                    {/* Suppliers */}
-                    {(canManage || hasQuotes) && (
-                        hasQuotes ? (
-                            <div className="col-span-2 bg-white rounded-lg shadow overflow-hidden">
-                                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
-                                    <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Suppliers</h2>
-                                    {canManage && (
-                                        <div className="flex items-center gap-3">
-                                            {hasAcceptedQuote && hasOtherInvitedQuotes && (
-                                                <button onClick={notifyOtherSuppliers} className="text-xs text-gray-500">
-                                                    Notify others it's let
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={openInviteSupplier}
-                                                className="text-sm px-3 py-1 bg-green-600 text-white rounded-lg"
-                                            >
-                                                + Invite Supplier
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="divide-y divide-gray-100">
-                                    {job.quotes.map((quote) => (
-                                        <QuoteRow
-                                            key={quote.id}
-                                            quote={quote}
-                                            canManage={canManage}
-                                            onAccept={openAccept}
-                                            onDecline={declineQuote}
-                                            onDestroy={destroyQuote}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        ) : (
-                            <EmptySectionTile label="Suppliers" actionLabel="+ Invite" onAction={openInviteSupplier} />
-                        )
-                    )}
-
-                <Modal show={showQuoteModal} onClose={closeQuoteModal} maxWidth="lg">
+                            <Modal show={showQuoteModal} onClose={closeQuoteModal} maxWidth="lg">
                     <div className="p-4 space-y-3">
                         <div className="flex items-center justify-between mb-1">
                             <h3 className="text-sm font-medium text-gray-700">Invite Supplier</h3>
@@ -1132,7 +1173,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                     </div>
                 </Modal>
 
-                <Modal show={showAcceptModal} onClose={closeAccept} maxWidth="sm">
+                            <Modal show={showAcceptModal} onClose={closeAccept} maxWidth="sm">
                     <div className="p-4 space-y-3">
                         <div className="flex items-center justify-between mb-1">
                             <h3 className="text-sm font-medium text-gray-700">Accept {acceptingQuote?.supplier?.name}'s Quote</h3>
@@ -1167,35 +1208,9 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                         </div>
                     </div>
                 </Modal>
-
-                    {/* Notes - the inline add-note form (not a Modal) needs full
-                        width to render, so it also forces the full card even
-                        while there are still no notes yet. */}
-                    {(hasNotes || addingNote) ? (
-                        <div className="col-span-2 bg-white rounded-lg shadow overflow-hidden">
-                            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
-                                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
-                                {canCreateNote && !addingNote && (
-                                    <button onClick={() => setAddingNote(true)} className="text-xs text-green-600 font-medium">
-                                        + Add
-                                    </button>
-                                )}
-                            </div>
-                            {hasNotes && (
-                                <div className="divide-y divide-gray-100">
-                                    {job.notes.map((note) => (
-                                        <NoteRow key={note.id} note={note} canManage={canManage} canCreate={canCreateNote} />
-                                    ))}
-                                </div>
-                            )}
-                            {addingNote && (
-                                <AddNoteForm parentField="job_id" parentId={job.id} onClose={() => setAddingNote(false)} />
-                            )}
                         </div>
-                    ) : (
-                        <EmptySectionTile label="Notes" actionLabel={canCreateNote ? '+ Add' : null} onAction={() => setAddingNote(true)} />
-                    )}
-                </div>
+                    );
+                })()}
 
                 {/* Finish job */}
                 {!job.job_status?.is_finished_default && (
