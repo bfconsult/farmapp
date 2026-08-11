@@ -4,6 +4,7 @@ import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate as formatDateDayFirst } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 const STATUS_LABELS = {
     draft: 'Draft',
@@ -249,12 +250,12 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                                     <div className="text-right flex-shrink-0 ml-2">
                                         {session.duration_in_hours && (
                                             <p className="text-sm font-medium text-gray-900">
-                                                {session.duration_in_hours}h
+                                                {formatNumber(session.duration_in_hours)}h
                                             </p>
                                         )}
                                         {session.billing_amount && (
                                             <p className="text-sm text-green-700">
-                                                ${session.billing_amount}
+                                                ${formatNumber(session.billing_amount)}
                                             </p>
                                         )}
                                         {!session.ended_at ? (

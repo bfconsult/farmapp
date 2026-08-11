@@ -3,6 +3,7 @@ import BackLink from '@/Components/BackLink';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 function AssetFields({ values, setValues, assetTypes }) {
     return (
@@ -96,7 +97,7 @@ function AssetRow({ asset, canManage, assetTypes }) {
             <Link href={route('assets.show', asset.id)} className="min-w-0 flex-1">
                 <p className="text-sm text-gray-900">{asset.name}</p>
                 <div className="flex items-center gap-2 mt-1">
-                    {asset.value && <span className="text-xs text-gray-500">${asset.value}</span>}
+                    {asset.value && <span className="text-xs text-gray-500">${formatNumber(asset.value)}</span>}
                     {dueDate && (
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
                             {isOverdue ? 'Overdue' : 'Due'} {formatDate(dueDate)}

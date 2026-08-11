@@ -9,6 +9,7 @@ import {
     fromLocalInputValue,
     joinLocalValue,
 } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 const STATUS_LABELS = {
     draft: 'Draft',
@@ -54,7 +55,7 @@ function SessionRow({ session }) {
                 <p className="text-sm font-medium text-gray-900">{sessionLabel(session)}</p>
                 <p className="text-xs text-gray-500 mt-1">
                     {formatDateDayFirst(session.started_at)} · {formatTime(session.started_at)} — {formatTime(session.ended_at)}
-                    {session.duration_in_hours && ` · ${session.duration_in_hours}h`}
+                    {session.duration_in_hours && ` · ${formatNumber(session.duration_in_hours)}h`}
                 </p>
                 {session.created_by && (
                     <p className="text-xs text-gray-400 mt-0.5">Added by {session.created_by.name}</p>

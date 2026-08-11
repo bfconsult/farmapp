@@ -4,6 +4,7 @@ import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate as formatDateDayFirst } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 const TYPE_LABELS = { expense: 'Expense', labour: 'Labour' };
 
@@ -51,12 +52,12 @@ function TransactionRow({ transaction }) {
                         {formatDateDayFirst(transaction.date)}
                         {isLabour ? (
                             <>
-                                {transaction.duration_in_hours && ` · ${transaction.duration_in_hours}h`}
+                                {transaction.duration_in_hours && ` · ${formatNumber(transaction.duration_in_hours)}h`}
                                 {' · '}
-                                {transaction.amount != null ? `$${transaction.amount.toFixed(2)}` : 'Rate not set'}
+                                {transaction.amount != null ? `$${formatNumber(transaction.amount)}` : 'Rate not set'}
                             </>
                         ) : (
-                            <> · ${transaction.amount.toFixed(2)} ({transaction.gst_inclusive ? 'GST inc' : 'GST ex'})</>
+                            <> · ${formatNumber(transaction.amount)} ({transaction.gst_inclusive ? 'GST inc' : 'GST ex'})</>
                         )}
                     </p>
                     {transaction.farm_job && (
@@ -164,7 +165,7 @@ export default function Show({ supplier, transactions, total, currentDateFrom, c
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                     <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Transactions</h2>
-                        <span className="text-sm font-medium text-gray-900">${total.toFixed(2)}</span>
+                        <span className="text-sm font-medium text-gray-900">${formatNumber(total)}</span>
                     </div>
                     {transactions.length === 0 ? (
                         <p className="text-sm text-gray-400 p-4">No transactions in this date range.</p>

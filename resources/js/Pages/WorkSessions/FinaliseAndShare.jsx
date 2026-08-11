@@ -4,6 +4,7 @@ import BackLink from '@/Components/BackLink';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 function currentMonthRange() {
     const now = new Date();
@@ -161,13 +162,13 @@ export default function FinaliseAndShare({ sessions, currentDateFrom, currentDat
                                             </p>
                                             {session.billing_amount && (
                                                 <p className="text-sm text-green-700 flex-shrink-0">
-                                                    ${session.billing_amount}
+                                                    ${formatNumber(session.billing_amount)}
                                                 </p>
                                             )}
                                         </div>
                                         <p className="text-sm text-gray-500 mt-1">
                                             {formatSessionDate(session.started_at)} · {formatTime(session.started_at)} — {formatTime(session.ended_at)}
-                                            {session.duration_in_hours && ` · ${session.duration_in_hours}h`}
+                                            {session.duration_in_hours && ` · ${formatNumber(session.duration_in_hours)}h`}
                                         </p>
                                         {session.has_conflict && (
                                             <p className="text-sm text-red-600 mt-1 font-medium">

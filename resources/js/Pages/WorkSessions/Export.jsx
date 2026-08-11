@@ -4,6 +4,7 @@ import BackLink from '@/Components/BackLink';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 function currentMonthRange() {
     const now = new Date();
@@ -107,11 +108,11 @@ export default function Export({ currentDateFrom, currentDateTo, draftCount, exp
                     </div>
                     <div className="flex justify-between text-sm mb-2">
                         <span className="text-gray-500">Total hours</span>
-                        <span className="font-medium text-gray-900">{exportSummary.hours}h</span>
+                        <span className="font-medium text-gray-900">{formatNumber(exportSummary.hours)}h</span>
                     </div>
                     <div className="flex justify-between text-sm mb-4">
                         <span className="text-gray-500">Total billing (Ex GST)</span>
-                        <span className="font-medium text-green-700">${exportSummary.billing}</span>
+                        <span className="font-medium text-green-700">${formatNumber(exportSummary.billing)}</span>
                     </div>
 
                     <div className="flex items-center justify-between mb-4">

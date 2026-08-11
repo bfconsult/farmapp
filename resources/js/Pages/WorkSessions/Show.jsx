@@ -7,6 +7,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import { formatDate as formatDateDayFirst } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 const STATUS_LABELS = {
     draft: 'Draft',
@@ -155,13 +156,13 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                         {durationInHours && (
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Duration</span>
-                                <span className="text-sm font-medium text-gray-900">{durationInHours}h</span>
+                                <span className="text-sm font-medium text-gray-900">{formatNumber(durationInHours)}h</span>
                             </div>
                         )}
                         {billingAmount && (
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Billing Amount</span>
-                                <span className="text-sm font-medium text-green-700">${billingAmount}</span>
+                                <span className="text-sm font-medium text-green-700">${formatNumber(billingAmount)}</span>
                             </div>
                         )}
                         {session.farm_job && (

@@ -58,7 +58,7 @@
                     <td>{{ $row['end'] }}</td>
                     <td class="amount">{{ $row['duration'] }}</td>
                     @if ($rateMode === 'billing')
-                        <td class="amount">{{ $row['amount'] !== null ? '$' . number_format($row['amount'], 2) : '—' }}</td>
+                        <td class="amount">{{ $row['amount'] !== null ? '$' . format_number($row['amount']) : '—' }}</td>
                     @endif
                 </tr>
             @endforeach
@@ -66,9 +66,9 @@
         <tfoot>
             <tr>
                 <td colspan="4">Total</td>
-                <td class="amount">{{ number_format($totalHours, 2) }}</td>
+                <td class="amount">{{ format_number($totalHours) }}</td>
                 @if ($rateMode === 'billing')
-                    <td class="amount">${{ number_format($totalBilling, 2) }}</td>
+                    <td class="amount">${{ format_number($totalBilling) }}</td>
                 @endif
             </tr>
         </tfoot>

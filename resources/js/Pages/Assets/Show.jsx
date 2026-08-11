@@ -6,6 +6,7 @@ import BackLink from '@/Components/BackLink';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 import { pillBadgeClass } from '@/Utils/pillColors';
 
 const ASSET_COLOR = '#2563eb';
@@ -613,7 +614,7 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours, workSe
                                 <p className="text-sm text-gray-500 mb-2">{asset.description}</p>
                             )}
                             {asset.value && (
-                                <p className="text-sm text-gray-900">${asset.value}</p>
+                                <p className="text-sm text-gray-900">${formatNumber(asset.value)}</p>
                             )}
                             {canManage && (
                                 <button onClick={() => setEditing(true)} className="text-xs text-green-600 mt-2">Edit</button>
@@ -785,7 +786,7 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours, workSe
                     ) : (
                         <div className="flex items-center justify-between px-4 py-3">
                             <div>
-                                <p className="text-lg font-semibold text-gray-900">{bookedHours}h</p>
+                                <p className="text-lg font-semibold text-gray-900">{formatNumber(bookedHours)}h</p>
                                 <p className="text-xs text-gray-500">total logged</p>
                             </div>
                             <button onClick={() => setShowSessionHistory(true)} className="text-sm text-green-600 font-medium">
@@ -816,7 +817,7 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours, workSe
                                     <tr key={session.id}>
                                         <td className="px-2 py-2 text-gray-900 whitespace-nowrap">{session.user_name}</td>
                                         <td className="px-2 py-2 text-gray-500 whitespace-nowrap">{formatDate(session.started_at.slice(0, 10))}</td>
-                                        <td className="px-2 py-2 text-gray-900 font-medium text-right">{session.hours}h</td>
+                                        <td className="px-2 py-2 text-gray-900 font-medium text-right">{formatNumber(session.hours)}h</td>
                                     </tr>
                                 ))}
                             </tbody>

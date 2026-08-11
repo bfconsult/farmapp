@@ -9,6 +9,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 import { pillBadgeClass } from '@/Utils/pillColors';
 
 const CHECKLIST_TYPE_LABELS = {
@@ -80,7 +81,7 @@ function ExpenseRow({ expense, onEdit }) {
                 <div className="min-w-0">
                     <p className="text-sm text-gray-900">{expense.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                        ${Number(expense.amount).toFixed(2)} ({expense.gst_inclusive ? 'GST inc' : 'GST ex'})
+                        ${formatNumber(expense.amount)} ({expense.gst_inclusive ? 'GST inc' : 'GST ex'})
                         {expense.supplier && ` · ${expense.supplier.name}`}
                     </p>
                 </div>
@@ -162,7 +163,7 @@ function QuoteRow({ quote, canManage, onAccept, onDecline, onDestroy }) {
                     <p className="text-sm text-gray-900 truncate">{quote.supplier?.name ?? 'Removed supplier'}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
                         {quote.requires_quote ? 'Quote requested' : 'Do-and-charge'}
-                        {quote.amount && ` · $${Number(quote.amount).toFixed(2)}`}
+                        {quote.amount && ` · $${formatNumber(quote.amount)}`}
                     </p>
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${QUOTE_STATUS_COLORS[quote.status]}`}>
@@ -610,13 +611,13 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                         {job.estimated_hours && (
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Estimated Hours</span>
-                                <span className="text-sm text-gray-900">{job.estimated_hours}h</span>
+                                <span className="text-sm text-gray-900">{formatNumber(job.estimated_hours)}h</span>
                             </div>
                         )}
                         {job.budget && (
                             <div className="flex justify-between">
                                 <span className="text-sm text-gray-500">Budget</span>
-                                <span className="text-sm text-gray-900">${job.budget}</span>
+                                <span className="text-sm text-gray-900">${formatNumber(job.budget)}</span>
                             </div>
                         )}
                         {job.latitude && (
@@ -692,7 +693,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                     >
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Labour</h2>
                         <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">${Number(labourTotal).toFixed(2)}</span>
+                            <span className="text-sm font-medium text-gray-900">${formatNumber(labourTotal)}</span>
                             <span className="text-gray-400 text-xs">{showLabourDetail ? '▲' : '▼'}</span>
                         </div>
                     </button>
@@ -705,10 +706,10 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                                 {labourEntries.map((entry) => (
                                     <div key={entry.id} className="px-4 py-2 flex items-center justify-between gap-2">
                                         <p className="text-sm text-gray-900 truncate">
-                                            {entry.user_name} · {formatDate(entry.started_at, { year: false })} · {entry.duration_in_hours}h
+                                            {entry.user_name} · {formatDate(entry.started_at, { year: false })} · {formatNumber(entry.duration_in_hours)}h
                                         </p>
                                         <span className="text-sm text-gray-900 flex-shrink-0">
-                                            ${Number(entry.amount).toFixed(2)}
+                                            ${formatNumber(entry.amount)}
                                         </span>
                                     </div>
                                 ))}

@@ -3,6 +3,7 @@ import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 function sessionLabel(session) {
     if (session.farm_job) return session.farm_job.name;
@@ -84,9 +85,9 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
                 <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow mb-3">
                     <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">All Workers</p>
                     <p className="text-base font-semibold text-gray-900">
-                        {grandTotal.hours}h
+                        {formatNumber(grandTotal.hours)}h
                         {grandTotal.billing > 0 && (
-                            <span className="text-green-700"> · ${grandTotal.billing}</span>
+                            <span className="text-green-700"> · ${formatNumber(grandTotal.billing)}</span>
                         )}
                     </p>
                 </div>
@@ -201,9 +202,9 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
                                     <div className="text-right">
                                         <p className="text-xs text-gray-500 uppercase tracking-wide">Subtotal</p>
                                         <p className="text-sm font-medium text-gray-900">
-                                            {worker.totalHours}h
+                                            {formatNumber(worker.totalHours)}h
                                             {worker.totalBilling > 0 && (
-                                                <span className="text-green-700"> · ${worker.totalBilling}</span>
+                                                <span className="text-green-700"> · ${formatNumber(worker.totalBilling)}</span>
                                             )}
                                         </p>
                                     </div>
@@ -220,9 +221,9 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
                                                 </p>
                                             </div>
                                             <div className="text-right flex-shrink-0">
-                                                <p className="text-sm text-gray-900">{session.duration_in_hours}h</p>
+                                                <p className="text-sm text-gray-900">{formatNumber(session.duration_in_hours)}h</p>
                                                 {session.billing_amount && (
-                                                    <p className="text-xs text-green-700">${session.billing_amount}</p>
+                                                    <p className="text-xs text-green-700">${formatNumber(session.billing_amount)}</p>
                                                 )}
                                             </div>
                                         </div>

@@ -3,6 +3,7 @@ import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 import { pillBadgeClass } from '@/Utils/pillColors';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -76,12 +77,12 @@ function JobCard({ job }) {
                 <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
                     {job.total_hours > 0 && (
                         <span>
-                            {job.total_hours}h booked
-                            {job.total_cost > 0 && ` · $${job.total_cost.toFixed(2)}`}
+                            {formatNumber(job.total_hours)}h booked
+                            {job.total_cost > 0 && ` · $${formatNumber(job.total_cost)}`}
                         </span>
                     )}
                     {job.total_expenses > 0 && (
-                        <span>Expenses: ${job.total_expenses.toFixed(2)}</span>
+                        <span>Expenses: ${formatNumber(job.total_expenses)}</span>
                     )}
                 </div>
             )}

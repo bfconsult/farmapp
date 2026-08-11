@@ -1,4 +1,5 @@
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 function formatDayHeading(dateStr) {
     return formatDate(dateStr, { weekday: 'long', month: 'long', year: 'numeric' });
@@ -37,7 +38,7 @@ export default function DiaryDays({ days }) {
                                     <p className="font-medium text-gray-900">{entry.label}</p>
                                     <p className="text-xs text-gray-500 flex-shrink-0">
                                         {formatTime(entry.started_at)} – {formatTime(entry.ended_at)}
-                                        {entry.duration_in_hours ? ` (${entry.duration_in_hours}h)` : ''}
+                                        {entry.duration_in_hours ? ` (${formatNumber(entry.duration_in_hours)}h)` : ''}
                                     </p>
                                 </div>
                                 <p className="text-sm text-gray-500 mb-2">{entry.user_name}</p>
