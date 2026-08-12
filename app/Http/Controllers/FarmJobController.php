@@ -337,23 +337,8 @@ class FarmJobController extends Controller
 
         $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos']);
 
-        // Curated on purpose - this is a public, unauthenticated route, so
-        // internal figures like budget/hourly_rate/location never leave the
-        // server, not just hidden in the UI.
         return Inertia::render('Jobs/SharedView', [
-            'job' => [
-                'name' => $farmJob->name,
-                'description' => $farmJob->description,
-                'scheduled_date' => $farmJob->scheduled_date,
-                'priority' => $farmJob->priority?->only(['name', 'color']),
-                'job_type' => $farmJob->jobType?->only(['name', 'color']),
-                'job_status' => $farmJob->jobStatus?->only(['name', 'color']),
-                'property' => $farmJob->property?->only(['name']),
-                'photos' => $farmJob->photos->map(fn ($photo) => [
-                    'id' => $photo->id,
-                    'url' => $photo->url,
-                ]),
-            ],
+            'job' => $farmJob->toSharePayload(),
             // Not a plain "/favicon.svg" path - Vapor only serves favicon.ico
             // and robots.txt directly from the app root; everything else in
             // public/ needs asset(), which redirects to the CDN-backed URL.

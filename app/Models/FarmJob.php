@@ -69,6 +69,30 @@ class FarmJob extends Model
         return $user !== null && $this->assignees()->where('users.id', $user->id)->exists();
     }
 
+    /**
+     * Curated payload for the public share view (Jobs/SharedView.jsx) - used
+     * both by the job's own share link and a supplier's quote-invite link.
+     * Deliberately excludes internal figures like budget/hourly_rate/location,
+     * since this is a public, unauthenticated route. Expects
+     * priority/jobType/jobStatus/property/photos already eager-loaded.
+     */
+    public function toSharePayload(): array
+    {
+        return [
+            'name' => $this->name,
+            'description' => $this->description,
+            'scheduled_date' => $this->scheduled_date,
+            'priority' => $this->priority?->only(['name', 'color']),
+            'job_type' => $this->jobType?->only(['name', 'color']),
+            'job_status' => $this->jobStatus?->only(['name', 'color']),
+            'property' => $this->property?->only(['name']),
+            'photos' => $this->photos->map(fn ($photo) => [
+                'id' => $photo->id,
+                'url' => $photo->url,
+            ]),
+        ];
+    }
+
     public function recurringJob()
     {
         return $this->belongsTo(RecurringJob::class);

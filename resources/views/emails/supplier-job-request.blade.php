@@ -10,7 +10,7 @@
 {{ $quote->message }}
 @endif
 
-<x-mail::button :url="route('jobs.share', $quote->farmJob->share_token)">
+<x-mail::button :url="route('quotes.share', $quote->share_token)">
 View Job Details
 </x-mail::button>
 

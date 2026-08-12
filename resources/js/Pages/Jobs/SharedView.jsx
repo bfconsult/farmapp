@@ -2,7 +2,7 @@ import { Head } from '@inertiajs/react';
 import { formatDate } from '@/dateInput';
 import { pillBadgeClass } from '@/Utils/pillColors';
 
-export default function SharedView({ job, logoUrl }) {
+export default function SharedView({ job, logoUrl, viewingSupplier }) {
     return (
         <>
             <Head title={job.name} />
@@ -13,6 +13,14 @@ export default function SharedView({ job, logoUrl }) {
                         <img src={logoUrl} className="w-5 h-5" alt="" />
                         <span>FieldWerkz</span>
                     </div>
+
+                    {viewingSupplier && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-center">
+                            <span className="text-sm text-green-800">
+                                Viewing as <span className="font-medium">{viewingSupplier}</span>
+                            </span>
+                        </div>
+                    )}
 
                     <div className="bg-white rounded-lg shadow p-4">
                         <h1 className="text-xl font-semibold text-gray-900 mb-3">{job.name}</h1>

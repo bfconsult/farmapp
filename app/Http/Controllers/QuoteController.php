@@ -11,9 +11,36 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class QuoteController extends Controller
 {
+    /**
+     * A supplier's own invite link - unique per quote (not the job's own
+     * share_token, which every supplier invited to the same job would
+     * otherwise share), so the shared job view can identify which supplier
+     * is looking at it without them needing an account. Same curated,
+     * read-only payload as FarmJobController::share() - no accept/decline
+     * actions here, that's still done from inside the app after a call.
+     */
+    public function share(string $token)
+    {
+        $quote = Quote::where('share_token', $token)->with('supplier')->firstOrFail();
+        $farmJob = $quote->farmJob;
+
+        if ($farmJob->isVisibleTo(Auth::user())) {
+            return redirect()->route('jobs.show', $farmJob);
+        }
+
+        $farmJob->load(['priority', 'jobType', 'jobStatus', 'property', 'photos']);
+
+        return Inertia::render('Jobs/SharedView', [
+            'job' => $farmJob->toSharePayload(),
+            'logoUrl' => asset('favicon.svg'),
+            'viewingSupplier' => $quote->supplier?->name,
+        ]);
+    }
+
     public function store(Request $request, FarmJob $farmJob)
     {
         // Blocks the whole process rather than sending from a blank reply-to -

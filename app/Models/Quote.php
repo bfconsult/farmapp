@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Quote extends Model
 {
@@ -22,6 +23,7 @@ class Quote extends Model
         'message',
         'invited_at',
         'decided_at',
+        'share_token',
     ];
 
     protected $casts = [
@@ -30,6 +32,13 @@ class Quote extends Model
         'invited_at' => 'datetime',
         'decided_at' => 'datetime',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function (Quote $quote) {
+            $quote->share_token = $quote->share_token ?? Str::random(40);
+        });
+    }
 
     public function farmJob()
     {

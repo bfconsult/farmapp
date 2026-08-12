@@ -249,3 +249,94 @@ test('deleting a supplier preserves the historical quote record with a null supp
     expect($quote->supplier_id)->toBeNull();
     expect((float) $quote->amount)->toBe(450.0);
 });
+
+test('each quote gets its own share token, distinct from the job and from other quotes on it', function () {
+    [$admin, $property, $job] = createJobAndAdmin();
+    $supplierA = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'a@example.test']);
+    $supplierB = Supplier::create(['property_id' => $property->id, 'name' => 'Bravo Fencing', 'email' => 'b@example.test']);
+
+    $quoteA = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplierA->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::INVITED, 'invited_at' => now(),
+    ]);
+    $quoteB = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplierB->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::INVITED, 'invited_at' => now(),
+    ]);
+
+    expect($quoteA->share_token)->not->toBeNull();
+    expect($quoteB->share_token)->not->toBeNull();
+    expect($quoteA->share_token)->not->toBe($quoteB->share_token);
+    expect($quoteA->share_token)->not->toBe($job->share_token);
+});
+
+test('the invite email links to the quote\'s own share link, not the job\'s', function () {
+    Mail::fake();
+    [$admin, $property, $job] = createJobAndAdmin();
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'quotes@acmefencing.test']);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('quotes.store', $job->id), ['supplier_id' => $supplier->id, 'requires_quote' => true]);
+
+    $quote = Quote::first();
+
+    Mail::assertSent(SupplierJobRequest::class, function ($mail) use ($quote) {
+        $rendered = $mail->render();
+        return str_contains($rendered, route('quotes.share', $quote->share_token))
+            && !str_contains($rendered, route('jobs.share', $quote->farmJob->share_token));
+    });
+});
+
+test('a quote\'s share link shows the job with the supplier identified, without an account', function () {
+    [$admin, $property, $job] = createJobAndAdmin();
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'quotes@acmefencing.test']);
+    $quote = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::INVITED, 'invited_at' => now(),
+    ]);
+
+    $this->get(route('quotes.share', $quote->share_token))
+        ->assertInertia(fn ($page) => $page
+            ->component('Jobs/SharedView')
+            ->where('job.name', 'Fence the north paddock')
+            ->where('viewingSupplier', 'Acme Fencing'));
+});
+
+test('two suppliers on the same job see the same job through their own distinct links', function () {
+    [$admin, $property, $job] = createJobAndAdmin();
+    $supplierA = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'a@example.test']);
+    $supplierB = Supplier::create(['property_id' => $property->id, 'name' => 'Bravo Fencing', 'email' => 'b@example.test']);
+    $quoteA = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplierA->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::INVITED, 'invited_at' => now(),
+    ]);
+    $quoteB = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplierB->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::INVITED, 'invited_at' => now(),
+    ]);
+
+    $this->get(route('quotes.share', $quoteA->share_token))
+        ->assertInertia(fn ($page) => $page->where('viewingSupplier', 'Acme Fencing'));
+
+    $this->get(route('quotes.share', $quoteB->share_token))
+        ->assertInertia(fn ($page) => $page->where('viewingSupplier', 'Bravo Fencing'));
+});
+
+test('an assignee who is logged in gets redirected to the real job page instead of the shared view', function () {
+    [$admin, $property, $job] = createJobAndAdmin();
+    $job->assignees()->attach($admin->id);
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'quotes@acmefencing.test']);
+    $quote = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::INVITED, 'invited_at' => now(),
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('quotes.share', $quote->share_token))
+        ->assertRedirect(route('jobs.show', $job->id));
+});
+
+test('an unknown quote share token 404s', function () {
+    $this->get(route('quotes.share', 'not-a-real-token'))->assertNotFound();
+});

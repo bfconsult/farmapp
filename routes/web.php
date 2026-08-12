@@ -329,6 +329,9 @@ Route::post('invitations/{token}/claim', [InvitationController::class, 'claim'])
 // viewer sees the normal job page or a read-only share view)
 Route::get('share/jobs/{token}', [FarmJobController::class, 'share'])->name('jobs.share');
 
+// A supplier's own invite link - unique per quote, see QuoteController::share()
+Route::get('share/quotes/{token}', [QuoteController::class, 'share'])->name('quotes.share');
+
 // Diary share link (no auth required - a public read-only day-by-day
 // activity report for an approver, see DiaryShareController)
 Route::get('share/diary/{token}', [DiaryShareController::class, 'show'])->name('diary.share');
