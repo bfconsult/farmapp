@@ -1,4 +1,3 @@
-import { Link, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import LocationMap from '@/Components/LocationMap';
 
@@ -66,7 +65,7 @@ function layerToCoordinates(layer) {
  * static preview instead of the draw tool, so it can never accidentally
  * clobber a boundary someone has since carefully refined in the full editor.
  */
-export default function PropertyBoundaryPicker({ property, onRefineClick }) {
+export default function PropertyBoundaryPicker({ property, onSave }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const squareLayer = useRef(null);
@@ -199,11 +198,7 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
     const saveBoundary = () => {
         const coordinates = layerToCoordinates(squareLayer.current);
         setSaving(true);
-        router.put(route('shape.update', property.id), { coordinates }, {
-            preserveScroll: true,
-            preserveState: true,
-            onFinish: () => setSaving(false),
-        });
+        onSave(coordinates, () => setSaving(false));
     };
 
     const startOver = () => {
@@ -226,16 +221,7 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
                     boundaryFillColor={BOUNDARY_COLOR}
                 />
                 <div className="px-3 py-2 bg-white border-t border-gray-200 text-sm">
-                    <span className="text-gray-500">Boundary is set — </span>
-                    {onRefineClick ? (
-                        <button type="button" onClick={onRefineClick} className="text-green-600">
-                            refine it on the Boundary page →
-                        </button>
-                    ) : (
-                        <Link href={route('shape.edit', property.id)} className="text-green-600">
-                            refine it on the Boundary page →
-                        </Link>
-                    )}
+                    <span className="text-gray-500">Boundary is set - you can refine it later on the Map page</span>
                 </div>
             </div>
         );
@@ -254,7 +240,7 @@ export default function PropertyBoundaryPicker({ property, onRefineClick }) {
             </div>
             <div className="mt-1 flex items-center justify-between gap-3">
                 <p className="text-xs text-gray-500">
-                    You can refine the exact shape anytime from the Boundary page.
+                    You can refine the exact shape anytime from the Map page.
                 </p>
                 {hasDrawn && (
                     <div className="flex items-center gap-3 shrink-0">

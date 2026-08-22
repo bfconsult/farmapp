@@ -95,7 +95,6 @@ class HandleInertiaRequests extends Middleware
         'hasIncompleteMetrics' => $hasIncompleteMetrics,
         'flash' => [
             'addPhoto' => session('addPhoto'),
-            'isNewProperty' => session('isNewProperty'),
             'error' => session('error'),
             'success' => session('success'),
         ],
