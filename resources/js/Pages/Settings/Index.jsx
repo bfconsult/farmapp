@@ -153,7 +153,7 @@ const BILLING_BLOCK_LABELS = {
     60: '1 hour',
 };
 
-export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, billingBlockMinutes, billingBlockOptions }) {
+export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, livestockTypes, billingBlockMinutes, billingBlockOptions }) {
     const [activeTab, setActiveTab] = useState('priorities');
 
     const tabs = [
@@ -161,6 +161,7 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
         { key: 'jobTypes', label: 'Types' },
         { key: 'jobStatuses', label: 'Statuses' },
         { key: 'assetTypes', label: 'Asset Types' },
+        { key: 'livestockTypes', label: 'Livestock Types' },
         { key: 'billing', label: 'Billing' },
     ];
 
@@ -188,6 +189,13 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
     const saveAssetType = (id, values) => router.patch(route('settings.asset-types.update', id), { name: values.name }, preserve);
     const deleteAssetType = (id) => {
         if (confirm('Delete this asset type?')) router.delete(route('settings.asset-types.destroy', id), preserve);
+    };
+
+    // Livestock Types
+    const addLivestockType = (values) => router.post(route('settings.livestock-types.store'), { name: values.name }, preserve);
+    const saveLivestockType = (id, values) => router.patch(route('settings.livestock-types.update', id), { name: values.name }, preserve);
+    const deleteLivestockType = (id) => {
+        if (confirm('Delete this livestock type?')) router.delete(route('settings.livestock-types.destroy', id), preserve);
     };
 
     // Job Statuses
@@ -332,6 +340,20 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, b
                                 />
                             ))}
                             <AddRow onAdd={addAssetType} />
+                        </>
+                    )}
+
+                    {activeTab === 'livestockTypes' && (
+                        <>
+                            {livestockTypes.map((item) => (
+                                <LookupRow
+                                    key={item.id}
+                                    item={item}
+                                    onSave={saveLivestockType}
+                                    onDelete={deleteLivestockType}
+                                />
+                            ))}
+                            <AddRow onAdd={addLivestockType} />
                         </>
                     )}
 

@@ -6,6 +6,7 @@ use App\Models\Priority;
 use App\Models\JobType;
 use App\Models\JobStatus;
 use App\Models\AssetType;
+use App\Models\LivestockType;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,6 +30,7 @@ class SettingsController extends Controller
             'jobTypes' => JobType::where('property_id', $currentPropertyId)->orderBy('name')->get(),
             'jobStatuses' => JobStatus::where('property_id', $currentPropertyId)->orderBy('order')->get(),
             'assetTypes' => AssetType::where('property_id', $currentPropertyId)->orderBy('name')->get(),
+            'livestockTypes' => LivestockType::where('property_id', $currentPropertyId)->orderBy('name')->get(),
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
             'billingBlockOptions' => User::BILLING_BLOCK_OPTIONS,
         ]);
@@ -149,6 +151,38 @@ class SettingsController extends Controller
         }
 
         $assetType->delete();
+        return back();
+    }
+
+    public function storeLivestockType(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+        LivestockType::create([...$validated, 'property_id' => session('current_property_id')]);
+        return back();
+    }
+
+    public function updateLivestockType(Request $request, LivestockType $livestockType)
+    {
+        if ($livestockType->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+        $livestockType->update($validated);
+        return back();
+    }
+
+    public function destroyLivestockType(LivestockType $livestockType)
+    {
+        if ($livestockType->property_id !== (int) session('current_property_id')) {
+            abort(404);
+        }
+
+        $livestockType->delete();
         return back();
     }
 

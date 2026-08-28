@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\ChecklistTemplate;
+use App\Models\Livestock;
 use App\Models\MaintenanceItem;
 use App\Models\Metric;
 use App\Models\MetricMeasurement;
+use App\Models\Mob;
 use App\Models\Property;
 use App\Models\Supplier;
 use Illuminate\Support\Facades\Auth;
@@ -49,6 +51,9 @@ class ManageController extends Controller
             ? Supplier::where('property_id', $currentPropertyId)->count()
             : 0;
 
+        $mobsCount = Mob::where('property_id', $currentPropertyId)->count();
+        $livestockCount = Livestock::where('property_id', $currentPropertyId)->count();
+
         return Inertia::render('Manage/Index', [
             'metricsTracked' => $metricsTracked,
             'metricsDue' => $metricsDue,
@@ -56,6 +61,8 @@ class ManageController extends Controller
             'assetsCount' => $assetsCount,
             'assetsOverdue' => $assetsOverdue,
             'suppliersCount' => $suppliersCount,
+            'mobsCount' => $mobsCount,
+            'livestockCount' => $livestockCount,
             'canManage' => $canManage,
             'canReviewWorkSessions' => $canReviewWorkSessions,
         ]);

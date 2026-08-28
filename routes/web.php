@@ -24,6 +24,8 @@ use App\Http\Controllers\ChecklistTemplateItemController;
 use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\LivestockController;
+use App\Http\Controllers\MobController;
 use App\Http\Controllers\MaintenanceItemController;
 use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ExpenseController;
@@ -151,6 +153,17 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('settings/asset-types', [SettingsController::class, 'storeAssetType'])->name('settings.asset-types.store');
     Route::patch('settings/asset-types/{assetType}', [SettingsController::class, 'updateAssetType'])->name('settings.asset-types.update');
     Route::delete('settings/asset-types/{assetType}', [SettingsController::class, 'destroyAssetType'])->name('settings.asset-types.destroy');
+    Route::post('settings/livestock-types', [SettingsController::class, 'storeLivestockType'])->name('settings.livestock-types.store');
+    Route::patch('settings/livestock-types/{livestockType}', [SettingsController::class, 'updateLivestockType'])->name('settings.livestock-types.update');
+    Route::delete('settings/livestock-types/{livestockType}', [SettingsController::class, 'destroyLivestockType'])->name('settings.livestock-types.destroy');
+    Route::post('mobs', [MobController::class, 'store'])->name('mobs.store');
+    Route::patch('mobs/{mob}', [MobController::class, 'update'])->name('mobs.update');
+    Route::put('mobs/{mob}/zone', [MobController::class, 'updateZone'])->name('mobs.update-zone');
+    Route::delete('mobs/{mob}', [MobController::class, 'destroy'])->name('mobs.destroy');
+    Route::post('mobs/{mob}/animals', [MobController::class, 'storeAnimals'])->name('mobs.animals.store');
+    Route::post('livestock', [LivestockController::class, 'store'])->name('livestock.store');
+    Route::patch('livestock/{livestock}', [LivestockController::class, 'update'])->name('livestock.update');
+    Route::delete('livestock/{livestock}', [LivestockController::class, 'destroy'])->name('livestock.destroy');
     Route::resource('manage/suppliers', SupplierController::class)->names('manage.suppliers');
     Route::post('jobs/{farmJob}/quotes', [QuoteController::class, 'store'])->name('quotes.store');
     Route::patch('quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
@@ -207,6 +220,9 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
     Route::get('assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
     Route::get('assets/{asset}/jobs', [AssetController::class, 'jobHistory'])->name('assets.jobs');
     Route::post('notes/{note}/seen', [NoteController::class, 'markSeen'])->name('notes.mark-seen');
+    Route::get('manage/livestock', [LivestockController::class, 'index'])->name('manage.livestock');
+    Route::get('mobs/{mob}', [MobController::class, 'show'])->name('mobs.show');
+    Route::get('livestock/{livestock}', [LivestockController::class, 'show'])->name('livestock.show');
 });
 
     // All authenticated users with a property

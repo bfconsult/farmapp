@@ -11,6 +11,8 @@ class Note extends Model
         'asset_id',
         'job_id',
         'work_session_id',
+        'mob_id',
+        'livestock_id',
         'created_by',
         'body',
         'latitude',
@@ -35,6 +37,16 @@ class Note extends Model
     public function workSession()
     {
         return $this->belongsTo(WorkSession::class);
+    }
+
+    public function mob()
+    {
+        return $this->belongsTo(Mob::class);
+    }
+
+    public function livestock()
+    {
+        return $this->belongsTo(Livestock::class);
     }
 
     public function createdBy()

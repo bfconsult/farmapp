@@ -252,7 +252,7 @@ export default function AuthenticatedLayout({ title, children }) {
                         <Link
                             href={route('manage.index')}
                             className={`flex flex-col items-center text-xs gap-1 px-4 py-2 ${
-                                route().current('manage.*') || route().current('metrics.*') || route().current('metric-measurements.*') || route().current('checklist-templates.*') || route().current('checklists.*') || route().current('checklist-items.*')
+                                route().current('manage.*') || route().current('metrics.*') || route().current('metric-measurements.*') || route().current('checklist-templates.*') || route().current('checklists.*') || route().current('checklist-items.*') || route().current('livestock.*') || route().current('mobs.*')
                                     ? 'text-green-600'
                                     : 'text-gray-500'
                             }`}

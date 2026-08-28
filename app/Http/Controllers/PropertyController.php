@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AssetType;
 use App\Models\JobStatus;
 use App\Models\JobType;
+use App\Models\LivestockType;
 use App\Models\Priority;
 use App\Models\Property;
 use App\Models\Role;
@@ -55,6 +56,7 @@ class PropertyController extends Controller
         Priority::seedDefaultsForProperty($property->id);
         JobType::seedDefaultsForProperty($property->id);
         AssetType::seedDefaultsForProperty($property->id);
+        LivestockType::seedDefaultsForProperty($property->id);
 
         session(['current_property_id' => $property->id]);
         Auth::user()->update(['current_property_id' => $property->id]);

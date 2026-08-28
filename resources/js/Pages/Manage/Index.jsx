@@ -21,7 +21,7 @@ function HubCard({ href, icon, title, subtitle }) {
     );
 }
 
-export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, suppliersCount, canManage, canReviewWorkSessions }) {
+export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, suppliersCount, mobsCount, livestockCount, canManage, canReviewWorkSessions }) {
     return (
         <AuthenticatedLayout title="Manage">
             <Head title="Manage" />
@@ -75,6 +75,17 @@ export default function Index({ metricsTracked, metricsDue, checklistTemplatesCo
                             <circle cx="7" cy="17" r="3" />
                             <circle cx="17" cy="17" r="3" />
                             <path d="M7 17V8h7l3 4h3v5" />
+                        </svg>
+                    }
+                />
+
+                <HubCard
+                    href={route('manage.livestock')}
+                    title="Livestock"
+                    subtitle={`${mobsCount} mob${mobsCount === 1 ? '' : 's'} · ${livestockCount} animal${livestockCount === 1 ? '' : 's'}`}
+                    icon={
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M4 10a4 4 0 014-4h1a3 3 0 013 3v1M4 10v7a2 2 0 002 2h1M4 10L2.5 8.5M9 6l1.5-2M12 10a4 4 0 014-4h1a3 3 0 013 3v1M12 10v7a2 2 0 002 2h1a2 2 0 002-2v-3M12 10l-1.5-1.5" />
                         </svg>
                     }
                 />
