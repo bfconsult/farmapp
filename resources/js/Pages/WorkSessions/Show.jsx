@@ -3,6 +3,7 @@ import WaypointTrail from '@/Components/WaypointTrail';
 import BackLink from '@/Components/BackLink';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
+import PhotoLightbox from '@/Components/PhotoLightbox';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
@@ -29,6 +30,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
     const canCreateNote = canManage || currentUserRole === 'worker';
     const [uploading, setUploading] = useState(false);
     const [addingNote, setAddingNote] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState(null);
 
     // Reached via Manage -> Work Sessions rather than the self-service Work
     // tab (see WorkSessionController::cameFromManage()) - Back has to know
@@ -284,11 +286,12 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                         </button>
                     ) : (
                         <div className="grid grid-cols-3 gap-2">
-                            {session.photos.map((photo) => (
+                            {session.photos.map((photo, i) => (
                                 <div key={photo.id} className="relative">
                                     <img
                                         src={photo.url}
-                                        className="w-full h-24 object-cover rounded-lg"
+                                        onClick={() => setLightboxIndex(i)}
+                                        className="w-full h-24 object-cover rounded-lg cursor-pointer"
                                     />
                                     <button
                                         onClick={() => destroyPhoto(photo.id)}
@@ -334,6 +337,15 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                     Delete Session
                 </button>
             </div>
+
+            {session.photos && session.photos.length > 0 && (
+                <PhotoLightbox
+                    photos={session.photos}
+                    index={lightboxIndex}
+                    onClose={() => setLightboxIndex(null)}
+                    onIndexChange={setLightboxIndex}
+                />
+            )}
         </AuthenticatedLayout>
     );
 }
