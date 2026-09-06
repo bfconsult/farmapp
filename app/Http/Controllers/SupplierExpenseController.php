@@ -49,6 +49,10 @@ class SupplierExpenseController extends Controller
 
         $quote->farmJob->expenses()->create([
             'name' => $validated['name'] ?? $quote->farmJob->name,
+            // The date the invoice was actually submitted - not the job's
+            // creation date, which is only used as a fallback when
+            // backfilling old expenses that predate this column entirely.
+            'date' => now()->toDateString(),
             'description' => $validated['description'] ?? null,
             'amount' => $validated['amount'] ?? null,
             'gst_inclusive' => $validated['gst_inclusive'] ?? true,

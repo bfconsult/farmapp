@@ -20,7 +20,7 @@ function createJobWithAdmin(): array
 test('a needs_review expense can be edited without providing an amount', function () {
     [$admin, $property, $job] = createJobWithAdmin();
     $expense = Expense::create([
-        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'amount' => null,
+        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'date' => '2026-06-15', 'amount' => null,
         'gst_inclusive' => true, 'status' => Expense::NEEDS_REVIEW,
     ]);
 
@@ -28,6 +28,7 @@ test('a needs_review expense can be edited without providing an amount', functio
         ->withSession(['current_property_id' => $property->id])
         ->patch(route('expenses.update', $expense->id), [
             'name' => 'Fence the north paddock',
+            'date' => '2026-06-15',
             'description' => 'Saw the invoice, materials only so far.',
         ])
         ->assertSessionHasNoErrors();
@@ -41,7 +42,7 @@ test('a needs_review expense can be edited without providing an amount', functio
 test('marking an expense reviewed is rejected while the amount is still missing', function () {
     [$admin, $property, $job] = createJobWithAdmin();
     $expense = Expense::create([
-        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'amount' => null,
+        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'date' => '2026-06-15', 'amount' => null,
         'gst_inclusive' => true, 'status' => Expense::NEEDS_REVIEW,
     ]);
 
@@ -56,7 +57,7 @@ test('marking an expense reviewed is rejected while the amount is still missing'
 test('an admin can mark an expense reviewed once an amount has been entered', function () {
     [$admin, $property, $job] = createJobWithAdmin();
     $expense = Expense::create([
-        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'amount' => 420,
+        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'date' => '2026-06-15', 'amount' => 420,
         'gst_inclusive' => true, 'status' => Expense::NEEDS_REVIEW,
     ]);
 
@@ -71,7 +72,7 @@ test('an admin can mark an expense reviewed once an amount has been entered', fu
 test('saving an amount does not automatically clear needs_review - marking reviewed is a separate step', function () {
     [$admin, $property, $job] = createJobWithAdmin();
     $expense = Expense::create([
-        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'amount' => null,
+        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'date' => '2026-06-15', 'amount' => null,
         'gst_inclusive' => true, 'status' => Expense::NEEDS_REVIEW,
     ]);
 
@@ -79,6 +80,7 @@ test('saving an amount does not automatically clear needs_review - marking revie
         ->withSession(['current_property_id' => $property->id])
         ->patch(route('expenses.update', $expense->id), [
             'name' => 'Fence the north paddock',
+            'date' => '2026-06-15',
             'amount' => 420,
         ])
         ->assertSessionHasNoErrors();
@@ -92,7 +94,7 @@ test('a worker cannot mark an expense reviewed', function () {
     $worker = User::factory()->create();
     Role::create(['user_id' => $worker->id, 'property_id' => $property->id, 'type' => Role::WORKER]);
     $expense = Expense::create([
-        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'amount' => 420,
+        'farm_job_id' => $job->id, 'name' => 'Fence the north paddock', 'date' => '2026-06-15', 'amount' => 420,
         'gst_inclusive' => true, 'status' => Expense::NEEDS_REVIEW,
     ]);
 
@@ -109,8 +111,8 @@ test('a needs_review expense with no amount is excluded from the job list total_
     JobStatus::seedDefaultsForProperty($property->id);
     $job->update(['job_status_id' => JobStatus::where('property_id', $property->id)->where('can_book_time', true)->firstOrFail()->id]);
     $job->assignees()->attach($admin->id);
-    Expense::create(['farm_job_id' => $job->id, 'name' => 'Complete one', 'amount' => 100, 'gst_inclusive' => true, 'status' => Expense::COMPLETE]);
-    Expense::create(['farm_job_id' => $job->id, 'name' => 'Pending one', 'amount' => null, 'gst_inclusive' => true, 'status' => Expense::NEEDS_REVIEW]);
+    Expense::create(['farm_job_id' => $job->id, 'name' => 'Complete one', 'date' => '2026-06-15', 'amount' => 100, 'gst_inclusive' => true, 'status' => Expense::COMPLETE]);
+    Expense::create(['farm_job_id' => $job->id, 'name' => 'Pending one', 'date' => '2026-06-15', 'amount' => null, 'gst_inclusive' => true, 'status' => Expense::NEEDS_REVIEW]);
 
     $response = $this->actingAs($admin)
         ->withSession(['current_property_id' => $property->id])

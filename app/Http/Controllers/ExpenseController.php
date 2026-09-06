@@ -13,6 +13,7 @@ class ExpenseController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'date' => 'required|date',
             'description' => 'nullable|string',
             'amount' => 'required|numeric|min:0',
             'gst_inclusive' => 'boolean',
@@ -44,6 +45,7 @@ class ExpenseController extends Controller
         // only changes via the explicit markReviewed() action below.
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'date' => 'required|date',
             'description' => 'nullable|string',
             'amount' => 'nullable|numeric|min:0',
             'gst_inclusive' => 'boolean',

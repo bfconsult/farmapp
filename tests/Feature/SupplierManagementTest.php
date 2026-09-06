@@ -70,14 +70,14 @@ test('the supplier summary page defaults to the past 3 months and totals in-rang
 
     $inRange = Expense::create([
         'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $user->id,
-        'name' => 'Fence posts', 'amount' => 150.00,
+        'name' => 'Fence posts', 'date' => now()->toDateString(), 'amount' => 150.00,
     ]);
     $inRange->created_at = now()->subMonth();
     $inRange->save();
 
     $outOfRange = Expense::create([
         'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $user->id,
-        'name' => 'Old wire', 'amount' => 40.00,
+        'name' => 'Old wire', 'date' => now()->toDateString(), 'amount' => 40.00,
     ]);
     $outOfRange->created_at = now()->subMonths(6);
     $outOfRange->save();
@@ -86,7 +86,7 @@ test('the supplier summary page defaults to the past 3 months and totals in-rang
     $otherSupplier = Supplier::create(['property_id' => $property->id, 'name' => 'Other Supplier']);
     Expense::create([
         'farm_job_id' => $job->id, 'supplier_id' => $otherSupplier->id, 'created_by' => $user->id,
-        'name' => 'Unrelated purchase', 'amount' => 999.00,
+        'name' => 'Unrelated purchase', 'date' => now()->toDateString(), 'amount' => 999.00,
     ]);
 
     $this->actingAs($user)
@@ -108,7 +108,7 @@ test('a custom date range on the supplier summary page includes transactions out
 
     $old = Expense::create([
         'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $user->id,
-        'name' => 'Old wire', 'amount' => 40.00,
+        'name' => 'Old wire', 'date' => now()->toDateString(), 'amount' => 40.00,
     ]);
     $old->created_at = now()->subMonths(6);
     $old->save();

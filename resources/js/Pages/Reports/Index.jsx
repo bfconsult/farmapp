@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
@@ -22,7 +22,7 @@ function currentMonthRange() {
     return { from, to };
 }
 
-export default function Index({ workers, grandTotal, currentDateFrom, currentDateTo, justSharedUrl }) {
+export default function Index({ workers, expensesByJob, grandTotal, currentDateFrom, currentDateTo, justSharedUrl }) {
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -88,6 +88,9 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
                         {formatNumber(grandTotal.hours)}h
                         {grandTotal.billing > 0 && (
                             <span className="text-green-700"> · ${formatNumber(grandTotal.billing)}</span>
+                        )}
+                        {grandTotal.expenses > 0 && (
+                            <span className="text-gray-500"> · ${formatNumber(grandTotal.expenses)} expenses</span>
                         )}
                     </p>
                 </div>
@@ -225,6 +228,45 @@ export default function Index({ workers, grandTotal, currentDateFrom, currentDat
                                                 {session.billing_amount && (
                                                     <p className="text-xs text-green-700">${formatNumber(session.billing_amount)}</p>
                                                 )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Expenses grouped by job */}
+                {expensesByJob.length > 0 && (
+                    <div className="space-y-4 mt-4">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide px-1">Expenses by Job</h2>
+                        {expensesByJob.map((jobGroup) => (
+                            <div key={jobGroup.farmJob.id} className="bg-white rounded-lg shadow overflow-hidden">
+                                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                                    <Link href={route('jobs.show', jobGroup.farmJob.id)} className="font-medium text-gray-900 truncate">
+                                        {jobGroup.farmJob.name}
+                                    </Link>
+                                    <div className="text-right flex-shrink-0">
+                                        <p className="text-xs text-gray-500 uppercase tracking-wide">Subtotal</p>
+                                        <p className="text-sm font-medium text-green-700">${formatNumber(jobGroup.totalAmount)}</p>
+                                    </div>
+                                </div>
+                                <div className="divide-y divide-gray-100">
+                                    {jobGroup.expenses.map((expense) => (
+                                        <div key={expense.id} className="flex items-start justify-between gap-2 px-4 py-3">
+                                            <div className="min-w-0">
+                                                <p className="text-sm text-gray-900 truncate">{expense.name}</p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {formatSessionDate(expense.date.slice(0, 10))}
+                                                </p>
+                                            </div>
+                                            <div className="text-right flex-shrink-0">
+                                                <p className="text-sm text-gray-900">
+                                                    {expense.amount != null
+                                                        ? `$${formatNumber(expense.amount)}`
+                                                        : 'Awaiting amount'}
+                                                </p>
                                             </div>
                                         </div>
                                     ))}

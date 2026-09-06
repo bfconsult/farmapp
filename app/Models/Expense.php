@@ -14,11 +14,12 @@ class Expense extends Model
 
     protected $fillable = [
         'farm_job_id', 'supplier_id', 'created_by', 'quote_id',
-        'name', 'description', 'amount', 'gst_inclusive', 'reimburse',
+        'name', 'date', 'description', 'amount', 'gst_inclusive', 'reimburse',
         'invoice_file', 'invoice_original_name', 'status',
     ];
 
     protected $casts = [
+        'date' => 'date',
         'amount' => 'decimal:2',
         'gst_inclusive' => 'boolean',
         'reimburse' => 'boolean',

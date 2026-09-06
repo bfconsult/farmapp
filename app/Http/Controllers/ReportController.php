@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DiaryShare;
+use App\Models\Expense;
 use App\Models\Metric;
 use App\Models\Property;
 use App\Models\WorkSession;
@@ -67,6 +68,37 @@ class ReportController extends Controller
             ->sortBy(fn ($worker) => $worker['user']->name)
             ->values();
 
+        // Grouped by job rather than by worker, same in-memory Collection
+        // approach as $workers above. A needs_review expense (no amount
+        // yet - see SupplierExpenseController) still shows in its job's
+        // list, but is excluded from both the per-job and grand totals,
+        // same as FarmJobController::index()'s total_expenses figure -
+        // otherwise the total would silently understate what's owed.
+        $expenses = Expense::whereHas('farmJob', fn ($query) => $query->where('property_id', $currentPropertyId))
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->with('farmJob')
+            ->get();
+
+        $expensesByJob = $expenses
+            ->groupBy('farm_job_id')
+            ->map(function ($jobExpenses) {
+                return [
+                    'farmJob' => $jobExpenses->first()->farmJob,
+                    'totalAmount' => round($jobExpenses->whereNotNull('amount')->sum('amount'), 2),
+                    'expenses' => $jobExpenses->sortByDesc('date')->map(fn ($expense) => [
+                        'id' => $expense->id,
+                        'name' => $expense->name,
+                        'date' => $expense->date,
+                        'description' => $expense->description,
+                        'amount' => $expense->amount !== null ? (float) $expense->amount : null,
+                        'gst_inclusive' => $expense->gst_inclusive,
+                        'status' => $expense->status,
+                    ])->values(),
+                ];
+            })
+            ->sortBy(fn ($job) => $job['farmJob']->name)
+            ->values();
+
         // Surfaced once, right after generating a link via storeDiaryShare -
         // not persisted/re-shown on a plain page reload.
         $justSharedUrl = null;
@@ -79,9 +111,11 @@ class ReportController extends Controller
 
         return Inertia::render('Reports/Index', [
             'workers' => $workers,
+            'expensesByJob' => $expensesByJob,
             'grandTotal' => [
                 'hours' => round($sessions->sum('duration_in_hours'), 2),
                 'billing' => round($sessions->sum('billing_amount'), 2),
+                'expenses' => round($expenses->whereNotNull('amount')->sum('amount'), 2),
             ],
             'currentDateFrom' => $dateFrom->toDateString(),
             'currentDateTo' => $dateTo->toDateString(),

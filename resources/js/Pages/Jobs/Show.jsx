@@ -86,6 +86,7 @@ function ExpenseRow({ expense, onEdit }) {
                 <div className="min-w-0">
                     <p className="text-sm text-gray-900">{expense.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
+                        {expense.date && `${formatDate(expense.date.slice(0, 10), { year: false })} · `}
                         {expense.amount != null
                             ? `$${formatNumber(expense.amount)} (${expense.gst_inclusive ? 'GST inc' : 'GST ex'})`
                             : 'Awaiting amount'}
@@ -274,7 +275,8 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const [showChecklistPicker, setShowChecklistPicker] = useState(false);
     const [showExpenseModal, setShowExpenseModal] = useState(false);
     const [editingExpense, setEditingExpense] = useState(null);
-    const [expenseForm, setExpenseForm] = useState({ name: '', description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
+    const todayIso = () => new Date().toISOString().slice(0, 10);
+    const [expenseForm, setExpenseForm] = useState({ name: '', date: todayIso(), description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
     const [creatingSupplier, setCreatingSupplier] = useState(false);
     const [newSupplierName, setNewSupplierName] = useState('');
     const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -380,7 +382,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
 
     const openAddExpense = () => {
         setEditingExpense(null);
-        setExpenseForm({ name: '', description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
+        setExpenseForm({ name: '', date: todayIso(), description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
         setShowExpenseModal(true);
     };
 
@@ -388,6 +390,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
         setEditingExpense(expense);
         setExpenseForm({
             name: expense.name,
+            date: expense.date?.slice(0, 10) ?? todayIso(),
             description: expense.description ?? '',
             amount: expense.amount ?? '',
             gst_inclusive: expense.gst_inclusive,
@@ -407,6 +410,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const saveExpense = () => {
         const payload = {
             name: expenseForm.name,
+            date: expenseForm.date,
             description: expenseForm.description,
             amount: expenseForm.amount,
             gst_inclusive: expenseForm.gst_inclusive,
@@ -1050,6 +1054,16 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                                 type="text"
                                 value={expenseForm.name}
                                 onChange={(e) => setExpenseForm({ ...expenseForm, name: e.target.value })}
+                                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Date</label>
+                            <input
+                                type="date"
+                                value={expenseForm.date}
+                                onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })}
                                 className="w-full border-gray-300 rounded-lg p-2 text-sm"
                             />
                         </div>
