@@ -4,9 +4,10 @@ import { formatDate } from '@/dateInput';
 import { pillBadgeClass } from '@/Utils/pillColors';
 
 export default function SharedView({ job, logoUrl, viewingSupplier, canSubmitInvoice, quoteToken }) {
-    const { flash, errors } = usePage().props;
+    const { errors } = usePage().props;
     const fileInput = useRef(null);
     const [submitting, setSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
     const [invoiceForm, setInvoiceForm] = useState({
         name: job.name, description: '', amount: '', gst_inclusive: true,
     });
@@ -27,6 +28,7 @@ export default function SharedView({ job, logoUrl, viewingSupplier, canSubmitInv
             preserveScroll: true,
             onFinish: () => setSubmitting(false),
             onSuccess: () => {
+                setSubmitted(true);
                 setInvoiceForm({ name: job.name, description: '', amount: '', gst_inclusive: true });
                 if (fileInput.current) fileInput.current.value = '';
             },
@@ -113,18 +115,32 @@ export default function SharedView({ job, logoUrl, viewingSupplier, canSubmitInv
                         </div>
                     )}
 
-                    {canSubmitInvoice && (
+                    {canSubmitInvoice && submitted && (
+                        <div className="bg-white rounded-lg shadow p-8 text-center">
+                            <div className="mx-auto mb-4 flex items-center justify-center w-20 h-20 rounded-full bg-green-100">
+                                <svg className="w-11 h-11 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Invoice Submitted</h2>
+                            <p className="text-sm text-gray-500 max-w-xs mx-auto">
+                                Thanks — your invoice has been received. There's nothing more you need to do.
+                            </p>
+                            <button
+                                onClick={() => setSubmitted(false)}
+                                className="mt-6 text-sm text-green-600 font-medium"
+                            >
+                                Submit another invoice
+                            </button>
+                        </div>
+                    )}
+
+                    {canSubmitInvoice && !submitted && (
                         <div className="bg-white rounded-lg shadow p-4 space-y-3">
                             <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Submit Invoice</h2>
                             <p className="text-xs text-gray-500 -mt-2">
                                 Don't have the details handy? Just attach your invoice below and the amount will be entered from it.
                             </p>
-
-                            {flash?.success && (
-                                <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-2">
-                                    {flash.success}
-                                </p>
-                            )}
 
                             <div>
                                 <label className="block text-xs text-gray-500 mb-1">Name (optional)</label>
