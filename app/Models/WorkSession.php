@@ -131,7 +131,13 @@ class WorkSession extends Model
     {
         if (!$this->ended_at) return null;
 
-        $minutes = $this->started_at->diffInMinutes($this->ended_at);
+        // Carbon 3's diffInMinutes() returns a float (e.g. 30.12 for 30m7s),
+        // unlike Carbon 2's truncated int - stop() stamps ended_at with
+        // real seconds via now(), so any tiny overshoot past a clean block
+        // multiple got ceil()'d all the way up to the *next* block below
+        // (30m7s / 15 = 2.0047, ceil'd to 3 -> 45m instead of 30m). Truncate
+        // to whole minutes first to restore the old, intended behaviour.
+        $minutes = (int) $this->started_at->diffInMinutes($this->ended_at);
 
         if ($blockMinutes = $this->user?->billing_block_minutes) {
             $minutes = ceil($minutes / $blockMinutes) * $blockMinutes;
