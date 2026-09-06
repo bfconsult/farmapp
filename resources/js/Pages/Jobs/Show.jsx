@@ -73,7 +73,12 @@ function ExpenseRow({ expense, onEdit }) {
         }
     };
 
+    const markReviewed = () => {
+        router.patch(route('expenses.mark-reviewed', expense.id), {}, { preserveScroll: true });
+    };
+
     const photo = expense.photos?.[0];
+    const needsReview = expense.status === 'needs_review';
 
     return (
         <div className="border border-gray-200 rounded-lg p-3">
@@ -81,7 +86,9 @@ function ExpenseRow({ expense, onEdit }) {
                 <div className="min-w-0">
                     <p className="text-sm text-gray-900">{expense.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                        ${formatNumber(expense.amount)} ({expense.gst_inclusive ? 'GST inc' : 'GST ex'})
+                        {expense.amount != null
+                            ? `$${formatNumber(expense.amount)} (${expense.gst_inclusive ? 'GST inc' : 'GST ex'})`
+                            : 'Awaiting amount'}
                         {expense.supplier && ` · ${expense.supplier.name}`}
                     </p>
                 </div>
@@ -94,6 +101,11 @@ function ExpenseRow({ expense, onEdit }) {
                     {expense.quote_id && (
                         <span className="text-xs px-2 py-1 rounded-full font-medium bg-blue-100 text-blue-700">
                             Submitted by supplier
+                        </span>
+                    )}
+                    {needsReview && (
+                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-orange-100 text-orange-700">
+                            Needs Review
                         </span>
                     )}
                 </div>
@@ -143,6 +155,16 @@ function ExpenseRow({ expense, onEdit }) {
                     </>
                 )}
                 <button onClick={() => onEdit(expense)} className="text-green-600 font-medium">Edit</button>
+                {needsReview && (
+                    <button
+                        onClick={markReviewed}
+                        disabled={expense.amount == null}
+                        title={expense.amount == null ? 'Add an amount first' : undefined}
+                        className="text-green-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Mark Reviewed
+                    </button>
+                )}
                 <button onClick={destroyExpense} className="text-red-500 font-medium">Delete</button>
             </div>
 
@@ -367,7 +389,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
         setExpenseForm({
             name: expense.name,
             description: expense.description ?? '',
-            amount: expense.amount,
+            amount: expense.amount ?? '',
             gst_inclusive: expense.gst_inclusive,
             reimburse: expense.reimburse,
             supplier_id: expense.supplier_id ? String(expense.supplier_id) : '',

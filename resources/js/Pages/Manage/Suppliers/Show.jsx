@@ -57,7 +57,12 @@ function TransactionRow({ transaction }) {
                                 {transaction.amount != null ? `$${formatNumber(transaction.amount)}` : 'Rate not set'}
                             </>
                         ) : (
-                            <> · ${formatNumber(transaction.amount)} ({transaction.gst_inclusive ? 'GST inc' : 'GST ex'})</>
+                            <>
+                                {' · '}
+                                {transaction.amount != null
+                                    ? `$${formatNumber(transaction.amount)} (${transaction.gst_inclusive ? 'GST inc' : 'GST ex'})`
+                                    : 'Pending review'}
+                            </>
                         )}
                     </p>
                     {transaction.farm_job && (

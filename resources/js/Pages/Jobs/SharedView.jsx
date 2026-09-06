@@ -116,6 +116,9 @@ export default function SharedView({ job, logoUrl, viewingSupplier, canSubmitInv
                     {canSubmitInvoice && (
                         <div className="bg-white rounded-lg shadow p-4 space-y-3">
                             <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Submit Invoice</h2>
+                            <p className="text-xs text-gray-500 -mt-2">
+                                Don't have the details handy? Just attach your invoice below and the amount will be entered from it.
+                            </p>
 
                             {flash?.success && (
                                 <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg p-2">
@@ -124,7 +127,7 @@ export default function SharedView({ job, logoUrl, viewingSupplier, canSubmitInv
                             )}
 
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Name</label>
+                                <label className="block text-xs text-gray-500 mb-1">Name (optional)</label>
                                 <input
                                     type="text"
                                     value={invoiceForm.name}
@@ -145,7 +148,7 @@ export default function SharedView({ job, logoUrl, viewingSupplier, canSubmitInv
                             </div>
 
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Amount</label>
+                                <label className="block text-xs text-gray-500 mb-1">Amount (optional)</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -193,7 +196,7 @@ export default function SharedView({ job, logoUrl, viewingSupplier, canSubmitInv
 
                             <button
                                 onClick={submitInvoice}
-                                disabled={submitting || !invoiceForm.name || !invoiceForm.amount}
+                                disabled={submitting}
                                 className="w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
                             >
                                 {submitting ? 'Submitting...' : 'Submit Invoice'}

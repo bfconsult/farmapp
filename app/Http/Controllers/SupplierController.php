@@ -66,7 +66,7 @@ class SupplierController extends Controller
                 'date' => $expense->created_at,
                 'name' => $expense->name,
                 'description' => $expense->description,
-                'amount' => (float) $expense->amount,
+                'amount' => $expense->amount !== null ? (float) $expense->amount : null,
                 'gst_inclusive' => $expense->gst_inclusive,
                 'reimburse' => $expense->reimburse,
                 'farm_job' => $expense->farmJob ? ['id' => $expense->farmJob->id, 'name' => $expense->farmJob->name] : null,

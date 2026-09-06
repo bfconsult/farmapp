@@ -170,6 +170,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::patch('quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
     Route::patch('quotes/{quote}/decline', [QuoteController::class, 'decline'])->name('quotes.decline');
     Route::post('quotes/{quote}/request-invoice', [QuoteController::class, 'requestInvoice'])->name('quotes.request-invoice');
+    Route::patch('expenses/{expense}/mark-reviewed', [ExpenseController::class, 'markReviewed'])->name('expenses.mark-reviewed');
     Route::delete('quotes/{quote}', [QuoteController::class, 'destroy'])->name('quotes.destroy');
     Route::post('jobs/{farmJob}/quotes/notify-others', [QuoteController::class, 'notifyOthers'])->name('quotes.notify-others');
     Route::post('assets', [AssetController::class, 'store'])->name('assets.store');

@@ -7,10 +7,15 @@ use Illuminate\Support\Facades\Storage;
 
 class Expense extends Model
 {
+    const COMPLETE = 'complete';
+    const NEEDS_REVIEW = 'needs_review';
+
+    const STATUSES = [self::COMPLETE, self::NEEDS_REVIEW];
+
     protected $fillable = [
         'farm_job_id', 'supplier_id', 'created_by', 'quote_id',
         'name', 'description', 'amount', 'gst_inclusive', 'reimburse',
-        'invoice_file', 'invoice_original_name',
+        'invoice_file', 'invoice_original_name', 'status',
     ];
 
     protected $casts = [

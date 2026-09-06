@@ -127,7 +127,10 @@ class FarmJobController extends Controller
 
             $job->total_hours = round($bookedSessions->sum('duration_in_hours'), 2);
             $job->total_cost = round($bookedSessions->sum('billing_amount'), 2);
-            $job->total_expenses = round($job->expenses->sum('amount'), 2);
+            // Excludes needs_review expenses (no amount yet, submitted by a
+            // supplier who only attached an invoice file) - the total would
+            // otherwise silently understate what's actually owed.
+            $job->total_expenses = round($job->expenses->whereNotNull('amount')->sum('amount'), 2);
             $job->has_unread_notes = $job->notes->contains(fn ($note) => $note->isUnreadBy(Auth::id()));
         });
 

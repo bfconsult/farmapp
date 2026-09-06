@@ -49,7 +49,41 @@ test('a supplier can submit an invoice image against the job via their share lin
     expect($expense->reimburse)->toBeFalse();
     expect($expense->invoice_file)->not->toBeNull();
     expect($expense->invoice_original_name)->toBe('invoice.jpg');
+    expect($expense->status)->toBe(Expense::COMPLETE);
     Storage::disk('public')->assertExists($expense->invoice_file);
+});
+
+test('a supplier who only attaches the file, with no name or amount, creates a needs_review expense', function () {
+    Storage::fake('public');
+    config(['filesystems.default' => 'public']);
+    [$quote, $job, $supplier] = createAcceptedQuote();
+
+    $this->post(route('quotes.share.expense', $quote->share_token), [
+        'invoice' => UploadedFile::fake()->create('invoice.pdf', 100),
+    ])->assertSessionHasNoErrors();
+
+    $expense = Expense::first();
+    expect($expense)->not->toBeNull();
+    expect($expense->name)->toBe($job->name);
+    expect($expense->amount)->toBeNull();
+    expect($expense->supplier_id)->toBe($supplier->id);
+    expect($expense->status)->toBe(Expense::NEEDS_REVIEW);
+});
+
+test('a blank amount field (empty string) is treated the same as omitting it entirely', function () {
+    Storage::fake('public');
+    config(['filesystems.default' => 'public']);
+    [$quote] = createAcceptedQuote();
+
+    $this->post(route('quotes.share.expense', $quote->share_token), [
+        'name' => '',
+        'amount' => '',
+        'invoice' => UploadedFile::fake()->image('invoice.jpg'),
+    ])->assertSessionHasNoErrors();
+
+    $expense = Expense::first();
+    expect($expense->amount)->toBeNull();
+    expect($expense->status)->toBe(Expense::NEEDS_REVIEW);
 });
 
 test('a supplier can submit a PDF invoice', function () {

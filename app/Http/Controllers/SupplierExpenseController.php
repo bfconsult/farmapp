@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Expense;
 use App\Models\Quote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -24,10 +25,19 @@ class SupplierExpenseController extends Controller
         // and not a declined/still-invited one.
         abort_unless($quote->status === Quote::ACCEPTED && $quote->invoice_requested_at, 404);
 
+        // A supplier who just wants to drop off the PDF without typing
+        // anything else shouldn't be blocked - an empty string from the
+        // form needs to actually become null for "nullable" to take effect
+        // (Laravel's nullable rule doesn't treat '' as null on its own).
+        $request->merge([
+            'name' => $request->filled('name') ? $request->input('name') : null,
+            'amount' => $request->filled('amount') ? $request->input('amount') : null,
+        ]);
+
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'amount' => 'required|numeric|min:0',
+            'amount' => 'nullable|numeric|min:0',
             'gst_inclusive' => 'boolean',
             // Stored untouched (see below) - must allow PDFs, so this can't
             // reuse Photo's image-only, force-recompressed pipeline.
@@ -38,11 +48,16 @@ class SupplierExpenseController extends Controller
         $path = Storage::disk(config('filesystems.default'))->putFile('invoices', $file);
 
         $quote->farmJob->expenses()->create([
-            'name' => $validated['name'],
+            'name' => $validated['name'] ?? $quote->farmJob->name,
             'description' => $validated['description'] ?? null,
-            'amount' => $validated['amount'],
+            'amount' => $validated['amount'] ?? null,
             'gst_inclusive' => $validated['gst_inclusive'] ?? true,
             'reimburse' => false,
+            // No amount means there isn't enough information to call this
+            // expense complete yet - the property manager has to open the
+            // invoice and enter it themselves (ExpenseController::update()
+            // + markReviewed()).
+            'status' => $validated['amount'] !== null ? Expense::COMPLETE : Expense::NEEDS_REVIEW,
             'supplier_id' => $quote->supplier_id,
             'quote_id' => $quote->id,
             'created_by' => null,
