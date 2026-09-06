@@ -85,15 +85,33 @@ function ExpenseRow({ expense, onEdit }) {
                         {expense.supplier && ` · ${expense.supplier.name}`}
                     </p>
                 </div>
-                {expense.reimburse && (
-                    <span className="text-xs px-2 py-1 rounded-full font-medium bg-amber-100 text-amber-700 flex-shrink-0">
-                        Reimburse
-                    </span>
-                )}
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    {expense.reimburse && (
+                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-amber-100 text-amber-700">
+                            Reimburse
+                        </span>
+                    )}
+                    {expense.quote_id && (
+                        <span className="text-xs px-2 py-1 rounded-full font-medium bg-blue-100 text-blue-700">
+                            Submitted by supplier
+                        </span>
+                    )}
+                </div>
             </div>
 
             {expense.description && (
                 <p className="text-sm text-gray-500 mt-2">{expense.description}</p>
+            )}
+
+            {expense.invoice_url && (
+                <a
+                    href={expense.invoice_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-green-600 font-medium mt-2 inline-block"
+                >
+                    View Invoice{expense.invoice_original_name ? ` (${expense.invoice_original_name})` : ''}
+                </a>
             )}
 
             {photo && (
@@ -155,7 +173,7 @@ const QUOTE_STATUS_COLORS = {
     declined: 'bg-red-100 text-red-500',
 };
 
-function QuoteRow({ quote, canManage, onAccept, onDecline, onDestroy }) {
+function QuoteRow({ quote, canManage, onAccept, onDecline, onDestroy, onRequestInvoice }) {
     return (
         <div className="px-4 py-3">
             <div className="flex items-start justify-between gap-2">
@@ -175,6 +193,16 @@ function QuoteRow({ quote, canManage, onAccept, onDecline, onDestroy }) {
                     <button onClick={() => onAccept(quote)} className="text-green-600 font-medium">Accept</button>
                     <button onClick={() => onDecline(quote)} className="text-gray-500">Decline</button>
                     <button onClick={() => onDestroy(quote)} className="text-red-500">Remove</button>
+                </div>
+            )}
+            {canManage && quote.status === 'accepted' && (
+                <div className="flex items-center gap-3 mt-2 text-xs">
+                    <button onClick={() => onRequestInvoice(quote)} className="text-green-600 font-medium">
+                        {quote.invoice_requested_at ? 'Resend Invoice Request' : 'Request an Invoice'}
+                    </button>
+                    {quote.invoice_requested_at && (
+                        <span className="text-gray-400">Requested {formatDate(quote.invoice_requested_at.slice(0, 10), { year: false })}</span>
+                    )}
                 </div>
             )}
         </div>
@@ -232,6 +260,8 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const [showAcceptModal, setShowAcceptModal] = useState(false);
     const [acceptingQuote, setAcceptingQuote] = useState(null);
     const [acceptAmount, setAcceptAmount] = useState('');
+    const [invoiceRequestQuote, setInvoiceRequestQuote] = useState(null);
+    const [invoiceRequestMessage, setInvoiceRequestMessage] = useState('');
     const [showLabourDetail, setShowLabourDetail] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(null);
     const [showLocationModal, setShowLocationModal] = useState(false);
@@ -431,6 +461,23 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
         if (confirm(`Mark ${quote.supplier?.name ?? 'this supplier'}'s quote as declined?`)) {
             router.patch(route('quotes.decline', quote.id), {}, { preserveScroll: true });
         }
+    };
+
+    const openRequestInvoice = (quote) => {
+        setInvoiceRequestQuote(quote);
+        setInvoiceRequestMessage(`Hi ${quote.supplier?.name ?? 'there'}, please submit your invoice for ${job.name} using the link below.`);
+    };
+
+    const closeRequestInvoice = () => {
+        setInvoiceRequestQuote(null);
+        setInvoiceRequestMessage('');
+    };
+
+    const sendInvoiceRequest = () => {
+        router.post(route('quotes.request-invoice', invoiceRequestQuote.id), { message: invoiceRequestMessage }, {
+            preserveScroll: true,
+            onSuccess: closeRequestInvoice,
+        });
     };
 
     const destroyQuote = (quote) => {
@@ -861,6 +908,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                                         onAccept={openAccept}
                                         onDecline={declineQuote}
                                         onDestroy={destroyQuote}
+                                        onRequestInvoice={openRequestInvoice}
                                     />
                                 ))}
                             </div>
@@ -1172,6 +1220,49 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                                 Send Invite
                             </button>
                             <button onClick={closeQuoteModal} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+
+                <Modal show={!!invoiceRequestQuote} onClose={closeRequestInvoice} maxWidth="lg">
+                    <div className="p-4 space-y-3">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-sm font-medium text-gray-700">
+                                Request an Invoice from {invoiceRequestQuote?.supplier?.name}
+                            </h3>
+                            <button onClick={closeRequestInvoice} className="text-sm text-gray-500">Close</button>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Message</label>
+                            <textarea
+                                value={invoiceRequestMessage}
+                                onChange={(e) => setInvoiceRequestMessage(e.target.value)}
+                                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                rows={3}
+                            />
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                            This sends {invoiceRequestQuote?.supplier?.name ?? 'the supplier'} an email with a link where they can submit their invoice directly.
+                        </p>
+
+                        {errors.invoice_request && (
+                            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
+                                {errors.invoice_request}
+                            </p>
+                        )}
+
+                        <div className="flex gap-2 pt-2">
+                            <button
+                                onClick={sendInvoiceRequest}
+                                className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium"
+                            >
+                                {invoiceRequestQuote?.invoice_requested_at ? 'Resend Request' : 'Send Request'}
+                            </button>
+                            <button onClick={closeRequestInvoice} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">
                                 Cancel
                             </button>
                         </div>

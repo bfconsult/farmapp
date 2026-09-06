@@ -31,6 +31,7 @@ use App\Http\Controllers\NoteController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\AppAdminController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SupplierExpenseController;
 use App\Http\Controllers\QuoteController;
 
 
@@ -168,6 +169,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('jobs/{farmJob}/quotes', [QuoteController::class, 'store'])->name('quotes.store');
     Route::patch('quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
     Route::patch('quotes/{quote}/decline', [QuoteController::class, 'decline'])->name('quotes.decline');
+    Route::post('quotes/{quote}/request-invoice', [QuoteController::class, 'requestInvoice'])->name('quotes.request-invoice');
     Route::delete('quotes/{quote}', [QuoteController::class, 'destroy'])->name('quotes.destroy');
     Route::post('jobs/{farmJob}/quotes/notify-others', [QuoteController::class, 'notifyOthers'])->name('quotes.notify-others');
     Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
@@ -347,6 +349,14 @@ Route::get('share/jobs/{token}', [FarmJobController::class, 'share'])->name('job
 
 // A supplier's own invite link - unique per quote, see QuoteController::share()
 Route::get('share/quotes/{token}', [QuoteController::class, 'share'])->name('quotes.share');
+
+// The app's first public WRITE - a supplier submitting their invoice from
+// the share page above, once one's been requested (see
+// SupplierExpenseController). Rate-limited since there's no login to rely
+// on; the share_token itself is the actual access control.
+Route::post('share/quotes/{token}/expense', [SupplierExpenseController::class, 'store'])
+    ->name('quotes.share.expense')
+    ->middleware('throttle:5,1');
 
 // Diary share link (no auth required - a public read-only day-by-day
 // activity report for an approver, see DiaryShareController)

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\SupplierInvoiceRequest;
 use App\Mail\SupplierJobLet;
 use App\Mail\SupplierJobRequest;
 use App\Models\FarmJob;
@@ -38,6 +39,8 @@ class QuoteController extends Controller
             'job' => $farmJob->toSharePayload(),
             'logoUrl' => asset('favicon.svg'),
             'viewingSupplier' => $quote->supplier?->name,
+            'canSubmitInvoice' => $quote->status === Quote::ACCEPTED && $quote->invoice_requested_at !== null,
+            'quoteToken' => $token,
         ]);
     }
 
@@ -97,6 +100,40 @@ class QuoteController extends Controller
         ]);
 
         return back();
+    }
+
+    /**
+     * Emails the accepted supplier a link to their existing share page,
+     * where they can submit an invoice/expense directly - see
+     * SupplierExpenseController. Callable repeatedly to resend; there's no
+     * lock-out once requested, matching the rest of this feature's
+     * deliberately loose design.
+     */
+    public function requestInvoice(Request $request, Quote $quote)
+    {
+        abort_unless($quote->status === Quote::ACCEPTED, 403);
+
+        $quote->load(['farmJob.property', 'supplier']);
+
+        // Same reasoning as store() - a supplier's reply (or the invoice
+        // itself) needs somewhere real to land.
+        if (!$quote->farmJob->property->email) {
+            return back()->withErrors(['invoice_request' => "{$quote->farmJob->property->name} has no email on file - add one from the property's Edit page first."]);
+        }
+
+        if (!$quote->supplier?->email) {
+            return back()->withErrors(['invoice_request' => "{$quote->supplier?->name} has no email on file - add one from Manage \u{2192} Suppliers first."]);
+        }
+
+        $validated = $request->validate([
+            'message' => 'nullable|string|max:2000',
+        ]);
+
+        $quote->update(['invoice_requested_at' => now()]);
+
+        Mail::to($quote->supplier->email)->send(new SupplierInvoiceRequest($quote, $validated['message'] ?? null));
+
+        return back()->with('success', 'Invoice request sent.');
     }
 
     public function destroy(Quote $quote)

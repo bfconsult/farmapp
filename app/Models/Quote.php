@@ -24,6 +24,7 @@ class Quote extends Model
         'invited_at',
         'decided_at',
         'share_token',
+        'invoice_requested_at',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class Quote extends Model
         'amount' => 'decimal:2',
         'invited_at' => 'datetime',
         'decided_at' => 'datetime',
+        'invoice_requested_at' => 'datetime',
     ];
 
     protected static function booted()

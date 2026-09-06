@@ -1,5 +1,6 @@
 <?php
 
+use App\Mail\SupplierInvoiceRequest;
 use App\Mail\SupplierJobLet;
 use App\Mail\SupplierJobRequest;
 use App\Models\FarmJob;
@@ -339,4 +340,102 @@ test('an assignee who is logged in gets redirected to the real job page instead 
 
 test('an unknown quote share token 404s', function () {
     $this->get(route('quotes.share', 'not-a-real-token'))->assertNotFound();
+});
+
+test('requesting an invoice on an accepted quote emails the supplier and records when', function () {
+    Mail::fake();
+    [$admin, $property, $job] = createJobAndAdmin();
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'quotes@acmefencing.test']);
+    $quote = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::ACCEPTED, 'amount' => 450, 'invited_at' => now(), 'decided_at' => now(),
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('quotes.request-invoice', $quote->id), ['message' => 'Please send it through.'])
+        ->assertSessionHasNoErrors();
+
+    expect($quote->refresh()->invoice_requested_at)->not->toBeNull();
+
+    Mail::assertSent(SupplierInvoiceRequest::class, function ($mail) use ($supplier, $quote, $property) {
+        return $mail->hasTo($supplier->email)
+            && $mail->quote->id === $quote->id
+            && $mail->requestMessage === 'Please send it through.'
+            && $mail->envelope()->replyTo[0]->address === $property->email;
+    });
+});
+
+test('requesting an invoice can be resent and updates the timestamp', function () {
+    Mail::fake();
+    [$admin, $property, $job] = createJobAndAdmin();
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'quotes@acmefencing.test']);
+    $quote = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::ACCEPTED, 'amount' => 450, 'invited_at' => now(), 'decided_at' => now(),
+        'invoice_requested_at' => now()->subDay(),
+    ]);
+    $firstRequestedAt = $quote->invoice_requested_at;
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('quotes.request-invoice', $quote->id))
+        ->assertSessionHasNoErrors();
+
+    expect($quote->refresh()->invoice_requested_at->gt($firstRequestedAt))->toBeTrue();
+    Mail::assertSent(SupplierInvoiceRequest::class, 1);
+});
+
+test('requesting an invoice on a non-accepted quote is rejected', function () {
+    Mail::fake();
+    [$admin, $property, $job] = createJobAndAdmin();
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'quotes@acmefencing.test']);
+    $quote = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::INVITED, 'invited_at' => now(),
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('quotes.request-invoice', $quote->id))
+        ->assertForbidden();
+
+    Mail::assertNothingSent();
+});
+
+test('requesting an invoice is blocked when the property has no email on file', function () {
+    Mail::fake();
+    $admin = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $admin->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $job = FarmJob::create(['name' => 'Fence the north paddock', 'property_id' => $property->id, 'user_id' => $admin->id]);
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'quotes@acmefencing.test']);
+    $quote = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::ACCEPTED, 'amount' => 450, 'invited_at' => now(), 'decided_at' => now(),
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('quotes.request-invoice', $quote->id))
+        ->assertSessionHasErrors('invoice_request');
+
+    expect($quote->refresh()->invoice_requested_at)->toBeNull();
+    Mail::assertNothingSent();
+});
+
+test('a worker cannot request an invoice', function () {
+    [$admin, $property, $job] = createJobAndAdmin();
+    $worker = User::factory()->create();
+    Role::create(['user_id' => $worker->id, 'property_id' => $property->id, 'type' => Role::WORKER]);
+    $supplier = Supplier::create(['property_id' => $property->id, 'name' => 'Acme Fencing', 'email' => 'quotes@acmefencing.test']);
+    $quote = Quote::create([
+        'farm_job_id' => $job->id, 'supplier_id' => $supplier->id, 'created_by' => $admin->id,
+        'requires_quote' => true, 'status' => Quote::ACCEPTED, 'amount' => 450, 'invited_at' => now(), 'decided_at' => now(),
+    ]);
+
+    $this->actingAs($worker)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('quotes.request-invoice', $quote->id))
+        ->assertForbidden();
 });
