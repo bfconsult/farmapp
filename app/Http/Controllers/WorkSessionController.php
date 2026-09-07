@@ -53,9 +53,12 @@ class WorkSessionController extends Controller
             'sessions' => $sessions,
             // Not date-filtered - a session still running "right now" is
             // shown regardless of which historical range is selected below.
+            // Deliberately not scoped to the current property - a session
+            // left running on a property the user has since switched away
+            // from is still theirs to stop (see stop()'s matching check).
             'activeSession' => Auth::user()->workSessions()
                 ->whereNull('ended_at')
-                ->with('farmJob')
+                ->with(['farmJob', 'property'])
                 ->first(),
             // Property-wide, not scoped by the date/status filters below -
             // distinguishes "never logged a session here" from "none match
@@ -274,9 +277,17 @@ class WorkSessionController extends Controller
 
     public function stop(WorkSession $workSession)
     {
-        if ($workSession->property_id !== (int) session('current_property_id')) {
-            abort(404);
-        }
+        // Deliberately checks property membership, not a match against the
+        // currently selected property - a session left running on a
+        // property the user has since switched away from must still be
+        // stoppable from wherever they currently are (see index()'s
+        // activeSession, which surfaces it regardless of the current
+        // selection). Still bars stopping a session on a property this
+        // user has no role on at all.
+        abort_unless(
+            Auth::user()->properties()->where('properties.id', $workSession->property_id)->exists(),
+            404
+        );
 
         $workSession->update(['ended_at' => now()]);
 

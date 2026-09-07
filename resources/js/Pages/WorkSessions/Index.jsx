@@ -126,31 +126,48 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
  
 
                 {/* Active session banner */}
-                {activeSession && (
-                    <div className="bg-green-600 rounded-lg p-4 text-white mb-4">
-                        <p className="text-sm font-medium mb-1">⏱ Session in progress</p>
-                        <p className="text-base font-semibold mb-3">
-                            {sessionLabel(activeSession)}
-                        </p>
-                        <p className="text-sm mb-3 opacity-90">
-                            Started at {formatTime(activeSession.started_at)}
-                        </p>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={stop}
-                                className="flex-1 py-2 bg-white text-green-600 rounded-lg font-medium text-sm"
-                            >
-                                Stop Work
-                            </button>
-                            <Link
-                                href={route('work-sessions.show', activeSession.id)}
-                                className="flex-1 py-2 border border-white text-white rounded-lg font-medium text-sm text-center"
-                            >
-                                View
-                            </Link>
+                {activeSession && (() => {
+                    // A session started on a property the user has since
+                    // switched away from still shows up here (see
+                    // WorkSessionController::index()) so it's never
+                    // orphaned - but its own page enforces the *current*
+                    // property, so only "Stop" (now property-independent,
+                    // see stop()) is offered instead of a dead-end "View".
+                    const onOtherProperty = currentProperty && activeSession.property_id !== currentProperty.id;
+
+                    return (
+                        <div className="bg-green-600 rounded-lg p-4 text-white mb-4">
+                            <p className="text-sm font-medium mb-1">⏱ Session in progress</p>
+                            <p className="text-base font-semibold mb-3">
+                                {sessionLabel(activeSession)}
+                            </p>
+                            <p className="text-sm mb-3 opacity-90">
+                                Started at {formatTime(activeSession.started_at)}
+                            </p>
+                            {onOtherProperty && (
+                                <p className="text-sm mb-3 bg-green-700/60 rounded-lg px-3 py-2">
+                                    This session was started on {activeSession.property.name} - switch to that property to view it.
+                                </p>
+                            )}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={stop}
+                                    className="flex-1 py-2 bg-white text-green-600 rounded-lg font-medium text-sm"
+                                >
+                                    Stop Work
+                                </button>
+                                {!onOtherProperty && (
+                                    <Link
+                                        href={route('work-sessions.show', activeSession.id)}
+                                        className="flex-1 py-2 border border-white text-white rounded-lg font-medium text-sm text-center"
+                                    >
+                                        View
+                                    </Link>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
 
                 {/* Start new session button */}
                 {!activeSession && (
