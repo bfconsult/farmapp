@@ -3,7 +3,7 @@ import HelpTip from '@/Components/HelpTip';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
-import { formatDate as formatDateDayFirst } from '@/dateInput';
+import { formatDate as formatDateDayFirst, fromLocalInputValue } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 
 const STATUS_LABELS = {
@@ -41,6 +41,7 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
     const [showCalendar, setShowCalendar] = useState(false);
     const [location, setLocation] = useState({ latitude: '', longitude: '' });
     const [starting, setStarting] = useState(false);
+    const [loggingPast, setLoggingPast] = useState(false);
 
     // Captured on mount (best effort) rather than on the button click - by
     // the time someone taps "Start Work Session" the browser has usually
@@ -62,6 +63,22 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
         setStarting(true);
         router.post(route('work-sessions.store'), location, {
             onFinish: () => setStarting(false),
+        });
+    };
+
+    // Defaults to a plain working day (6am - 3pm today) rather than opening
+    // a blank form - Edit is where the details actually get filled in.
+    const logPastSession = () => {
+        const today = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const dateStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+        setLoggingPast(true);
+        router.post(route('work-sessions.store'), {
+            started_at: fromLocalInputValue(`${dateStr}T06:00`),
+            ended_at: fromLocalInputValue(`${dateStr}T15:00`),
+        }, {
+            onFinish: () => setLoggingPast(false),
         });
     };
 
@@ -145,12 +162,13 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                         >
                             Start Work Session
                         </button>
-                        <Link
-                            href={route('work-sessions.create')}
-                            className="block w-full py-2 mt-3 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
+                        <button
+                            onClick={logPastSession}
+                            disabled={loggingPast}
+                            className="block w-full py-2 mt-3 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg disabled:opacity-50"
                         >
                             Log a past session
-                        </Link>
+                        </button>
                     </div>
                 )}
 

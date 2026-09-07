@@ -183,7 +183,7 @@ export default function Edit({ session, plannedJobs, assets, waypoints, zones, b
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                             <textarea
                                 value={data.description}
                                 onChange={(e) => setData('description', e.target.value)}

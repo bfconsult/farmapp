@@ -120,7 +120,12 @@ class WorkSessionController extends Controller
             $this->promoteJobToInProgress($session->farm_job_id);
         }
 
-        return redirect()->route('work-sessions.show', $session);
+        // A session created with its end time already set is being logged
+        // after the fact (never "in progress") - Edit is the useful next
+        // stop for filling in the job/description, not the live Show view.
+        return $session->ended_at
+            ? redirect()->route('work-sessions.edit', $session)
+            : redirect()->route('work-sessions.show', $session);
     }
 
     public function show(Request $request, WorkSession $workSession)
