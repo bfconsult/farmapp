@@ -75,10 +75,11 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
         });
     };
 
-    const saveJob = () => {
+    const saveJob = (newJobId) => {
+        setJobId(newJobId);
         router.patch(route('work-sessions.update', session.id), {
             started_at: session.started_at,
-            farm_job_id: jobId || null,
+            farm_job_id: newJobId || null,
         }, { preserveScroll: true });
     };
 
@@ -305,7 +306,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                             </label>
                             <select
                                 value={jobId}
-                                onChange={(e) => setJobId(e.target.value)}
+                                onChange={(e) => saveJob(e.target.value)}
                                 className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
                             >
                                 <option value="">Ad-hoc work (no planned job)</option>
@@ -313,15 +314,6 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                                     <option key={job.id} value={job.id}>{job.name}</option>
                                 ))}
                             </select>
-                            {jobId !== (session.farm_job_id ?? '') && (
-                                <button
-                                    type="button"
-                                    onClick={saveJob}
-                                    className="mt-3 w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium"
-                                >
-                                    Save
-                                </button>
-                            )}
                         </div>
                     </>
                 )}
