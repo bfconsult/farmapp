@@ -1,7 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import WaypointTrail from '@/Components/WaypointTrail';
 import BackLink from '@/Components/BackLink';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo } from 'react';
 import {
     toLocalInputValue,
@@ -15,6 +15,7 @@ import {
 } from '@/dateInput';
 
 export default function Edit({ session, plannedJobs, assets, waypoints, zones, billingBlockMinutes }) {
+    const { flash } = usePage().props;
     // The exact recorded moment (e.g. an auto-tracked visit's GPS timestamp)
     // never needs to be shown or selectable - the start suggests the block
     // boundary before it, the end the one after, so the dropdown only ever
@@ -69,6 +70,16 @@ export default function Edit({ session, plannedJobs, assets, waypoints, zones, b
     const backHref = isAutoTracked ? route('work-sessions.index') : route('work-sessions.show', session.id);
     const backLabel = isAutoTracked ? 'Work' : 'Back';
 
+    // Flashed once by WorkSessionController::store() when this session was
+    // just created via "Log a past session" - backing out without saving
+    // should discard the untouched placeholder rather than leave a
+    // half-filled 6am-3pm entry sitting in the user's history.
+    const isNewPastSession = Boolean(flash?.newPastSession);
+
+    const discardPastSession = () => {
+        router.delete(route('work-sessions.destroy', session.id));
+    };
+
     const destroy = () => {
         if (confirm('Delete this visit? This cannot be undone.')) {
             router.delete(route('work-sessions.destroy', session.id));
@@ -81,7 +92,7 @@ export default function Edit({ session, plannedJobs, assets, waypoints, zones, b
 
             <div className="max-w-lg mx-auto">
                 <div className="flex items-center justify-between mb-6">
-                    <BackLink href={backHref}>{backLabel}</BackLink>
+                    <BackLink href={backHref} onClick={isNewPastSession ? discardPastSession : undefined}>{backLabel}</BackLink>
                     <h1 className="text-xl font-semibold text-gray-900">
                         {isAutoTracked ? 'Auto Tracked Visit' : 'Edit Session'}
                     </h1>
@@ -194,12 +205,22 @@ export default function Edit({ session, plannedJobs, assets, waypoints, zones, b
                     </div>
 
                     <div className="flex gap-3">
-                        <Link
-                            href={backHref}
-                            className="flex-1 py-4 border border-gray-300 text-gray-700 rounded-lg text-base text-center"
-                        >
-                            Cancel
-                        </Link>
+                        {isNewPastSession ? (
+                            <button
+                                type="button"
+                                onClick={discardPastSession}
+                                className="flex-1 py-4 border border-gray-300 text-gray-700 rounded-lg text-base text-center"
+                            >
+                                Cancel
+                            </button>
+                        ) : (
+                            <Link
+                                href={backHref}
+                                className="flex-1 py-4 border border-gray-300 text-gray-700 rounded-lg text-base text-center"
+                            >
+                                Cancel
+                            </Link>
+                        )}
                         <button
                             type="submit"
                             disabled={processing}

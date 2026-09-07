@@ -123,8 +123,12 @@ class WorkSessionController extends Controller
         // A session created with its end time already set is being logged
         // after the fact (never "in progress") - Edit is the useful next
         // stop for filling in the job/description, not the live Show view.
+        // The newPastSession flash flags it as not "really" existing yet -
+        // Edit.jsx uses it to delete instead of merely navigating away if
+        // the user backs out without saving, so the placeholder 6am-3pm
+        // entry they never asked to keep doesn't linger in their history.
         return $session->ended_at
-            ? redirect()->route('work-sessions.edit', $session)
+            ? redirect()->route('work-sessions.edit', $session)->with('newPastSession', true)
             : redirect()->route('work-sessions.show', $session);
     }
 

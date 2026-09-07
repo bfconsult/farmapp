@@ -97,6 +97,7 @@ class HandleInertiaRequests extends Middleware
             'addPhoto' => session('addPhoto'),
             'error' => session('error'),
             'success' => session('success'),
+            'newPastSession' => session('newPastSession'),
         ],
     ];
 }
