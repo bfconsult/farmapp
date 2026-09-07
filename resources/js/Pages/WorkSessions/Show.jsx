@@ -5,7 +5,7 @@ import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
 import PhotoLightbox from '@/Components/PhotoLightbox';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import {
     toLocalInputValue,
@@ -48,6 +48,44 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
     const [startTime, setStartTime] = useState('');
     const [jobId, setJobId] = useState(session.farm_job_id ?? '');
     const startTimeOptions = useMemo(() => timeOptionsForBlock(billingBlockMinutes), [billingBlockMinutes]);
+    const hasLocation = session.latitude && session.longitude;
+    const [locating, setLocating] = useState(!hasLocation);
+
+    // The session may have started without a location fix (denied/slow GPS
+    // at the time) - keep watching in the background while active and save
+    // one the moment it comes in, rather than leaving it unavailable for
+    // good just because the first attempt on the Start page missed it.
+    useEffect(() => {
+        if (session.ended_at || hasLocation || !navigator.geolocation) {
+            setLocating(false);
+            return;
+        }
+
+        setLocating(true);
+        const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                navigator.geolocation.clearWatch(watchId);
+                setLocating(false);
+                router.patch(route('work-sessions.update', session.id), {
+                    started_at: session.started_at,
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                }, { preserveScroll: true, preserveState: true });
+            },
+            (error) => {
+                // Permission denial won't ever resolve on its own - stop
+                // asking. A timeout or momentary fix failure might still
+                // succeed on a later attempt, so keep the watch running.
+                if (error.code === error.PERMISSION_DENIED) {
+                    navigator.geolocation.clearWatch(watchId);
+                    setLocating(false);
+                }
+            },
+            { enableHighAccuracy: true, timeout: 20000 }
+        );
+
+        return () => navigator.geolocation.clearWatch(watchId);
+    }, [session.id, session.ended_at, hasLocation]);
 
     // Reached via Manage -> Work Sessions rather than the self-service Work
     // tab (see WorkSessionController::cameFromManage()) - Back has to know
@@ -141,7 +179,7 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
             </svg>
-            {session.latitude && session.longitude ? 'Location saved' : 'Location unavailable'}
+            {hasLocation ? 'Location saved' : locating ? 'Locating…' : 'Location unavailable'}
         </span>
     );
 
@@ -166,7 +204,12 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                 {/* Active session banner */}
                 {!session.ended_at && (
                     <div className="bg-green-600 rounded-lg p-4 text-white">
-                        <p className="text-sm font-medium mb-3">⏱ Session in progress...</p>
+                        <p className="text-sm font-medium mb-3 flex items-center gap-1.5">
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Session in progress...
+                        </p>
                         <button
                             onClick={stop}
                             className="w-full py-3 bg-white text-green-600 rounded-lg font-medium text-base"
