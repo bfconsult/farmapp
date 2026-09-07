@@ -147,9 +147,9 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                         </button>
                         <Link
                             href={route('work-sessions.create')}
-                            className="block text-center text-sm text-gray-500 mt-2"
+                            className="block w-full py-2 mt-3 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
                         >
-                            Log a completed session instead
+                            Log a past session
                         </Link>
                     </div>
                 )}
