@@ -103,15 +103,10 @@ class WorkSessionController extends Controller
 
         // A session logged with an end time already set (e.g. forgotten past work being
         // added after the fact) isn't "active", so it doesn't conflict with one that is.
-        if (!$validated['ended_at'] && ($activeSession = $this->activeSession())) {
+        if (empty($validated['ended_at']) && ($activeSession = $this->activeSession())) {
             return redirect()->route('work-sessions.show', $activeSession)
                 ->with('error', 'You already have an active work session. Stop it before starting a new one.');
         }
-
-        // If the user set a custom start/end time (rather than leaving it to
-        // default to "now"), they're logging work from somewhere other than the
-        // job site right now — don't pop the camera asking for an on-site photo.
-        $timeWasAltered = $validated['started_at'] || $validated['ended_at'];
 
         $validated['user_id'] = Auth::id();
         $validated['property_id'] = session('current_property_id');
@@ -125,9 +120,7 @@ class WorkSessionController extends Controller
             $this->promoteJobToInProgress($session->farm_job_id);
         }
 
-        $redirect = redirect()->route('work-sessions.show', $session);
-
-        return $timeWasAltered ? $redirect : $redirect->with('addPhoto', true);
+        return redirect()->route('work-sessions.show', $session);
     }
 
     public function show(Request $request, WorkSession $workSession)
@@ -154,12 +147,25 @@ class WorkSessionController extends Controller
             && $workSession->overlapsFinalisedSession();
         $workSession->notes->each(fn ($note) => $note->is_unread = $note->isUnreadBy(Auth::id()));
 
+        // Only the in-progress view offers the inline "Start Time" / "Pick a
+        // Job" cards (see Show.jsx) - skip building this for every finished
+        // session, which is the far more common case.
+        $plannedJobs = null;
+        if (!$workSession->ended_at) {
+            $plannedJobs = $this->bookableJobs($workSession->property_id);
+            if ($workSession->farm_job_id && !$plannedJobs->contains('id', $workSession->farm_job_id)) {
+                $plannedJobs->push($workSession->farmJob);
+            }
+        }
+
         return Inertia::render('WorkSessions/Show', [
             'session' => $workSession,
             'durationInHours' => $workSession->duration_in_hours,
             'billingAmount' => $workSession->billing_amount,
             'waypoints' => $workSession->waypoints,
             'zones' => $workSession->property->zones,
+            'plannedJobs' => $plannedJobs,
+            'billingBlockMinutes' => Auth::user()->billing_block_minutes,
             // Reached via Manage -> Work Sessions rather than the self-service
             // Work tab - carried through finalise/stop/revert's redirects (see
             // redirectToSession() below) so "Back" keeps pointing at Manage
@@ -224,7 +230,7 @@ class WorkSessionController extends Controller
             'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
-        if (!$validated['ended_at'] && ($activeSession = $this->activeSession())
+        if (empty($validated['ended_at']) && ($activeSession = $this->activeSession())
             && $activeSession->isNot($workSession)) {
             throw \Illuminate\Validation\ValidationException::withMessages([
                 'ended_at' => 'You already have another active work session. Stop it first.',

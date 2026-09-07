@@ -2,7 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import HelpTip from '@/Components/HelpTip';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatDate as formatDateDayFirst } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 
@@ -39,9 +39,30 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
     const { currentProperty } = usePage().props;
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
+    const [location, setLocation] = useState({ latitude: '', longitude: '' });
+    const [starting, setStarting] = useState(false);
+
+    // Captured on mount (best effort) rather than on the button click - by
+    // the time someone taps "Start Work Session" the browser has usually
+    // already resolved this, so the session isn't left waiting on it.
+    useEffect(() => {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+            (position) => setLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+            () => {},
+            { timeout: 10000, enableHighAccuracy: true }
+        );
+    }, []);
 
     const stop = () => {
         router.post(route('work-sessions.stop', activeSession.id));
+    };
+
+    const startWork = () => {
+        setStarting(true);
+        router.post(route('work-sessions.store'), location, {
+            onFinish: () => setStarting(false),
+        });
     };
 
     const goTo = (overrides = {}) => {
@@ -116,12 +137,21 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
 
                 {/* Start new session button */}
                 {!activeSession && (
-                    <Link
-                        href={route('work-sessions.create')}
-                        className="block w-full py-4 bg-green-600 text-white rounded-lg text-base font-medium text-center mb-4"
-                    >
-                        Start Work Session
-                    </Link>
+                    <div className="mb-4">
+                        <button
+                            onClick={startWork}
+                            disabled={starting}
+                            className="block w-full py-4 bg-green-600 text-white rounded-lg text-base font-medium text-center disabled:opacity-50"
+                        >
+                            Start Work Session
+                        </button>
+                        <Link
+                            href={route('work-sessions.create')}
+                            className="block text-center text-sm text-gray-500 mt-2"
+                        >
+                            Log a completed session instead
+                        </Link>
+                    </div>
                 )}
 
                 {/* Filters / Finalise & share / export */}

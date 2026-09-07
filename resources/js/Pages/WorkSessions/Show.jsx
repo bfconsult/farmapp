@@ -5,9 +5,17 @@ import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
 import PhotoLightbox from '@/Components/PhotoLightbox';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
-import { formatDate as formatDateDayFirst } from '@/dateInput';
+import {
+    toLocalInputValue,
+    fromLocalInputValue,
+    splitLocalValue,
+    joinLocalValue,
+    timeOptionsForBlock,
+    floorToBillingBlock,
+    formatDate as formatDateDayFirst,
+} from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 
 const STATUS_LABELS = {
@@ -22,15 +30,24 @@ const STATUS_COLORS = {
     approved: 'bg-green-100 text-green-700',
 };
 
-export default function Show({ session, durationInHours, billingAmount, waypoints, zones, from }) {
+export default function Show({ session, durationInHours, billingAmount, waypoints, zones, from, plannedJobs, billingBlockMinutes }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
-    const { flash, currentUserRole } = usePage().props;
+    const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canCreateNote = canManage || currentUserRole === 'worker';
     const [uploading, setUploading] = useState(false);
     const [addingNote, setAddingNote] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(null);
+
+    // Only relevant while the session is still active - see the "Start
+    // Time" / "Pick a Job" cards below, which replace Session Details for
+    // that case (it's mostly empty fields until the session has ended).
+    const [editingStart, setEditingStart] = useState(false);
+    const [startDate, setStartDate] = useState('');
+    const [startTime, setStartTime] = useState('');
+    const [jobId, setJobId] = useState(session.farm_job_id ?? '');
+    const startTimeOptions = useMemo(() => timeOptionsForBlock(billingBlockMinutes), [billingBlockMinutes]);
 
     // Reached via Manage -> Work Sessions rather than the self-service Work
     // tab (see WorkSessionController::cameFromManage()) - Back has to know
@@ -38,14 +55,31 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
     const backHref = from === 'manage' ? route('manage.work-sessions') : route('work-sessions.index');
     const backLabel = from === 'manage' ? 'Manage' : 'Work';
 
-    useEffect(() => {
-        if (flash?.addPhoto && cameraInput.current) {
-            cameraInput.current.click();
-        }
-    }, [flash]);
-
     const stop = () => {
         router.post(route('work-sessions.stop', session.id));
+    };
+
+    const beginEditStart = () => {
+        const local = splitLocalValue(toLocalInputValue(floorToBillingBlock(new Date(session.started_at), billingBlockMinutes).toISOString()));
+        setStartDate(local.date);
+        setStartTime(local.time);
+        setEditingStart(true);
+    };
+
+    const saveStart = () => {
+        router.patch(route('work-sessions.update', session.id), {
+            started_at: fromLocalInputValue(joinLocalValue(startDate, startTime)),
+        }, {
+            preserveScroll: true,
+            onSuccess: () => setEditingStart(false),
+        });
+    };
+
+    const saveJob = () => {
+        router.patch(route('work-sessions.update', session.id), {
+            started_at: session.started_at,
+            farm_job_id: jobId || null,
+        }, { preserveScroll: true });
     };
 
     const finalise = () => {
@@ -100,6 +134,16 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
         return formatDateDayFirst(datetime);
     };
 
+    const locationBadge = (
+        <span className="inline-flex items-center gap-1 font-normal text-gray-400">
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+            </svg>
+            {session.latitude && session.longitude ? 'Location saved' : 'Location unavailable'}
+        </span>
+    );
+
     return (
         <AuthenticatedLayout>
             <Head title="Work Session" />
@@ -132,71 +176,155 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                 )}
 
                 {/* Session details */}
-                <div className="bg-white rounded-lg shadow p-4">
-                    <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-                        Session Details
-                    </h2>
-                    <div className="space-y-3">
-                        <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Status</span>
-                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[session.status]}`}>
-                                {STATUS_LABELS[session.status]}
-                            </span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Date</span>
-                            <span className="text-sm text-gray-900">{formatDate(session.started_at)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Started</span>
-                            <span className="text-sm text-gray-900">{formatTime(session.started_at)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">Ended</span>
-                            <span className="text-sm text-gray-900">{formatTime(session.ended_at)}</span>
-                        </div>
-                        {durationInHours && (
+                {session.ended_at ? (
+                    <div className="bg-white rounded-lg shadow p-4">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
+                            Session Details
+                        </h2>
+                        <div className="space-y-3">
                             <div className="flex justify-between">
-                                <span className="text-sm text-gray-500">Duration</span>
-                                <span className="text-sm font-medium text-gray-900">{formatNumber(durationInHours)}h</span>
+                                <span className="text-sm text-gray-500">Status</span>
+                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[session.status]}`}>
+                                    {STATUS_LABELS[session.status]}
+                                </span>
                             </div>
-                        )}
-                        {billingAmount && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-gray-500">Billing Amount</span>
-                                <span className="text-sm font-medium text-green-700">${formatNumber(billingAmount)}</span>
+                                <span className="text-sm text-gray-500">Date</span>
+                                <span className="text-sm text-gray-900">{formatDate(session.started_at)}</span>
                             </div>
-                        )}
-                        {session.farm_job && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-gray-500">Planned Job</span>
-                                <Link
-                                    href={route('jobs.show', session.farm_job.id)}
-                                    className="text-sm text-green-600"
-                                >
-                                    {session.farm_job.name}
-                                </Link>
+                                <span className="text-sm text-gray-500">Started</span>
+                                <span className="text-sm text-gray-900">{formatTime(session.started_at)}</span>
                             </div>
-                        )}
-                        {session.asset && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-gray-500">Asset</span>
-                                <Link
-                                    href={route('assets.show', session.asset.id)}
-                                    className="text-sm text-green-600"
-                                >
-                                    {session.asset.name}
-                                </Link>
+                                <span className="text-sm text-gray-500">Ended</span>
+                                <span className="text-sm text-gray-900">{formatTime(session.ended_at)}</span>
                             </div>
-                        )}
-                        {session.description && (
-                            <div>
-                                <p className="text-sm text-gray-500 mb-1">Description</p>
-                                <p className="text-sm text-gray-900">{session.description}</p>
-                            </div>
-                        )}
+                            {durationInHours && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-gray-500">Duration</span>
+                                    <span className="text-sm font-medium text-gray-900">{formatNumber(durationInHours)}h</span>
+                                </div>
+                            )}
+                            {billingAmount && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-gray-500">Billing Amount</span>
+                                    <span className="text-sm font-medium text-green-700">${formatNumber(billingAmount)}</span>
+                                </div>
+                            )}
+                            {session.farm_job && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-gray-500">Planned Job</span>
+                                    <Link
+                                        href={route('jobs.show', session.farm_job.id)}
+                                        className="text-sm text-green-600"
+                                    >
+                                        {session.farm_job.name}
+                                    </Link>
+                                </div>
+                            )}
+                            {session.asset && (
+                                <div className="flex justify-between">
+                                    <span className="text-sm text-gray-500">Asset</span>
+                                    <Link
+                                        href={route('assets.show', session.asset.id)}
+                                        className="text-sm text-green-600"
+                                    >
+                                        {session.asset.name}
+                                    </Link>
+                                </div>
+                            )}
+                            {session.description && (
+                                <div>
+                                    <p className="text-sm text-gray-500 mb-1">Description</p>
+                                    <p className="text-sm text-gray-900">{session.description}</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    <>
+                        {/* Start time */}
+                        <div className="bg-white rounded-lg shadow p-4">
+                            {!editingStart ? (
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-xs text-gray-500 mb-1 flex items-center gap-2">
+                                            <span>Start Time</span>
+                                            {locationBadge}
+                                        </p>
+                                        <p className="text-lg font-medium text-gray-900">{formatTime(session.started_at)}</p>
+                                    </div>
+                                    <button type="button" onClick={beginEditStart} className="text-sm text-green-600 font-medium">
+                                        Change
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <input
+                                            type="date"
+                                            value={startDate}
+                                            onChange={(e) => setStartDate(e.target.value)}
+                                            className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                        />
+                                        <select
+                                            value={startTime}
+                                            onChange={(e) => setStartTime(e.target.value)}
+                                            className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                                        >
+                                            {startTimeOptions.map((option) => (
+                                                <option key={option.value} value={option.value}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditingStart(false)}
+                                            className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={saveStart}
+                                            className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium"
+                                        >
+                                            Save
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Pick a job */}
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Link to Planned Job (optional)
+                            </label>
+                            <select
+                                value={jobId}
+                                onChange={(e) => setJobId(e.target.value)}
+                                className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                            >
+                                <option value="">Ad-hoc work (no planned job)</option>
+                                {plannedJobs.map((job) => (
+                                    <option key={job.id} value={job.id}>{job.name}</option>
+                                ))}
+                            </select>
+                            {jobId !== (session.farm_job_id ?? '') && (
+                                <button
+                                    type="button"
+                                    onClick={saveJob}
+                                    className="mt-3 w-full py-2 bg-green-600 text-white rounded-lg text-sm font-medium"
+                                >
+                                    Save
+                                </button>
+                            )}
+                        </div>
+                    </>
+                )}
 
                 <WaypointTrail waypoints={waypoints} zones={zones} workSessionId={session.id} />
 
