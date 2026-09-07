@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 import {
     toLocalInputValue,
@@ -12,7 +12,6 @@ import {
 } from '@/dateInput';
 
 export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
-    const { currentProperty } = usePage().props;
     const { data, setData, post, processing, errors, transform } = useForm({
         description: '',
         farm_job_id: '',
@@ -85,42 +84,32 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
         post(route('work-sessions.store'));
     };
 
+    // Shown inline next to the "Start Time" heading (both modes below) -
+    // this is the only remaining trace of location status on the page now
+    // the property card is hidden, so it needs to read fine standalone.
+    const pinIcon = (
+        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+        </svg>
+    );
+
+    const locationBadge = (
+        <span className="inline-flex items-center gap-1 font-normal text-gray-400">
+            {locationStatus === 'getting' && (<>{pinIcon}Getting location...</>)}
+            {locationStatus === 'got' && (<>{pinIcon}Location saved</>)}
+            {locationStatus === 'failed' && (<>{pinIcon}Location unavailable</>)}
+        </span>
+    );
+
     return (
         <AuthenticatedLayout>
             <Head title="Start Work Session" />
 
-            <div className="max-w-lg mx-auto">
-                <div className="flex gap-3 mb-4">
-                    {currentProperty && (
-                        <div className="flex-[2] p-3 bg-green-50 rounded-md border border-green-200">
-                            <p className="text-xs text-gray-500">Property</p>
-                            <p className="font-medium text-green-800">{currentProperty.name}</p>
-                        </div>
-                    )}
-                    <div className="flex-1 flex items-center justify-center text-center text-xs text-gray-500 px-1">
-                        {locationStatus === 'getting' && '📍 Getting location...'}
-                        {locationStatus === 'got' && (
-                            <span className="inline-flex items-center gap-1">
-                                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                                </svg>
-                                Location saved
-                            </span>
-                        )}
-                        {locationStatus === 'failed' && '📍 Location unavailable'}
-                    </div>
-                </div>
-
+            <div className="max-w-lg mx-auto mt-2">
                 <form onSubmit={submit} className="space-y-4">
                     {/* Start/Cancel */}
                     <div className="flex gap-3">
-                        <Link
-                            href={route('work-sessions.index')}
-                            className="flex-1 py-4 border border-gray-300 text-gray-700 rounded-lg text-base text-center"
-                        >
-                            Cancel
-                        </Link>
                         <button
                             type="submit"
                             disabled={processing}
@@ -128,6 +117,12 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
                         >
                             {data.ended_date && data.ended_time ? 'Log Work' : 'Start Work'}
                         </button>
+                        <Link
+                            href={route('work-sessions.index')}
+                            className="flex-1 py-4 border border-gray-300 text-gray-700 rounded-lg text-base text-center"
+                        >
+                            Cancel
+                        </Link>
                     </div>
 
                     {/* Start time */}
@@ -135,11 +130,14 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
                         {mode === 'now' ? (
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-xs text-gray-500 mb-1">
-                                        Start Time
-                                        {billingBlockMinutes && (
-                                            <span className="text-gray-400"> (nearest {billingBlockLabel(billingBlockMinutes)})</span>
-                                        )}
+                                    <p className="text-xs text-gray-500 mb-1 flex items-center gap-2">
+                                        <span>
+                                            Start Time
+                                            {billingBlockMinutes && (
+                                                <span className="text-gray-400"> (nearest {billingBlockLabel(billingBlockMinutes)})</span>
+                                            )}
+                                        </span>
+                                        {locationBadge}
                                     </p>
                                     <p className="text-lg font-medium text-gray-900">
                                         {billingBlockMinutes
@@ -169,11 +167,14 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Start Time
-                                        {billingBlockMinutes && (
-                                            <span className="text-gray-400 font-normal"> (in steps of {billingBlockLabel(billingBlockMinutes)})</span>
-                                        )}
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                                        <span>
+                                            Start Time
+                                            {billingBlockMinutes && (
+                                                <span className="text-gray-400 font-normal"> (in steps of {billingBlockLabel(billingBlockMinutes)})</span>
+                                            )}
+                                        </span>
+                                        {locationBadge}
                                     </label>
                                     <div className="grid grid-cols-2 gap-2">
                                         <input
@@ -239,6 +240,20 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
                         </select>
                     </div>
 
+                    {/* Description */}
+                    <div className="bg-white rounded-lg shadow p-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            What are you doing? (optional)
+                        </label>
+                        <textarea
+                            value={data.description}
+                            onChange={(e) => setData('description', e.target.value)}
+                            placeholder="Brief description..."
+                            rows={3}
+                            className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                        />
+                    </div>
+
                     {/* Link to asset - for ad-hoc work not tied to a planned job */}
                     <div className="bg-white rounded-lg shadow p-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -263,20 +278,6 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
                                 </Link>
                             </p>
                         )}
-                    </div>
-
-                    {/* Description */}
-                    <div className="bg-white rounded-lg shadow p-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            What are you doing? (optional)
-                        </label>
-                        <textarea
-                            value={data.description}
-                            onChange={(e) => setData('description', e.target.value)}
-                            placeholder="Brief description..."
-                            rows={3}
-                            className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
-                        />
                     </div>
                 </form>
             </div>
