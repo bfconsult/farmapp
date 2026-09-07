@@ -90,23 +90,46 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
             <Head title="Start Work Session" />
 
             <div className="max-w-lg mx-auto">
-                <div className="flex items-center justify-between mb-6">
-                    <h1 className="text-xl font-semibold text-gray-900">Start Work</h1>
-                    <div className="text-xs text-gray-500">
+                <div className="flex gap-3 mb-4">
+                    {currentProperty && (
+                        <div className="flex-[2] p-3 bg-green-50 rounded-md border border-green-200">
+                            <p className="text-xs text-gray-500">Property</p>
+                            <p className="font-medium text-green-800">{currentProperty.name}</p>
+                        </div>
+                    )}
+                    <div className="flex-1 flex items-center justify-center text-center text-xs text-gray-500 px-1">
                         {locationStatus === 'getting' && '📍 Getting location...'}
-                        {locationStatus === 'got' && '📍 Location saved'}
+                        {locationStatus === 'got' && (
+                            <span className="inline-flex items-center gap-1">
+                                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+                                </svg>
+                                Location saved
+                            </span>
+                        )}
                         {locationStatus === 'failed' && '📍 Location unavailable'}
                     </div>
                 </div>
 
-                {currentProperty && (
-                    <div className="mb-4 p-3 bg-green-50 rounded-md border border-green-200">
-                        <p className="text-xs text-gray-500">Property</p>
-                        <p className="font-medium text-green-800">{currentProperty.name}</p>
-                    </div>
-                )}
-
                 <form onSubmit={submit} className="space-y-4">
+                    {/* Start/Cancel */}
+                    <div className="flex gap-3">
+                        <Link
+                            href={route('work-sessions.index')}
+                            className="flex-1 py-4 border border-gray-300 text-gray-700 rounded-lg text-base text-center"
+                        >
+                            Cancel
+                        </Link>
+                        <button
+                            type="submit"
+                            disabled={processing}
+                            className="flex-[2] py-4 bg-green-600 text-white rounded-lg text-base font-medium hover:bg-green-700 disabled:opacity-50"
+                        >
+                            {data.ended_date && data.ended_time ? 'Log Work' : 'Start Work'}
+                        </button>
+                    </div>
+
                     {/* Start time */}
                     <div className="bg-white rounded-lg shadow p-4">
                         {mode === 'now' ? (
@@ -254,22 +277,6 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
                             rows={3}
                             className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
                         />
-                    </div>
-
-                    <div className="flex gap-3">
-                        <Link
-                            href={route('work-sessions.index')}
-                            className="flex-1 py-4 border border-gray-300 text-gray-700 rounded-lg text-base text-center"
-                        >
-                            Cancel
-                        </Link>
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="flex-1 py-4 bg-green-600 text-white rounded-lg text-base font-medium hover:bg-green-700 disabled:opacity-50"
-                        >
-                            {data.ended_date && data.ended_time ? 'Log Work' : 'Start Work'}
-                        </button>
                     </div>
                 </form>
             </div>
