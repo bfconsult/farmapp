@@ -74,16 +74,19 @@ function PurchaseFields({ values, setValues }) {
     );
 }
 
-function AnimalFields({ values, setValues, mobs }) {
+function AnimalFields({ values, setValues, mobs, errors }) {
     return (
         <div className="space-y-3">
-            <input
-                type="text"
-                value={values.tag_number}
-                onChange={(e) => setValues({ ...values, tag_number: e.target.value })}
-                className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                placeholder="Tag number"
-            />
+            <div>
+                <input
+                    type="text"
+                    value={values.tag_number}
+                    onChange={(e) => setValues({ ...values, tag_number: e.target.value })}
+                    className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                    placeholder="Tag number"
+                />
+                {errors?.tag_number && <p className="mt-1 text-xs text-red-600">{errors.tag_number}</p>}
+            </div>
             <input
                 type="text"
                 value={values.name}
@@ -146,6 +149,7 @@ export default function Show({ livestock, offspring, potentialParents, mobs }) {
     const canCreateNote = canManage || currentUserRole === 'worker';
 
     const [editing, setEditing] = useState(false);
+    const [errors, setErrors] = useState({});
     const [values, setValues] = useState({
         tag_number: livestock.tag_number,
         name: livestock.name ?? '',
@@ -180,7 +184,8 @@ export default function Show({ livestock, offspring, potentialParents, mobs }) {
         router.patch(route('livestock.update', livestock.id), values, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => setEditing(false),
+            onSuccess: () => { setEditing(false); setErrors({}); },
+            onError: setErrors,
         });
     };
 
@@ -251,10 +256,10 @@ export default function Show({ livestock, offspring, potentialParents, mobs }) {
                 <div className="bg-white rounded-lg shadow p-4">
                     {editing ? (
                         <div className="space-y-3">
-                            <AnimalFields values={values} setValues={setValues} mobs={mobs} />
+                            <AnimalFields values={values} setValues={setValues} mobs={mobs} errors={errors} />
                             <div className="flex gap-2">
                                 <button onClick={save} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Save</button>
-                                <button onClick={() => setEditing(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
+                                <button onClick={() => { setEditing(false); setErrors({}); }} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
                             </div>
                         </div>
                     ) : (
