@@ -3,6 +3,7 @@ import { Head, router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 import BackLink from '@/Components/BackLink';
 
 const STATUS_LABELS = {
@@ -22,7 +23,7 @@ export default function Show({ measurement }) {
     const [submitting, setSubmitting] = useState(false);
     const [value, setValue] = useState(
         measurement.answer_type === 'number'
-            ? measurement.value_number ?? ''
+            ? (measurement.value_number != null ? formatNumber(measurement.value_number) : '')
             : measurement.value_text ?? ''
     );
 
@@ -129,7 +130,9 @@ export default function Show({ measurement }) {
                     ) : (
                         <>
                             <p className="text-base text-gray-900 whitespace-pre-wrap">
-                                {measurement.answer_type === 'number' ? measurement.value_number : measurement.value_text}
+                                {measurement.answer_type === 'number'
+                                    ? (measurement.value_number != null ? formatNumber(measurement.value_number) : '')
+                                    : measurement.value_text}
                             </p>
                             <button
                                 onClick={remeasure}

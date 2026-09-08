@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { formatNumber } from '@/numberFormat';
 
 const REPORTING_PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
@@ -27,7 +28,11 @@ function formatMeasurementValue(measurement) {
         return 'Not measured';
     }
     if (measurement.answer_type === 'number') {
-        return measurement.value_number ?? 'No value recorded';
+        // A decimal(12,2) column always comes back zero-padded ("500.00",
+        // "9.50") - most of these are whole numbers (tank volumes) or one
+        // decimal place (fence voltage), so show only the precision that's
+        // actually there rather than forcing two decimals on everything.
+        return measurement.value_number != null ? formatNumber(measurement.value_number) : 'No value recorded';
     }
     return measurement.value_text || 'No value recorded';
 }

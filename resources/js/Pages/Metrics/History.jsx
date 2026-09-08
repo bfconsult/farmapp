@@ -4,6 +4,7 @@ import BackLink from '@/Components/BackLink';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { formatNumber } from '@/numberFormat';
 
 const STATUS_LABELS = {
     incomplete: 'Incomplete',
@@ -57,7 +58,7 @@ function NumberHistoryTable({ measurements, canMeasure }) {
                             <tr key={measurement.id}>
                                 <td className="px-2 py-2 whitespace-nowrap text-gray-500">{formatPeriod(measurement)}</td>
                                 <td className="px-2 py-2 text-gray-900 font-medium">
-                                    {measurement.value_number ?? '—'}
+                                    {measurement.value_number != null ? formatNumber(measurement.value_number) : '—'}
                                 </td>
                                 <td className="px-2 py-2">
                                     <span className={`px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap ${STATUS_COLORS[measurement.status]}`}>
