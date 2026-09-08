@@ -63,6 +63,32 @@ export function ceilToBillingBlock(date, blockMinutes) {
     return ceiled;
 }
 
+// The first/last day of the current calendar month, as "YYYY-MM-DD"
+// strings - the "This month" quick-filter offered on Work, Jobs, and
+// Reports' date-range pickers (see previousMonthRange below for its pair).
+export function currentMonthRange() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const from = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const to = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(lastDay)}`;
+    return { from, to };
+}
+
+// Same as currentMonthRange, one month back - the common case of doing
+// reporting/billing in the first few days of a new month, for last month's
+// work. new Date(year, -1, 1) normalizes to December of the prior year on
+// its own, so this doesn't need special-casing a January rollover.
+export function previousMonthRange() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const from = `${prevMonth.getFullYear()}-${pad(prevMonth.getMonth() + 1)}-01`;
+    const lastDay = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate();
+    const to = `${prevMonth.getFullYear()}-${pad(prevMonth.getMonth() + 1)}-${pad(lastDay)}`;
+    return { from, to };
+}
+
 // Every "HH:mm" time-of-day value at a billing_block_minutes granularity,
 // for a <select> that can only ever choose a block-aligned time - unlike
 // <input type="time" step>, whose step is only honoured by some browsers'

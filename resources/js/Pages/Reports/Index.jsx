@@ -2,7 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
-import { formatDate } from '@/dateInput';
+import { formatDate, currentMonthRange, previousMonthRange } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 
 function sessionLabel(session) {
@@ -11,15 +11,6 @@ function sessionLabel(session) {
     // WorkSessionController::update()) - after that it's treated as a
     // normal entry everywhere, same as Edit.jsx's isAutoTracked.
     return session.source === 'auto_tracked' && !session.reviewed_at ? 'Auto-tracked visit' : 'Ad-hoc work';
-}
-
-function currentMonthRange() {
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const from = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const to = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(lastDay)}`;
-    return { from, to };
 }
 
 export default function Index({ workers, expensesByJob, grandTotal, currentDateFrom, currentDateTo, justSharedUrl }) {
@@ -61,8 +52,18 @@ export default function Index({ workers, expensesByJob, grandTotal, currentDateF
         goTo({ dateFrom: from, dateTo: to });
     };
 
+    const resetToPreviousMonth = () => {
+        const { from, to } = previousMonthRange();
+        goTo({ dateFrom: from, dateTo: to });
+    };
+
     const isThisMonth = (() => {
         const { from, to } = currentMonthRange();
+        return currentDateFrom === from && currentDateTo === to;
+    })();
+
+    const isPreviousMonth = (() => {
+        const { from, to } = previousMonthRange();
         return currentDateFrom === from && currentDateTo === to;
     })();
 
@@ -107,9 +108,17 @@ export default function Index({ workers, expensesByJob, grandTotal, currentDateF
                         </span>
                         <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
                     </button>
+                    {!isPreviousMonth && (
+                        <button
+                            onClick={resetToPreviousMonth}
+                            className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600 flex-shrink-0"
+                        >
+                            Previous month
+                        </button>
+                    )}
                     <button
                         onClick={() => setConfirmingShare((v) => !v)}
-                        className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600"
+                        className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600 flex-shrink-0"
                     >
                         Share diary
                     </button>

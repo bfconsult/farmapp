@@ -2,20 +2,11 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
-import { formatDate } from '@/dateInput';
+import { formatDate, currentMonthRange, previousMonthRange } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 import { pillBadgeClass } from '@/Utils/pillColors';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-
-function currentMonthRange() {
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const from = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const to = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(lastDay)}`;
-    return { from, to };
-}
 
 function JobCard({ job }) {
     return (
@@ -253,12 +244,22 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
         goTo({ dateFrom: from, dateTo: to });
     };
 
+    const resetToPreviousMonth = () => {
+        const { from, to } = previousMonthRange();
+        goTo({ dateFrom: from, dateTo: to });
+    };
+
     const showAllDates = () => goTo({ dateFrom: '', dateTo: '' });
 
     const isAllDates = !currentDateFrom && !currentDateTo;
 
     const isThisMonth = (() => {
         const { from, to } = currentMonthRange();
+        return currentDateFrom === from && currentDateTo === to;
+    })();
+
+    const isPreviousMonth = (() => {
+        const { from, to } = previousMonthRange();
         return currentDateFrom === from && currentDateTo === to;
     })();
 
@@ -369,9 +370,14 @@ export default function Index({ jobs, counts, currentStatusIds, currentOrder, cu
                                             All dates
                                         </button>
                                     )}
+                                    {!isPreviousMonth && (
+                                        <button onClick={resetToPreviousMonth} className="text-green-600">
+                                            Previous month
+                                        </button>
+                                    )}
                                     {!isThisMonth && (
                                         <button onClick={resetToThisMonth} className="text-green-600">
-                                            Reset to this month
+                                            This month
                                         </button>
                                     )}
                                 </div>

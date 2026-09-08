@@ -3,7 +3,7 @@ import HelpTip from '@/Components/HelpTip';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
-import { formatDate as formatDateDayFirst, fromLocalInputValue } from '@/dateInput';
+import { formatDate as formatDateDayFirst, fromLocalInputValue, currentMonthRange, previousMonthRange } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 
 const STATUS_LABELS = {
@@ -24,15 +24,6 @@ function sessionLabel(session) {
     // WorkSessionController::update()) - after that it's treated as a
     // normal entry everywhere, same as Edit.jsx's isAutoTracked.
     return session.source === 'auto_tracked' && !session.reviewed_at ? 'Auto-tracked visit' : 'Ad-hoc work';
-}
-
-function currentMonthRange() {
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const from = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const to = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(lastDay)}`;
-    return { from, to };
 }
 
 export default function Index({ sessions, activeSession, currentDateFrom, currentDateTo, currentStatusDraft, currentStatusFinalised, hasAnySessions }) {
@@ -102,8 +93,18 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
         goTo({ dateFrom: from, dateTo: to });
     };
 
+    const resetToPreviousMonth = () => {
+        const { from, to } = previousMonthRange();
+        goTo({ dateFrom: from, dateTo: to });
+    };
+
     const isThisMonth = (() => {
         const { from, to } = currentMonthRange();
+        return currentDateFrom === from && currentDateTo === to;
+    })();
+
+    const isPreviousMonth = (() => {
+        const { from, to } = previousMonthRange();
         return currentDateFrom === from && currentDateTo === to;
     })();
 
@@ -227,11 +228,18 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-gray-700">Date range</span>
-                                {!isThisMonth && (
-                                    <button onClick={resetToThisMonth} className="text-xs text-green-600">
-                                        Reset to this month
-                                    </button>
-                                )}
+                                <div className="flex gap-3 text-xs">
+                                    {!isPreviousMonth && (
+                                        <button onClick={resetToPreviousMonth} className="text-green-600">
+                                            Previous month
+                                        </button>
+                                    )}
+                                    {!isThisMonth && (
+                                        <button onClick={resetToThisMonth} className="text-green-600">
+                                            This month
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <button
                                 onClick={() => setShowCalendar((v) => !v)}
