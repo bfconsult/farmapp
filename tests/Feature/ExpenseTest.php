@@ -6,6 +6,8 @@ use App\Models\JobStatus;
 use App\Models\Property;
 use App\Models\Role;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 function createJobWithAdmin(): array
 {
@@ -120,4 +122,104 @@ test('a needs_review expense with no amount is excluded from the job list total_
 
     $response->assertInertia(fn ($page) => $page
         ->where('jobs.0.total_expenses', 100));
+});
+
+test('an admin can attach an invoice file when manually creating an expense', function () {
+    Storage::fake('public');
+    config(['filesystems.default' => 'public']);
+    [$admin, $property, $job] = createJobWithAdmin();
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('expenses.store', $job->id), [
+            'name' => 'Fencing materials and labour',
+            'date' => '2026-06-15',
+            'amount' => 890.50,
+            'gst_inclusive' => true,
+            'invoice' => UploadedFile::fake()->create('invoice.pdf', 100),
+        ])
+        ->assertSessionHasNoErrors();
+
+    $expense = Expense::first();
+    expect($expense->invoice_file)->not->toBeNull();
+    expect($expense->invoice_original_name)->toBe('invoice.pdf');
+    Storage::disk('public')->assertExists($expense->invoice_file);
+});
+
+test('an admin can attach an invoice file to an existing expense that had none', function () {
+    Storage::fake('public');
+    config(['filesystems.default' => 'public']);
+    [$admin, $property, $job] = createJobWithAdmin();
+    $expense = Expense::create([
+        'farm_job_id' => $job->id, 'name' => 'Fencing materials and labour', 'date' => '2026-06-15',
+        'amount' => 890.50, 'gst_inclusive' => true, 'status' => Expense::COMPLETE,
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->patch(route('expenses.update', $expense->id), [
+            'name' => 'Fencing materials and labour',
+            'date' => '2026-06-15',
+            'amount' => 890.50,
+            'invoice' => UploadedFile::fake()->image('invoice.jpg'),
+        ])
+        ->assertSessionHasNoErrors();
+
+    $expense->refresh();
+    expect($expense->invoice_file)->not->toBeNull();
+    expect($expense->invoice_original_name)->toBe('invoice.jpg');
+    Storage::disk('public')->assertExists($expense->invoice_file);
+});
+
+test('replacing an expense\'s invoice file deletes the old one', function () {
+    Storage::fake('public');
+    config(['filesystems.default' => 'public']);
+    [$admin, $property, $job] = createJobWithAdmin();
+    $oldPath = Storage::disk('public')->putFile('invoices', UploadedFile::fake()->image('old.jpg'));
+    $expense = Expense::create([
+        'farm_job_id' => $job->id, 'name' => 'Fencing materials and labour', 'date' => '2026-06-15',
+        'amount' => 890.50, 'gst_inclusive' => true, 'status' => Expense::COMPLETE,
+        'invoice_file' => $oldPath, 'invoice_original_name' => 'old.jpg',
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->patch(route('expenses.update', $expense->id), [
+            'name' => 'Fencing materials and labour',
+            'date' => '2026-06-15',
+            'amount' => 890.50,
+            'invoice' => UploadedFile::fake()->image('new.jpg'),
+        ])
+        ->assertSessionHasNoErrors();
+
+    $expense->refresh();
+    expect($expense->invoice_original_name)->toBe('new.jpg');
+    Storage::disk('public')->assertExists($expense->invoice_file);
+    Storage::disk('public')->assertMissing($oldPath);
+});
+
+test('editing an expense without choosing a new file leaves its existing invoice untouched', function () {
+    Storage::fake('public');
+    config(['filesystems.default' => 'public']);
+    [$admin, $property, $job] = createJobWithAdmin();
+    $path = Storage::disk('public')->putFile('invoices', UploadedFile::fake()->image('invoice.jpg'));
+    $expense = Expense::create([
+        'farm_job_id' => $job->id, 'name' => 'Fencing materials and labour', 'date' => '2026-06-15',
+        'amount' => 890.50, 'gst_inclusive' => true, 'status' => Expense::COMPLETE,
+        'invoice_file' => $path, 'invoice_original_name' => 'invoice.jpg',
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->patch(route('expenses.update', $expense->id), [
+            'name' => 'Fencing materials and labour (updated)',
+            'date' => '2026-06-15',
+            'amount' => 890.50,
+        ])
+        ->assertSessionHasNoErrors();
+
+    $expense->refresh();
+    expect($expense->invoice_file)->toBe($path);
+    expect($expense->invoice_original_name)->toBe('invoice.jpg');
+    Storage::disk('public')->assertExists($path);
 });

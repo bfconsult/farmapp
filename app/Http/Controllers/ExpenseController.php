@@ -6,6 +6,7 @@ use App\Models\Expense;
 use App\Models\FarmJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class ExpenseController extends Controller
 {
@@ -19,10 +20,16 @@ class ExpenseController extends Controller
             'gst_inclusive' => 'boolean',
             'reimburse' => 'boolean',
             'supplier_id' => 'nullable|exists:suppliers,id',
+            // Covers the case where a supplier emails/hands over an invoice
+            // directly instead of using their Request-an-Invoice link (see
+            // SupplierExpenseController, which handles that path) - stored
+            // the same way, untouched, so a PDF isn't forced through the
+            // image-only Photo pipeline.
+            'invoice' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ]);
 
         $farmJob->expenses()->create([
-            ...$validated,
+            ...$this->withInvoiceFile($validated),
             'created_by' => Auth::id(),
         ]);
 
@@ -51,11 +58,47 @@ class ExpenseController extends Controller
             'gst_inclusive' => 'boolean',
             'reimburse' => 'boolean',
             'supplier_id' => 'nullable|exists:suppliers,id',
+            // Lets a manager attach the invoice after the fact too - e.g.
+            // it arrived by email instead of through the supplier's own
+            // link - or replace whichever file is already on there.
+            'invoice' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:10240',
         ]);
 
-        $expense->update($validated);
+        $newValidated = $this->withInvoiceFile($validated);
+        $oldInvoiceFile = isset($newValidated['invoice_file']) ? $expense->invoice_file : null;
+
+        $expense->update($newValidated);
+
+        // Replacing an already-attached invoice shouldn't leave the old
+        // file behind - same cleanup as an avatar replacement.
+        if ($oldInvoiceFile) {
+            Storage::disk(config('filesystems.default'))->delete($oldInvoiceFile);
+        }
 
         return back();
+    }
+
+    /**
+     * Pulls the uploaded "invoice" file (if any) out of a validated array
+     * and swaps it for the invoice_file/invoice_original_name columns that
+     * are actually mass-assignable - mirrors SupplierExpenseController's
+     * upload, storing the file untouched rather than through the image-only,
+     * force-recompressed Photo pipeline.
+     */
+    private function withInvoiceFile(array $validated): array
+    {
+        $file = $validated['invoice'] ?? null;
+        unset($validated['invoice']);
+
+        if (!$file) {
+            return $validated;
+        }
+
+        return [
+            ...$validated,
+            'invoice_file' => Storage::disk(config('filesystems.default'))->putFile('invoices', $file),
+            'invoice_original_name' => $file->getClientOriginalName(),
+        ];
     }
 
     /**

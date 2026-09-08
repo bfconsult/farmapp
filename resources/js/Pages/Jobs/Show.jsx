@@ -277,6 +277,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const [editingExpense, setEditingExpense] = useState(null);
     const todayIso = () => new Date().toISOString().slice(0, 10);
     const [expenseForm, setExpenseForm] = useState({ name: '', date: todayIso(), description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
+    const [invoiceFile, setInvoiceFile] = useState(null);
     const [creatingSupplier, setCreatingSupplier] = useState(false);
     const [newSupplierName, setNewSupplierName] = useState('');
     const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -383,6 +384,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const openAddExpense = () => {
         setEditingExpense(null);
         setExpenseForm({ name: '', date: todayIso(), description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
+        setInvoiceFile(null);
         setShowExpenseModal(true);
     };
 
@@ -397,12 +399,14 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
             reimburse: expense.reimburse,
             supplier_id: expense.supplier_id ? String(expense.supplier_id) : '',
         });
+        setInvoiceFile(null);
         setShowExpenseModal(true);
     };
 
     const closeExpenseModal = () => {
         setShowExpenseModal(false);
         setEditingExpense(null);
+        setInvoiceFile(null);
         setCreatingSupplier(false);
         setNewSupplierName('');
     };
@@ -417,15 +421,18 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
             reimburse: expenseForm.reimburse,
             supplier_id: expenseForm.supplier_id || null,
         };
+        if (invoiceFile) payload.invoice = invoiceFile;
 
         if (editingExpense) {
             router.patch(route('expenses.update', editingExpense.id), payload, {
                 preserveScroll: true,
+                forceFormData: true,
                 onSuccess: closeExpenseModal,
             });
         } else {
             router.post(route('expenses.store', job.id), payload, {
                 preserveScroll: true,
+                forceFormData: true,
                 onSuccess: closeExpenseModal,
             });
         }
@@ -1088,6 +1095,26 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                                 onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
                                 className="w-full border-gray-300 rounded-lg p-2 text-sm"
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Invoice (optional)</label>
+                            <input
+                                type="file"
+                                accept="image/*,application/pdf"
+                                onChange={(e) => setInvoiceFile(e.target.files[0] ?? null)}
+                                className="w-full text-sm"
+                            />
+                            {editingExpense?.invoice_url && !invoiceFile && (
+                                <a
+                                    href={editingExpense.invoice_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs text-green-600 mt-1 inline-block"
+                                >
+                                    Currently attached: {editingExpense.invoice_original_name ?? 'view invoice'} (choose a file above to replace)
+                                </a>
+                            )}
                         </div>
 
                         <div className="flex gap-4">
