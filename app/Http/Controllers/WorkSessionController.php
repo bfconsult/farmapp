@@ -607,6 +607,13 @@ class WorkSessionController extends Controller
         $filename = "work-sessions_{$dateFrom->toDateString()}_{$dateTo->toDateString()}";
 
         if ($request->format === 'pdf') {
+            // Vapor never inspects Content-Type to decide whether a response
+            // needs base64 encoding for API Gateway - only this header does
+            // (see the Excel branch below for the failure mode when it's
+            // missing). This PDF has stayed accidentally safe so far only
+            // because a plain table with no embedded images/fonts happens to
+            // produce a byte stream that survives as valid UTF-8 - one logo
+            // added to this template would break it the same way.
             return \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.work-sessions', [
                 'rows' => $rows,
                 'rateMode' => $rateMode,
@@ -616,7 +623,7 @@ class WorkSessionController extends Controller
                 'totalBilling' => $totalBilling,
                 'billingDetails' => $billingDetails,
                 'fromLine' => $fromLine,
-            ])->download("{$filename}.pdf");
+            ])->download("{$filename}.pdf")->header('X-Vapor-Base64-Encode', 'True');
         }
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -676,9 +683,23 @@ class WorkSessionController extends Controller
         $writer->save('php://output');
         $contents = ob_get_clean();
 
+        // Still 502'd in production even after the buffering fix above -
+        // Vapor's LambdaResponse only base64-encodes the body (required for
+        // any binary payload to survive the trip through API Gateway) when
+        // this exact header is present; it never sniffs Content-Type to
+        // decide (see vendor/laravel/vapor-core/src/Runtime/LambdaResponse.php).
+        // Without it, the xlsx's raw zip bytes get sent as if they were a
+        // UTF-8 string, corrupting the Lambda response and producing a
+        // content-free "Internal server error" from API Gateway rather than
+        // anything Laravel's own error handling ever sees. Confirmed via a
+        // production repro: identical code succeeds when invoked directly
+        // (bypassing the HTTP/API Gateway round trip entirely) but 502s
+        // through the real endpoint - isolating this to the response
+        // encoding rather than anything in the spreadsheet generation.
         return response($contents, 200, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => "attachment; filename=\"{$filename}.xlsx\"",
+            'X-Vapor-Base64-Encode' => 'True',
         ]);
     }
 
