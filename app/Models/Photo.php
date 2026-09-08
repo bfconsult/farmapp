@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Storage;
 
 class Photo extends Model
 {
-    protected $fillable = ['job_id', 'work_session_id', 'metric_measurement_id', 'checklist_item_id', 'note_id', 'expense_id', 'file', 'time_taken', 'location'];
+    protected $fillable = ['job_id', 'work_session_id', 'metric_measurement_id', 'checklist_item_id', 'note_id', 'expense_id', 'livestock_id', 'file', 'time_taken', 'location'];
 
     protected $casts = [
         'time_taken' => 'datetime',
@@ -43,6 +43,11 @@ class Photo extends Model
     public function expense()
     {
         return $this->belongsTo(Expense::class);
+    }
+
+    public function livestock()
+    {
+        return $this->belongsTo(Livestock::class);
     }
 
     public function getUrlAttribute()

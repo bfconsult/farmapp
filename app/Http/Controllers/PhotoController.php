@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ChecklistItem;
 use App\Models\Expense;
 use App\Models\FarmJob;
+use App\Models\Livestock;
 use App\Models\MetricMeasurement;
 use App\Models\Note;
 use App\Models\Photo;
@@ -138,6 +139,26 @@ class PhotoController extends Controller
             $path = $this->storeCompressed($file);
 
             $expense->photos()->create([
+                'file' => $path,
+                'time_taken' => now(),
+                'location' => $request->location ?? null,
+            ]);
+        }
+
+        return back();
+    }
+
+    public function storeForLivestock(Request $request, Livestock $livestock)
+    {
+        $request->validate([
+            'photos' => 'required|array',
+            'photos.*' => 'image|max:10240',
+        ]);
+
+        foreach ($request->file('photos') as $file) {
+            $path = $this->storeCompressed($file);
+
+            $livestock->photos()->create([
                 'file' => $path,
                 'time_taken' => now(),
                 'location' => $request->location ?? null,

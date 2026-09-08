@@ -207,6 +207,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker'])->group(functio
     Route::post('maintenance-items/{maintenanceItem}/convert', [MaintenanceItemController::class, 'convertToJob'])->name('maintenance-items.convert');
     Route::post('notes', [NoteController::class, 'store'])->name('notes.store');
     Route::post('notes/{note}/photos', [PhotoController::class, 'storeForNote'])->name('photos.store-note');
+    Route::post('livestock/{livestock}/photos', [PhotoController::class, 'storeForLivestock'])->name('photos.store-livestock');
     Route::post('jobs/{farmJob}/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
     Route::patch('expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update');
     Route::delete('expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');

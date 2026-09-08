@@ -2,8 +2,10 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackLink from '@/Components/BackLink';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
+import PhotoLightbox from '@/Components/PhotoLightbox';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { compressImageFiles } from '@/imageCompression';
 import { formatDate } from '@/dateInput';
 
 const STATUS_BADGE = {
@@ -162,6 +164,11 @@ export default function Show({ livestock, offspring, potentialParents, mobs }) {
     const [damId, setDamId] = useState(livestock.dam_id ?? '');
     const [addingNote, setAddingNote] = useState(false);
 
+    const cameraInput = useRef(null);
+    const galleryInput = useRef(null);
+    const [uploading, setUploading] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState(null);
+
     const [editingSale, setEditingSale] = useState(false);
     const [saleValues, setSaleValues] = useState({
         sale_weight: livestock.sale_weight ?? '',
@@ -208,6 +215,30 @@ export default function Show({ livestock, offspring, potentialParents, mobs }) {
             preserveState: true,
             onSuccess: () => setEditingSale(false),
         });
+    };
+
+    const uploadPhotos = async (e) => {
+        const files = e.target.files;
+        if (!files.length) return;
+
+        setUploading(true);
+        const compressed = await compressImageFiles(files);
+
+        const formData = new FormData();
+        compressed.forEach(file => formData.append('photos[]', file));
+
+        router.post(route('photos.store-livestock', livestock.id), formData, {
+            forceFormData: true,
+            preserveScroll: true,
+            onFinish: () => setUploading(false),
+            onError: () => alert('Photo upload failed. Please try again with a smaller photo.'),
+        });
+    };
+
+    const destroyPhoto = (photoId) => {
+        if (confirm('Delete this photo?')) {
+            router.delete(route('photos.destroy', photoId), { preserveScroll: true });
+        }
     };
 
     return (
@@ -420,6 +451,90 @@ export default function Show({ livestock, offspring, potentialParents, mobs }) {
                     )}
                 </div>
 
+                <div className="bg-white rounded-lg shadow p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Photos</h2>
+                        {canCreateNote && (
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => cameraInput.current.click()}
+                                    disabled={uploading}
+                                    aria-label="Take photo"
+                                    className="p-2 bg-green-600 text-white rounded-lg disabled:opacity-50"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => galleryInput.current.click()}
+                                    disabled={uploading}
+                                    aria-label="Choose from gallery"
+                                    className="p-2 bg-white border border-gray-300 text-gray-700 rounded-lg disabled:opacity-50"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
+                                    </svg>
+                                </button>
+                            </div>
+                        )}
+                        <input
+                            ref={cameraInput}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={uploadPhotos}
+                            className="hidden"
+                        />
+                        <input
+                            ref={galleryInput}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={uploadPhotos}
+                            className="hidden"
+                        />
+                    </div>
+
+                    {livestock.photos.length === 0 ? (
+                        canCreateNote ? (
+                            <button
+                                onClick={() => cameraInput.current.click()}
+                                className="w-full border-2 border-dashed border-gray-300 rounded-lg p-8 text-center text-gray-400"
+                            >
+                                <svg className="w-8 h-8 mx-auto mb-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <p className="text-sm">Tap to add a photo</p>
+                            </button>
+                        ) : (
+                            <p className="text-sm text-gray-400">No photos yet.</p>
+                        )
+                    ) : (
+                        <div className="grid grid-cols-3 gap-2">
+                            {livestock.photos.map((photo, i) => (
+                                <div key={photo.id} className="relative">
+                                    <img
+                                        src={photo.url}
+                                        onClick={() => setLightboxIndex(i)}
+                                        className="w-full h-24 object-cover rounded-lg cursor-pointer"
+                                    />
+                                    {canCreateNote && (
+                                        <button
+                                            onClick={() => destroyPhoto(photo.id)}
+                                            className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
                         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
@@ -443,6 +558,15 @@ export default function Show({ livestock, offspring, potentialParents, mobs }) {
                     )}
                 </div>
             </div>
+
+            {livestock.photos.length > 0 && (
+                <PhotoLightbox
+                    photos={livestock.photos}
+                    index={lightboxIndex}
+                    onClose={() => setLightboxIndex(null)}
+                    onIndexChange={setLightboxIndex}
+                />
+            )}
         </AuthenticatedLayout>
     );
 }

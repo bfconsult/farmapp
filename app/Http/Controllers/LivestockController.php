@@ -77,7 +77,7 @@ class LivestockController extends Controller
     {
         abort_unless($livestock->property_id === (int) session('current_property_id'), 404);
 
-        $livestock->load(['livestockType', 'mob', 'sire', 'dam', 'notes.photos', 'notes.createdBy', 'notes.views']);
+        $livestock->load(['livestockType', 'mob', 'sire', 'dam', 'photos', 'notes.photos', 'notes.createdBy', 'notes.views']);
         $livestock->notes->each(fn ($note) => $note->is_unread = $note->isUnreadBy(Auth::id()));
 
         $currentPropertyId = $livestock->property_id;
