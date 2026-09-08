@@ -19,6 +19,7 @@ export default function Export({ currentDateFrom, currentDateTo, draftCount, exp
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
     const [showBilling, setShowBilling] = useState(false);
+    const [groupByJob, setGroupByJob] = useState(false);
 
     const goTo = (overrides = {}) => {
         router.get(route('work-sessions.export'), {
@@ -44,6 +45,7 @@ export default function Export({ currentDateFrom, currentDateTo, draftCount, exp
         date_to: currentDateTo,
         format,
         rate: showBilling ? 'billing' : 'time',
+        group_by_job: groupByJob ? 1 : 0,
     });
 
     return (
@@ -129,6 +131,27 @@ export default function Export({ currentDateFrom, currentDateTo, draftCount, exp
                             <span
                                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                                     showBilling ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                            />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="text-sm font-medium text-gray-700">
+                            Group by Job <span className="text-xs text-gray-400 font-normal">(Excel only)</span>
+                        </span>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={groupByJob}
+                            onClick={() => setGroupByJob((v) => !v)}
+                            className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                groupByJob ? 'bg-green-600' : 'bg-gray-300'
+                            }`}
+                        >
+                            <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    groupByJob ? 'translate-x-6' : 'translate-x-1'
                                 }`}
                             />
                         </button>

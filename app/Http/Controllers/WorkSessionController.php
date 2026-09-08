@@ -547,6 +547,9 @@ class WorkSessionController extends Controller
         $currentPropertyId = session('current_property_id');
         [$dateFrom, $dateTo] = $this->parseDateRange($request);
         $rateMode = $request->rate === 'billing' ? 'billing' : 'time';
+        // Excel only (see the Excel-building block below) - the PDF layout
+        // is a single flat table and was never asked to gain this.
+        $groupByJob = $request->boolean('group_by_job');
 
         $property = $currentPropertyId ? Property::find($currentPropertyId) : null;
 
@@ -651,14 +654,60 @@ class WorkSessionController extends Controller
         }
         $sheet->fromArray($headers, null, "A{$rowNumber}");
         $rowNumber++;
+        $lastColumn = $rateMode === 'billing' ? 'F' : 'E';
 
-        foreach ($rows as $row) {
-            $line = [$row['date'], $row['job'], $row['start'], $row['end'], $row['duration']];
-            if ($rateMode === 'billing') {
-                $line[] = $row['amount'];
+        if ($groupByJob) {
+            // Grouped by farm_job_id, not name - two distinct jobs (e.g.
+            // separate instances of the same recurring job) can share a
+            // name, and merging those subtotals together would be wrong.
+            // Sorted alphabetically by that name for display, with
+            // unattached "Ad-hoc" work always last - it isn't a real job to
+            // sort among the others.
+            $jobGroups = $sessions->groupBy('farm_job_id')
+                ->sortBy(fn ($group) => $group->first()->farmJob?->name ?? '', SORT_NATURAL | SORT_FLAG_CASE);
+            $adHocKey = $jobGroups->search(fn ($group) => $group->first()->farm_job_id === null);
+            if ($adHocKey !== false) {
+                $adHoc = $jobGroups->pull($adHocKey);
+                $jobGroups->put($adHocKey, $adHoc);
             }
-            $sheet->fromArray($line, null, "A{$rowNumber}");
-            $rowNumber++;
+
+            foreach ($jobGroups as $groupSessions) {
+                $jobName = $groupSessions->first()->farmJob?->name ?? 'Ad-hoc';
+                $groupSessions = $groupSessions->sortBy('started_at');
+                $groupHours = round($groupSessions->sum('duration_in_hours'), 2);
+
+                $subtotalRow = ['', $jobName, '', '', $groupHours];
+                if ($rateMode === 'billing') {
+                    $subtotalRow[] = round($groupSessions->sum('billing_amount'), 2);
+                }
+                $sheet->fromArray($subtotalRow, null, "A{$rowNumber}");
+                $sheet->getStyle("A{$rowNumber}:{$lastColumn}{$rowNumber}")->getFont()->setBold(true);
+                $rowNumber++;
+
+                foreach ($groupSessions as $session) {
+                    $line = [
+                        $session->started_at->clone()->setTimezone($timezone)->format('d/m/Y'),
+                        $jobName,
+                        $session->started_at->clone()->setTimezone($timezone)->format('H:i'),
+                        $session->ended_at?->clone()->setTimezone($timezone)->format('H:i') ?? '—',
+                        $session->duration_in_hours,
+                    ];
+                    if ($rateMode === 'billing') {
+                        $line[] = $session->billing_amount;
+                    }
+                    $sheet->fromArray($line, null, "A{$rowNumber}");
+                    $rowNumber++;
+                }
+            }
+        } else {
+            foreach ($rows as $row) {
+                $line = [$row['date'], $row['job'], $row['start'], $row['end'], $row['duration']];
+                if ($rateMode === 'billing') {
+                    $line[] = $row['amount'];
+                }
+                $sheet->fromArray($line, null, "A{$rowNumber}");
+                $rowNumber++;
+            }
         }
 
         $totalRow = ['', 'Total', '', '', $totalHours];
