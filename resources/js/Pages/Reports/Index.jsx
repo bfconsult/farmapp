@@ -108,14 +108,6 @@ export default function Index({ workers, expensesByJob, grandTotal, currentDateF
                         </span>
                         <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
                     </button>
-                    {!isPreviousMonth && (
-                        <button
-                            onClick={resetToPreviousMonth}
-                            className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600 flex-shrink-0"
-                        >
-                            Previous month
-                        </button>
-                    )}
                     <button
                         onClick={() => setConfirmingShare((v) => !v)}
                         className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600 flex-shrink-0"
@@ -179,11 +171,18 @@ export default function Index({ workers, expensesByJob, grandTotal, currentDateF
                     <div className="bg-white rounded-lg shadow p-4 mb-4">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-gray-700">Date range</span>
-                            {!isThisMonth && (
-                                <button onClick={resetToThisMonth} className="text-xs text-green-600">
-                                    Reset to this month
-                                </button>
-                            )}
+                            <div className="flex gap-3 text-xs">
+                                {!isPreviousMonth && (
+                                    <button onClick={resetToPreviousMonth} className="text-green-600">
+                                        Previous month
+                                    </button>
+                                )}
+                                {!isThisMonth && (
+                                    <button onClick={resetToThisMonth} className="text-green-600">
+                                        This month
+                                    </button>
+                                )}
+                            </div>
                         </div>
                         <button
                             onClick={() => setShowCalendar((v) => !v)}
