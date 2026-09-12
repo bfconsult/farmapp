@@ -106,4 +106,12 @@ class Livestock extends Model
     {
         return $this->hasMany(Photo::class);
     }
+
+    /**
+     * The most recently added photo - mirrors Asset::currentLocation()/Mob::currentZone().
+     */
+    public function latestPhoto()
+    {
+        return $this->hasOne(Photo::class)->latestOfMany();
+    }
 }

@@ -357,23 +357,32 @@ function AnimalRow({ animal, canManage, livestockTypes, mobs }) {
 
     return (
         <div className="flex items-center justify-between gap-2 px-4 py-3">
-            <Link href={route('livestock.show', animal.id)} className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                    <p className="text-sm text-gray-900">{animal.tag_number}{animal.name ? ` · ${animal.name}` : ''}</p>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_BADGE[animal.status]}`}>
-                        {animal.status}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                    {animal.livestock_type && <span className="text-xs text-gray-500">{animal.livestock_type.name}</span>}
-                    {animal.mob && <span className="text-xs text-gray-400">{animal.mob.name}</span>}
-                </div>
-                {canManage && (
-                    <div className="flex gap-3 mt-1 text-xs">
-                        <button type="button" onClick={(e) => { e.preventDefault(); setEditing(true); }} className="text-green-600">Edit</button>
-                        <button type="button" onClick={(e) => { e.preventDefault(); destroy(); }} className="text-red-500">Delete</button>
-                    </div>
+            <Link href={route('livestock.show', animal.id)} className="min-w-0 flex-1 flex items-center gap-3">
+                {animal.latest_photo && (
+                    <img
+                        src={animal.latest_photo.url}
+                        alt=""
+                        className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                    />
                 )}
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                        <p className="text-sm text-gray-900">{animal.tag_number}{animal.name ? ` · ${animal.name}` : ''}</p>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_BADGE[animal.status]}`}>
+                            {animal.status}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                        {animal.livestock_type && <span className="text-xs text-gray-500">{animal.livestock_type.name}</span>}
+                        {animal.mob && <span className="text-xs text-gray-400">{animal.mob.name}</span>}
+                    </div>
+                    {canManage && (
+                        <div className="flex gap-3 mt-1 text-xs">
+                            <button type="button" onClick={(e) => { e.preventDefault(); setEditing(true); }} className="text-green-600">Edit</button>
+                            <button type="button" onClick={(e) => { e.preventDefault(); destroy(); }} className="text-red-500">Delete</button>
+                        </div>
+                    )}
+                </div>
             </Link>
         </div>
     );

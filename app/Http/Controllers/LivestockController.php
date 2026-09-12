@@ -29,7 +29,7 @@ class LivestockController extends Controller
             ->get();
 
         $livestock = Livestock::where('property_id', $currentPropertyId)
-            ->with(['livestockType', 'mob'])
+            ->with(['livestockType', 'mob', 'latestPhoto'])
             ->orderBy('tag_number')
             ->get();
 
