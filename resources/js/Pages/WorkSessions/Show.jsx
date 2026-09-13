@@ -4,6 +4,7 @@ import BackLink from '@/Components/BackLink';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
 import PhotoLightbox from '@/Components/PhotoLightbox';
+import UploadingOverlay from '@/Components/UploadingOverlay';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
@@ -186,6 +187,8 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
     return (
         <AuthenticatedLayout>
             <Head title="Work Session" />
+
+            <UploadingOverlay show={uploading} />
 
             <div className="max-w-lg mx-auto mt-2 space-y-4">
                 {/* Header */}

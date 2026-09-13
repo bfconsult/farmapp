@@ -1,5 +1,6 @@
 import Avatar from '@/Components/Avatar';
 import AvatarCropModal from '@/Components/AvatarCropModal';
+import Spinner from '@/Components/Spinner';
 import { router, usePage } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 
@@ -55,8 +56,9 @@ export default function AvatarForm() {
                         type="button"
                         onClick={pickFile}
                         disabled={uploading}
-                        className="text-sm font-medium text-green-600"
+                        className="flex items-center gap-1.5 text-sm font-medium text-green-600"
                     >
+                        {uploading && <Spinner className="h-4 w-4" />}
                         {uploading ? 'Uploading...' : user.avatar_url ? 'Change photo' : 'Add photo'}
                     </button>
                     {user.avatar_url && (

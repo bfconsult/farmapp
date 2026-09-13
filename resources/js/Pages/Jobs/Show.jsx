@@ -5,6 +5,8 @@ import LocationMap from '@/Components/LocationMap';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
 import BackLink from '@/Components/BackLink';
+import Spinner from '@/Components/Spinner';
+import UploadingOverlay from '@/Components/UploadingOverlay';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
@@ -16,15 +18,6 @@ const CHECKLIST_TYPE_LABELS = {
     before_start: 'Before Start',
     at_completion: 'At Completion',
 };
-
-function Spinner({ className = 'h-4 w-4' }) {
-    return (
-        <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-    );
-}
 
 function formatViewedAt(datetime) {
     const time = new Date(datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -141,19 +134,26 @@ function ExpenseRow({ expense, onEdit }) {
 
             <div className="flex gap-3 mt-2 text-xs items-center">
                 {!photo && (
-                    <>
-                        <button onClick={() => cameraInput.current.click()} disabled={uploading} aria-label="Take photo" className="text-green-600 disabled:opacity-50">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </button>
-                        <button onClick={() => galleryInput.current.click()} disabled={uploading} aria-label="Choose from gallery" className="text-green-600 disabled:opacity-50">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
-                            </svg>
-                        </button>
-                    </>
+                    uploading ? (
+                        <span className="flex items-center gap-1 text-green-600">
+                            <Spinner className="h-4 w-4" />
+                            Uploading…
+                        </span>
+                    ) : (
+                        <>
+                            <button onClick={() => cameraInput.current.click()} aria-label="Take photo" className="text-green-600">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </button>
+                            <button onClick={() => galleryInput.current.click()} aria-label="Choose from gallery" className="text-green-600">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
+                                </svg>
+                            </button>
+                        </>
+                    )
                 )}
                 <button onClick={() => onEdit(expense)} className="text-green-600 font-medium">Edit</button>
                 {needsReview && (
@@ -552,14 +552,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
         <AuthenticatedLayout>
             <Head title={job.name} />
 
-            {uploading && (
-                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
-                    <div className="bg-white rounded-lg shadow-lg px-6 py-5 flex flex-col items-center gap-3">
-                        <Spinner className="h-10 w-10 text-green-600" />
-                        <p className="text-sm text-gray-700">Uploading photo…</p>
-                    </div>
-                </div>
-            )}
+            <UploadingOverlay show={uploading} />
 
             <div className="max-w-lg mx-auto mt-2 space-y-4">
                 {/* Header */}

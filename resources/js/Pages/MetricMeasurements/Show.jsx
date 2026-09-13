@@ -5,6 +5,7 @@ import { compressImageFiles } from '@/imageCompression';
 import { formatDate } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 import BackLink from '@/Components/BackLink';
+import UploadingOverlay from '@/Components/UploadingOverlay';
 
 const STATUS_LABELS = {
     incomplete: 'Incomplete',
@@ -77,6 +78,8 @@ export default function Show({ measurement }) {
     return (
         <AuthenticatedLayout>
             <Head title={measurement.name} />
+
+            <UploadingOverlay show={uploading} />
 
             <div className="max-w-lg mx-auto mt-2 space-y-4">
                 {/* Header */}

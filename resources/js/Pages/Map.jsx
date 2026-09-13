@@ -3,6 +3,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import Modal from '@/Components/Modal';
+import Spinner from '@/Components/Spinner';
 import { formatDate } from '@/dateInput';
 import { pillBadgeClass } from '@/Utils/pillColors';
 
@@ -858,19 +859,26 @@ export default function Map({
                         {!editingNoteBody && (
                             <div className="flex flex-wrap gap-3 text-xs pt-1">
                                 {canCreateNote && (
-                                    <>
-                                        <button onClick={() => noteCameraInput.current.click()} disabled={uploadingNotePhoto} aria-label="Take photo" className="text-teal-600 disabled:opacity-50">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
-                                        </button>
-                                        <button onClick={() => noteGalleryInput.current.click()} disabled={uploadingNotePhoto} aria-label="Choose from gallery" className="text-teal-600 disabled:opacity-50">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
-                                            </svg>
-                                        </button>
-                                    </>
+                                    uploadingNotePhoto ? (
+                                        <span className="flex items-center gap-1 text-teal-600">
+                                            <Spinner className="h-4 w-4" />
+                                            Uploading…
+                                        </span>
+                                    ) : (
+                                        <>
+                                            <button onClick={() => noteCameraInput.current.click()} aria-label="Take photo" className="text-teal-600">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                            </button>
+                                            <button onClick={() => noteGalleryInput.current.click()} aria-label="Choose from gallery" className="text-teal-600">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
+                                                </svg>
+                                            </button>
+                                        </>
+                                    )
                                 )}
                                 {isAdminOrManager && (
                                     <>

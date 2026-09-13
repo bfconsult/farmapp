@@ -3,6 +3,7 @@ import BackLink from '@/Components/BackLink';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
 import PhotoLightbox from '@/Components/PhotoLightbox';
+import UploadingOverlay from '@/Components/UploadingOverlay';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
@@ -249,6 +250,8 @@ export default function Show({ livestock, offspring, potentialParents, mobs }) {
     return (
         <AuthenticatedLayout>
             <Head title={livestock.tag_number} />
+
+            <UploadingOverlay show={uploading} />
 
             <div className="max-w-lg mx-auto mt-2 space-y-4">
                 <BackLink href={route('manage.livestock')}>Livestock</BackLink>
