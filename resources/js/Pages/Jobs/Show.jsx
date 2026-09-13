@@ -1103,7 +1103,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                                 type="file"
                                 accept="image/*,application/pdf"
                                 onChange={(e) => setInvoiceFile(e.target.files[0] ?? null)}
-                                className="w-full text-sm"
+                                className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-600 file:text-white file:cursor-pointer"
                             />
                             {editingExpense?.invoice_url && !invoiceFile && (
                                 <a

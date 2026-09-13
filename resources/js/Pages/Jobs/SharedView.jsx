@@ -205,7 +205,7 @@ export default function SharedView({ job, logoUrl, viewingSupplier, canSubmitInv
                                     ref={fileInput}
                                     type="file"
                                     accept="image/*,application/pdf"
-                                    className="w-full text-sm"
+                                    className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-600 file:text-white file:cursor-pointer"
                                 />
                                 {errors?.invoice && <p className="mt-1 text-xs text-red-600">{errors.invoice}</p>}
                             </div>
