@@ -73,7 +73,7 @@ class LivestockController extends Controller
         return back()->with('success', 'Animal deleted.');
     }
 
-    public function show(Livestock $livestock)
+    public function show(Request $request, Livestock $livestock)
     {
         abort_unless($livestock->property_id === (int) session('current_property_id'), 404);
 
@@ -95,6 +95,9 @@ class LivestockController extends Controller
             'offspring' => $livestock->offspring()->orderBy('tag_number')->get(),
             'potentialParents' => $potentialParents,
             'mobs' => Mob::where('property_id', $currentPropertyId)->orderBy('name')->get(['id', 'name']),
+            // Lets the back link return to whichever Livestock tab the user
+            // actually came from, instead of always landing on Mobs.
+            'backTab' => $request->query('tab') === 'animals' ? 'animals' : null,
         ]);
     }
 

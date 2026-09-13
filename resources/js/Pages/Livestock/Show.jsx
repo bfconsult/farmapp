@@ -144,7 +144,7 @@ function parentLabel(parent) {
     return parent.name ? `${parent.tag_number} · ${parent.name}` : parent.tag_number;
 }
 
-export default function Show({ livestock, offspring, potentialParents, mobs }) {
+export default function Show({ livestock, offspring, potentialParents, mobs, backTab }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canCreateNote = canManage || currentUserRole === 'worker';
@@ -254,7 +254,7 @@ export default function Show({ livestock, offspring, potentialParents, mobs }) {
             <UploadingOverlay show={uploading} />
 
             <div className="max-w-lg mx-auto mt-2 space-y-4">
-                <BackLink href={route('manage.livestock')}>Livestock</BackLink>
+                <BackLink href={route('manage.livestock', backTab ? { tab: backTab } : undefined)}>Livestock</BackLink>
 
                 <div className="bg-white rounded-lg shadow p-4">
                     {editing ? (

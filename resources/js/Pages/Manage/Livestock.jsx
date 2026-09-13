@@ -357,7 +357,7 @@ function AnimalRow({ animal, canManage, livestockTypes, mobs }) {
 
     return (
         <div className="flex items-center justify-between gap-2 px-4 py-3">
-            <Link href={route('livestock.show', animal.id)} className="min-w-0 flex-1 flex items-center gap-3">
+            <Link href={route('livestock.show', { livestock: animal.id, tab: 'animals' })} className="min-w-0 flex-1 flex items-center gap-3">
                 {animal.latest_photo && (
                     <img
                         src={animal.latest_photo.url}
@@ -389,7 +389,12 @@ function AnimalRow({ animal, canManage, livestockTypes, mobs }) {
 }
 
 export default function Livestock({ mobs, livestock, livestockTypes, zones, canManage }) {
-    const [activeTab, setActiveTab] = useState('mobs');
+    // Lets a caller (e.g. the back link from an animal's own page) land back
+    // on Animals via ?tab=animals, rather than always resetting to Mobs.
+    const [activeTab, setActiveTab] = useState(() => {
+        const requested = new URLSearchParams(window.location.search).get('tab');
+        return requested === 'animals' ? 'animals' : 'mobs';
+    });
 
     const [addingMob, setAddingMob] = useState(false);
     const [mobValues, setMobValues] = useState({ name: '' });
