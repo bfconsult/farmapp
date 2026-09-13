@@ -37,6 +37,13 @@ class SupplierController extends Controller
             'property_id' => session('current_property_id'),
         ]);
 
+        // The expense form's "+ Add new supplier" creates one inline without
+        // navigating away - it needs to land back on the job page it came
+        // from, not the Suppliers list this route normally redirects to.
+        if ($request->boolean('inline')) {
+            return back();
+        }
+
         return redirect()->route('manage.suppliers.index')->with('success', 'Supplier added.');
     }
 

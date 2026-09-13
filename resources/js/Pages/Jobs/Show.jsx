@@ -444,7 +444,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const createSupplierInline = () => {
         if (!newSupplierName.trim()) return;
 
-        router.post(route('settings.suppliers.store'), { name: newSupplierName }, {
+        router.post(route('manage.suppliers.store'), { name: newSupplierName, inline: true }, {
             preserveScroll: true,
             preserveState: true,
             only: ['suppliers'],
