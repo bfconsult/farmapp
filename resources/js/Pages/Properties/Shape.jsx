@@ -46,6 +46,7 @@ export default function Shape({ property, shape, zones, notes }) {
     const zonesRef = useRef(zones);
     const [selectedZoneId, setSelectedZoneId] = useState(null);
     const selectedZoneIdRef = useRef(null);
+    const selectedZone = zones?.find((z) => z.id === selectedZoneId) ?? null;
     // Off by default - this is a reference overlay for drawing zones, not
     // the primary content of this page, so it shouldn't clutter the
     // boundary/zone view until asked for.
@@ -78,7 +79,19 @@ export default function Shape({ property, shape, zones, notes }) {
         const nextId = zoneId === previousId ? null : zoneId;
         if (nextId != null && zoneLayers.current[nextId]) {
             const nextLayer = zoneLayers.current[nextId];
-            nextLayer.pm.enable();
+            nextLayer.pm.enable({
+                // Repeated reshaping only ever adds points (dragging a vertex
+                // onto another doesn't merge them, just leaves a redundant
+                // one sitting on top), so a zone can accumulate an
+                // impractical number of them over time. Double-tap removes
+                // one, which - unlike Geoman's 'contextmenu' default (a
+                // right-click, unreliable/undiscoverable on a phone) - works
+                // the same on touch and desktop. Blocks shrinking below a
+                // triangle (flashes the layer instead of removing) rather
+                // than the default of letting the whole zone disappear.
+                removeVertexOn: 'dblclick',
+                removeLayerBelowMinVertexCount: false,
+            });
             nextLayer.setStyle({ weight: 4, color: '#4c1d95' });
         }
 
@@ -318,7 +331,20 @@ export default function Shape({ property, shape, zones, notes }) {
         (zones ?? []).forEach((zone) => {
             const existing = zoneLayers.current[zone.id];
             if (existing) {
-                existing.setLatLngs(zone.coordinates);
+                // Skip the actively-edited zone - it was the source of this
+                // very save, so its layer already has this geometry. Calling
+                // setLatLngs on it anyway doesn't change what's shown, but it
+                // does desync Geoman's live vertex-marker overlay from the
+                // polygon underneath (each save round-trips through here,
+                // since every edit here auto-saves with no separate Save
+                // step): the markers keep their positions from when editing
+                // started, while future lookups by index into the polygon's
+                // now-externally-touched coordinates drift out of step,
+                // making further reshaping/vertex removal in the same
+                // session increasingly unreliable.
+                if (selectedZoneIdRef.current !== zone.id) {
+                    existing.setLatLngs(zone.coordinates);
+                }
                 existing.setTooltipContent(zone.name);
                 return;
             }
@@ -402,6 +428,15 @@ export default function Shape({ property, shape, zones, notes }) {
         // into the old (wrong) dimensions.
         setTimeout(() => map.invalidateSize(), 0);
     }, [activeTab]);
+
+    // Same height-change problem as above: collapsing the zone list down to
+    // a single "Editing: <name> / Done" bar while a zone is selected (and
+    // expanding it back) changes the panel's height too.
+    useEffect(() => {
+        const map = mapInstance.current;
+        if (!map) return;
+        setTimeout(() => map.invalidateSize(), 0);
+    }, [selectedZoneId]);
 
     const saveShape = () => {
         if (!polygonLayer.current) return;
@@ -656,27 +691,45 @@ export default function Shape({ property, shape, zones, notes }) {
                 </div>
 
                 {activeTab === 'zones' && (
-                    <div className="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-3">
-                        <p className="text-xs text-gray-500 mb-2">
-                            Use the polygon tool to draw a paddock or other named
-                            area - you'll be asked to name it as soon as you finish
-                            drawing. Each zone saves immediately. To reshape an
-                            existing zone, tap Edit below and drag its points -
-                            changes save as soon as you drop a point. Tap Done, or
-                            Edit on a different zone, to stop.
-                        </p>
-                        {(!zones || zones.length === 0) ? (
-                            <p className="text-sm text-gray-500">No zones yet.</p>
-                        ) : (
-                            <div className="max-h-40 space-y-2 overflow-y-auto">
-                                {zones.map((zone) => {
-                                    const isEditing = selectedZoneId === zone.id;
-                                    return (
+                    selectedZone ? (
+                        // While reshaping a zone, the full list (which can run to
+                        // many rows on a farm with several paddocks) would eat
+                        // most of a phone screen's height for no reason - only
+                        // the zone being edited and a way out of it matter here.
+                        <div className="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-sm font-medium text-gray-900">
+                                    Editing: {selectedZone.name}
+                                </span>
+                                <button
+                                    onClick={() => selectZoneForEditing(selectedZone.id)}
+                                    className="flex-shrink-0 rounded-md bg-violet-600 px-3 py-1 text-xs font-medium text-white"
+                                >
+                                    Done
+                                </button>
+                            </div>
+                            <p className="mt-1 text-xs text-gray-500">
+                                Drag its points to reshape, double-tap a point to remove it - changes save as soon as you drop a point.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-3">
+                            <p className="text-xs text-gray-500 mb-2">
+                                Use the polygon tool to draw a paddock or other named
+                                area - you'll be asked to name it as soon as you finish
+                                drawing. Each zone saves immediately. To reshape an
+                                existing zone, tap Edit below and drag its points -
+                                changes save as soon as you drop a point. Tap Done, or
+                                Edit on a different zone, to stop.
+                            </p>
+                            {(!zones || zones.length === 0) ? (
+                                <p className="text-sm text-gray-500">No zones yet.</p>
+                            ) : (
+                                <div className="max-h-40 space-y-2 overflow-y-auto">
+                                    {zones.map((zone) => (
                                         <div
                                             key={zone.id}
-                                            className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 ${
-                                                isEditing ? 'bg-violet-50' : ''
-                                            }`}
+                                            className="flex items-center justify-between gap-2 rounded-md px-2 py-1"
                                         >
                                             <span className="text-sm text-gray-900 truncate">
                                                 {zone.name}
@@ -684,13 +737,9 @@ export default function Shape({ property, shape, zones, notes }) {
                                             <div className="flex flex-shrink-0 items-center gap-3">
                                                 <button
                                                     onClick={() => selectZoneForEditing(zone.id)}
-                                                    className={`rounded-md px-2 py-1 text-xs font-medium ${
-                                                        isEditing
-                                                            ? 'bg-violet-600 text-white'
-                                                            : 'text-violet-600'
-                                                    }`}
+                                                    className="rounded-md px-2 py-1 text-xs font-medium text-violet-600"
                                                 >
-                                                    {isEditing ? 'Done' : 'Edit'}
+                                                    Edit
                                                 </button>
                                                 <button
                                                     onClick={() => renameZoneItem(zone)}
@@ -706,11 +755,11 @@ export default function Shape({ property, shape, zones, notes }) {
                                                 </button>
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )
                 )}
 
                 <div className={`min-h-0 flex-1 ${activeTab === 'zones' ? 'zones-tab-active' : ''} ${hasShape ? 'has-shape' : ''} ${hasZone ? 'has-zone' : ''}`}>
