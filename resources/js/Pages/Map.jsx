@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import Modal from '@/Components/Modal';
 import Spinner from '@/Components/Spinner';
@@ -31,16 +31,19 @@ function loadLayerPrefs() {
 
 /** Same pin shape/size everywhere (the default Leaflet marker), just
  * recolored per layer - a same-dimension swap of the stock icon, not a
- * different marker style. */
-function pinIcon(L, color) {
+ * different marker style. `scale` is an exception for the in-progress note
+ * pin, which needs to stand out from same-colored existing pins while it's
+ * being placed. */
+function pinIcon(L, color, scale = 1) {
+    const [w, h] = [25 * scale, 41 * scale];
     return L.icon({
         iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
         iconRetinaUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${color}.png`,
         shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41],
+        iconSize: [w, h],
+        iconAnchor: [w / 2, h],
+        popupAnchor: [1, -h + 7],
+        shadowSize: [h, h],
     });
 }
 
@@ -58,6 +61,10 @@ export default function Map({
     const noteMarkersById = useRef({});
     const noteCameraInput = useRef(null);
     const noteGalleryInput = useRef(null);
+    // Cancels a still-pending geolocation fix from a previous "+ Add Note"
+    // click, so it can't resurrect the form (or place a stale pin) after
+    // the user has already cancelled or a new click has started a fresh one.
+    const cancelPendingNoteLocation = useRef(null);
     const updateZoneLabels = useRef(null);
     const updateAssetLabels = useRef(null);
     // Jobs default to visible (this page's original, only content before the
@@ -81,7 +88,11 @@ export default function Map({
     const [creatingNote, setCreatingNote] = useState(false);
     const [draftNoteLatLng, setDraftNoteLatLng] = useState(null);
     const [draftNoteBody, setDraftNoteBody] = useState('');
-    const { currentProperty } = usePage().props;
+    // GPS accuracy radius (metres) for the current draft pin - only
+    // meaningful until the pin is dragged, since a manually-placed point
+    // has no accuracy figure of its own.
+    const [draftNoteAccuracy, setDraftNoteAccuracy] = useState(null);
+    const { currentProperty, flash } = usePage().props;
     const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
     const canCreateNote = isAdminOrManager || currentRole === 'worker';
     const jobsWithLocation = jobs.filter(j => j.latitude && j.longitude);
@@ -89,6 +100,41 @@ export default function Map({
     useEffect(() => {
         localStorage.setItem(LAYER_PREFS_KEY, JSON.stringify({ showJobs, showZones, showAssets, showNotes }));
     }, [showJobs, showZones, showAssets, showNotes]);
+
+    // The map's height was a flat `100dvh` minus a constant, sized for the
+    // fixed top/bottom nav alone - any banner above it (missing-boundary,
+    // no-jobs-with-location, or a flash message like "Note added") pushed
+    // the whole map area down without shrinking it, so its bottom - and the
+    // "+ Add Note" button anchored to it - ended up below the fixed bottom
+    // nav instead of flush with it. Measuring the map's actual on-screen
+    // top and sizing to fill exactly to the bottom nav adapts to however
+    // much banner content is above it, however many banners there are.
+    // Held in state (not set directly on the DOM node) so it doesn't get
+    // clobbered by the next unrelated re-render reapplying the JSX style.
+    const [mapHeightPx, setMapHeightPx] = useState(null);
+
+    useLayoutEffect(() => {
+        if (!mapRef.current) return;
+
+        const BOTTOM_NAV_AND_GAP_PX = 80; // 4rem nav + 1rem breathing room
+
+        const resize = () => {
+            if (!mapRef.current) return;
+            const top = mapRef.current.getBoundingClientRect().top;
+            setMapHeightPx(Math.max(window.innerHeight - top - BOTTOM_NAV_AND_GAP_PX, 200));
+        };
+
+        resize();
+        window.addEventListener('resize', resize);
+        return () => window.removeEventListener('resize', resize);
+    }, [flash?.success, flash?.error, currentProperty, shape, jobsWithLocation.length]);
+
+    // Leaflet caches its container size, so anything that changes the
+    // container's actual height (above) has to be followed by telling it to
+    // re-measure, or tiles/markers stay laid out for the old size.
+    useEffect(() => {
+        if (mapReady) mapInstance.current?.invalidateSize();
+    }, [mapHeightPx, mapReady]);
 
     // Rebuilds the whole map (boundary, non-working zone, initial camera
     // fit, and the zone/asset layer groups the toggle effects below attach
@@ -377,19 +423,37 @@ export default function Map({
     }, [notes]);
 
     // "+ Add Note" draft marker - a single draggable pin shown while creating.
+    // Oversized and shown with its GPS accuracy radius so it's unmistakable
+    // among any existing (same-colored) note pins already on the map.
     useEffect(() => {
         if (!mapReady || !mapInstance.current || !leafletRef.current || !creatingNote || !draftNoteLatLng) return;
         const L = leafletRef.current;
 
-        const marker = L.marker([draftNoteLatLng.lat, draftNoteLatLng.lng], { draggable: true, icon: pinIcon(L, 'green') })
+        const marker = L.marker([draftNoteLatLng.lat, draftNoteLatLng.lng], { draggable: true, icon: pinIcon(L, 'green', 1.6) })
             .addTo(mapInstance.current);
+
+        let circle = draftNoteAccuracy
+            ? L.circle([draftNoteLatLng.lat, draftNoteLatLng.lng], {
+                radius: draftNoteAccuracy,
+                color: '#0d9488',
+                weight: 1,
+                fillOpacity: 0.1,
+            }).addTo(mapInstance.current)
+            : null;
 
         marker.on('dragend', () => {
             const { lat, lng } = marker.getLatLng();
             setDraftNoteLatLng({ lat, lng });
+            // A manually-dragged point has no GPS accuracy figure of its own.
+            circle?.remove();
+            circle = null;
+            setDraftNoteAccuracy(null);
         });
 
-        return () => marker.remove();
+        return () => {
+            marker.remove();
+            circle?.remove();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [creatingNote, mapReady]);
 
@@ -403,7 +467,7 @@ export default function Map({
 
         if (staticMarker && group) group.removeLayer(staticMarker);
 
-        const overlay = L.marker([pendingNoteLatLng.lat, pendingNoteLatLng.lng], { draggable: true, icon: pinIcon(L, 'green') })
+        const overlay = L.marker([pendingNoteLatLng.lat, pendingNoteLatLng.lng], { draggable: true, icon: pinIcon(L, 'green', 1.6) })
             .addTo(mapInstance.current);
 
         overlay.on('dragend', () => {
@@ -459,14 +523,26 @@ export default function Map({
     const hasNonDefaultFilters = jobAge !== 'all' || !sameIdSet(jobStatusIds, defaultJobStatusIds);
 
     const startAddingNote = () => {
-        const place = (lat, lng) => {
+        // Open the form immediately - getting a GPS fix can take a few
+        // seconds, and there's no reason to make the user stare at nothing
+        // while it happens when they could already be typing the note.
+        setCreatingNote(true);
+        setDraftNoteLatLng(null);
+        setDraftNoteAccuracy(null);
+        setDraftNoteBody('');
+
+        let cancelled = false;
+        cancelPendingNoteLocation.current = () => { cancelled = true; };
+
+        const place = (lat, lng, accuracy = null) => {
+            if (cancelled) return;
             setDraftNoteLatLng({ lat, lng });
-            setCreatingNote(true);
+            setDraftNoteAccuracy(accuracy);
         };
 
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-                (position) => place(position.coords.latitude, position.coords.longitude),
+                (position) => place(position.coords.latitude, position.coords.longitude, position.coords.accuracy),
                 () => {
                     const center = mapInstance.current.getCenter();
                     place(center.lat, center.lng);
@@ -491,15 +567,18 @@ export default function Map({
                 setCreatingNote(false);
                 setDraftNoteLatLng(null);
                 setDraftNoteBody('');
+                setDraftNoteAccuracy(null);
                 setShowNotes(true);
             },
         });
     };
 
     const cancelNewNote = () => {
+        cancelPendingNoteLocation.current?.();
         setCreatingNote(false);
         setDraftNoteLatLng(null);
         setDraftNoteBody('');
+        setDraftNoteAccuracy(null);
     };
 
     const openNoteEdit = () => {
@@ -762,18 +841,33 @@ export default function Map({
 
                     {creatingNote && (
                         <div className="absolute inset-x-4 bottom-4 z-[1000] bg-white rounded-lg shadow-md p-3 space-y-2">
-                            <p className="text-xs text-gray-500">Drag the pin to adjust the location.</p>
+                            <p className="text-xs text-gray-500 flex items-center gap-1.5">
+                                {draftNoteLatLng ? (
+                                    <>
+                                        Drag the pin to adjust the location.
+                                        {draftNoteAccuracy != null && (
+                                            <> Accuracy: ±{Math.round(draftNoteAccuracy)}m.</>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Spinner className="h-3.5 w-3.5 text-teal-600" />
+                                        Getting your location…
+                                    </>
+                                )}
+                            </p>
                             <textarea
                                 value={draftNoteBody}
                                 onChange={(e) => setDraftNoteBody(e.target.value)}
                                 placeholder="Note..."
                                 rows={2}
                                 className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                autoFocus
                             />
                             <div className="flex gap-2">
                                 <button
                                     onClick={saveNewNote}
-                                    disabled={!draftNoteBody}
+                                    disabled={!draftNoteBody || !draftNoteLatLng}
                                     className="flex-1 py-2 bg-teal-600 text-white rounded-lg text-sm disabled:opacity-50"
                                 >
                                     Save
@@ -801,7 +895,7 @@ export default function Map({
 
                     <div
                         ref={mapRef}
-                        style={{ height: 'calc(100dvh - 8.5rem)' }}
+                        style={{ height: mapHeightPx != null ? `${mapHeightPx}px` : 'calc(100dvh - 8.5rem)' }}
                     />
                 </div>
             </div>
