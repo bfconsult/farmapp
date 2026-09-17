@@ -182,7 +182,7 @@ class ReportController extends Controller
             'property' => $property->only(['name']),
             'dateFrom' => $dateFrom->toDateString(),
             'dateTo' => $dateTo->toDateString(),
-            'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo),
+            'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo, forPdf: true),
             'metrics' => Metric::forDiaryPeriodExport($currentPropertyId, $dateFrom, $dateTo),
         ])->download("diary_{$dateFrom->toDateString()}_{$dateTo->toDateString()}.pdf");
     }

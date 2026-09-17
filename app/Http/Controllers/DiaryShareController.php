@@ -54,7 +54,7 @@ class DiaryShareController extends Controller
             'property' => $share->property->only(['name']),
             'dateFrom' => $share->date_from->toDateString(),
             'dateTo' => $share->date_to->toDateString(),
-            'days' => WorkSession::diaryDays($share->property_id, $dateFrom, $dateTo),
+            'days' => WorkSession::diaryDays($share->property_id, $dateFrom, $dateTo, forPdf: true),
             'metrics' => Metric::forDiaryPeriodExport($share->property_id, $dateFrom, $dateTo),
         ])->download("diary_{$share->date_from->toDateString()}_{$share->date_to->toDateString()}.pdf");
     }

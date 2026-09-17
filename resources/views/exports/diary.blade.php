@@ -13,6 +13,9 @@
     .entry-time { color: #6b7280; font-size: 11px; float: right; }
     .entry-user { color: #6b7280; margin: 2px 0; }
     .entry-description { white-space: pre-line; margin-top: 4px; }
+    .entry-photos { margin-top: 6px; }
+    {{-- dompdf doesn't support object-fit; Photo::pdf_thumbnail is pre-cropped to this exact ratio instead. --}}
+    .entry-photo { width: 110px; height: 80px; border-radius: 4px; margin-right: 6px; margin-bottom: 6px; }
     .empty { text-align: center; color: #6b7280; padding: 20px 0; }
     h2.section { font-size: 14px; margin-top: 24px; border-bottom: 1px solid #1f2937; padding-bottom: 4px; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
@@ -45,6 +48,13 @@
                     <p class="entry-user">{{ $entry['user_name'] }}</p>
                     @if (!empty($entry['description']))
                         <p class="entry-description">{{ $entry['description'] }}</p>
+                    @endif
+                    @if (!empty($entry['photos']))
+                        <div class="entry-photos">
+                            @foreach ($entry['photos'] as $photo)
+                                <img src="{{ $photo['pdf_thumbnail'] }}" class="entry-photo">
+                            @endforeach
+                        </div>
                     @endif
                 </div>
             @endforeach

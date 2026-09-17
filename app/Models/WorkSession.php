@@ -96,8 +96,11 @@ class WorkSession extends Model
      * by day - the shared shape behind both the public diary share
      * (DiaryShareController) and the in-app approver diary (ReportController).
      * Curated: no billing figures, only what's needed to recognise the work.
+     *
+     * $forPdf additionally crops/encodes a PDF-ready thumbnail per photo -
+     * skip it for the web preview, where it'd just be wasted work.
      */
-    public static function diaryDays(int $propertyId, $dateFrom, $dateTo)
+    public static function diaryDays(int $propertyId, $dateFrom, $dateTo, bool $forPdf = false)
     {
         return static::where('property_id', $propertyId)
             ->whereIn('status', [self::FINALISED, self::APPROVED])
@@ -120,6 +123,7 @@ class WorkSession extends Model
                     'photos' => $session->photos->map(fn ($photo) => [
                         'id' => $photo->id,
                         'url' => $photo->url,
+                        ...($forPdf ? ['pdf_thumbnail' => $photo->pdf_thumbnail] : []),
                     ]),
                 ])->values(),
             ])
