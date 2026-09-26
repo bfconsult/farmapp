@@ -58,8 +58,12 @@ class Photo extends Model
         $disk = Storage::disk(config('filesystems.default'));
 
         // S3 buckets aren't necessarily public-readable, so use a signed URL
-        // rather than assuming a public ACL/bucket policy is in place.
-        return config('filesystems.default') === 's3'
+        // rather than assuming a public ACL/bucket policy is in place. Checks
+        // the disk's driver, not its name - this app's default disk is named
+        // "s3" on Vapor but "farmapp" on Laravel Cloud (same underlying s3
+        // driver, different FILESYSTEM_DISK per platform), so comparing
+        // against a literal disk name would only ever be right on one of them.
+        return config('filesystems.disks.'.config('filesystems.default').'.driver') === 's3'
             ? $disk->temporaryUrl($this->file, now()->addHour())
             : $disk->url($this->file);
     }

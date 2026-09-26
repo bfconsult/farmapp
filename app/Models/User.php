@@ -81,8 +81,9 @@ class User extends Authenticatable
 
         // S3 buckets aren't necessarily public-readable, so use a signed URL
         // rather than assuming a public ACL/bucket policy is in place -
-        // same reasoning as Photo::getUrlAttribute().
-        return config('filesystems.default') === 's3'
+        // same reasoning as Photo::getUrlAttribute(), including checking the
+        // driver rather than the disk name.
+        return config('filesystems.disks.'.config('filesystems.default').'.driver') === 's3'
             ? $disk->temporaryUrl($this->avatar, now()->addHour())
             : $disk->url($this->avatar);
     }

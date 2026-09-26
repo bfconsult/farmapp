@@ -67,6 +67,26 @@ return [
             'report' => false,
         ],
 
+        // Laravel Cloud's Object Storage requires a disk name of 3+
+        // characters, so "s3" (Vapor's own FILESYSTEM_DISK value, kept above
+        // unchanged for production) isn't usable there - "farmapp" is Cloud's
+        // disk name for the same bucket-shaped resource instead. Only one of
+        // these two disks is ever actually selected at a time (whichever
+        // FILESYSTEM_DISK the current platform injects), so it's safe for
+        // both to read the same AWS_* env var names.
+        'farmapp' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION', env('AWS_REGION')),
+            'bucket' => env('AWS_BUCKET'),
+            'url' => env('AWS_URL'),
+            'endpoint' => env('AWS_ENDPOINT', env('AWS_ENDPOINT_URL')),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

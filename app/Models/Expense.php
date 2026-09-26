@@ -71,7 +71,8 @@ class Expense extends Model
 
         $disk = Storage::disk(config('filesystems.default'));
 
-        return config('filesystems.default') === 's3'
+        // Checks the driver, not the disk name - see Photo::getUrlAttribute().
+        return config('filesystems.disks.'.config('filesystems.default').'.driver') === 's3'
             ? $disk->temporaryUrl($this->invoice_file, now()->addHour())
             : $disk->url($this->invoice_file);
     }
