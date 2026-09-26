@@ -51,10 +51,17 @@ return [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'region' => env('AWS_DEFAULT_REGION'),
+            // Prefer this app's own established name (what Vapor injects for
+            // the declared `storage:` resource) over Laravel Cloud's
+            // AWS_REGION/AWS_ENDPOINT_URL naming - not just a style choice:
+            // AWS Lambda (what Vapor runs on) unconditionally sets its own
+            // reserved AWS_REGION env var to wherever the function is
+            // deployed, which would silently win over the bucket's actual
+            // region if AWS_REGION were checked first.
+            'region' => env('AWS_DEFAULT_REGION', env('AWS_REGION')),
             'bucket' => env('AWS_BUCKET'),
             'url' => env('AWS_URL'),
-            'endpoint' => env('AWS_ENDPOINT'),
+            'endpoint' => env('AWS_ENDPOINT', env('AWS_ENDPOINT_URL')),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
             'report' => false,
