@@ -160,6 +160,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('mobs', [MobController::class, 'store'])->name('mobs.store');
     Route::patch('mobs/{mob}', [MobController::class, 'update'])->name('mobs.update');
     Route::put('mobs/{mob}/zone', [MobController::class, 'updateZone'])->name('mobs.update-zone');
+    Route::patch('mobs/{mob}/zone-history/{zoneHistory}', [MobController::class, 'updateZoneHistoryDate'])->name('mobs.zone-history.update');
     Route::delete('mobs/{mob}', [MobController::class, 'destroy'])->name('mobs.destroy');
     Route::post('mobs/{mob}/animals', [MobController::class, 'storeAnimals'])->name('mobs.animals.store');
     Route::post('livestock', [LivestockController::class, 'store'])->name('livestock.store');

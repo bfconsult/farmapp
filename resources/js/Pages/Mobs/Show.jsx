@@ -26,9 +26,14 @@ export default function Show({ mob }) {
     const [editing, setEditing] = useState(false);
     const [values, setValues] = useState({ name: mob.name });
 
+    const today = new Date().toISOString().slice(0, 10);
+
     const [zoneId, setZoneId] = useState(mob.current_zone?.zone_id ?? '');
+    const [moveDate, setMoveDate] = useState(today);
     const [addingNote, setAddingNote] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
+    const [editingHistoryId, setEditingHistoryId] = useState(null);
+    const [historyDate, setHistoryDate] = useState('');
 
     const pastZones = (mob.zone_history ?? []).slice(1); // [0] is current_zone itself
 
@@ -41,9 +46,23 @@ export default function Show({ mob }) {
     };
 
     const moveZone = () => {
-        router.put(route('mobs.update-zone', mob.id), { zone_id: zoneId || null }, {
+        router.put(route('mobs.update-zone', mob.id), { zone_id: zoneId || null, moved_at: moveDate }, {
             preserveScroll: true,
             preserveState: true,
+            onSuccess: () => setMoveDate(today),
+        });
+    };
+
+    const startEditingHistoryDate = (entry) => {
+        setEditingHistoryId(entry.id);
+        setHistoryDate(entry.moved_at ?? today);
+    };
+
+    const saveHistoryDate = (entry) => {
+        router.patch(route('mobs.zone-history.update', [mob.id, entry.id]), { moved_at: historyDate }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => setEditingHistoryId(null),
         });
     };
 
@@ -96,6 +115,13 @@ export default function Show({ mob }) {
                                         <option key={zone.id} value={zone.id}>{zone.name}</option>
                                     ))}
                                 </select>
+                                <input
+                                    type="date"
+                                    value={moveDate}
+                                    max={today}
+                                    onChange={(e) => setMoveDate(e.target.value)}
+                                    className="border-gray-300 rounded-lg p-2 text-sm"
+                                />
                                 <button onClick={moveZone} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">
                                     Move
                                 </button>
@@ -117,9 +143,31 @@ export default function Show({ mob }) {
                         {showHistory && (
                             <div className="divide-y divide-gray-100">
                                 {pastZones.map((entry) => (
-                                    <div key={entry.id} className="px-4 py-2 text-sm text-gray-700 flex justify-between">
+                                    <div key={entry.id} className="px-4 py-2 text-sm text-gray-700 flex justify-between items-center">
                                         <span>{entry.zone?.name ?? 'No paddock'}</span>
-                                        <span className="text-xs text-gray-400">{formatDate(entry.created_at)}</span>
+                                        {editingHistoryId === entry.id ? (
+                                            <span className="flex items-center gap-1">
+                                                <input
+                                                    type="date"
+                                                    value={historyDate}
+                                                    max={today}
+                                                    onChange={(e) => setHistoryDate(e.target.value)}
+                                                    className="border-gray-300 rounded-lg p-1 text-xs"
+                                                    autoFocus
+                                                />
+                                                <button onClick={() => saveHistoryDate(entry)} className="text-xs text-green-600 px-1">Save</button>
+                                                <button onClick={() => setEditingHistoryId(null)} className="text-xs text-gray-400 px-1">Cancel</button>
+                                            </span>
+                                        ) : canManage ? (
+                                            <button
+                                                onClick={() => startEditingHistoryDate(entry)}
+                                                className="text-xs text-gray-400 hover:text-green-600"
+                                            >
+                                                {formatDate(entry.moved_at)}
+                                            </button>
+                                        ) : (
+                                            <span className="text-xs text-gray-400">{formatDate(entry.moved_at)}</span>
+                                        )}
                                     </div>
                                 ))}
                             </div>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Livestock;
 use App\Models\Mob;
+use App\Models\MobZoneHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -58,14 +59,35 @@ class MobController extends Controller
 
         $validated = $request->validate([
             'zone_id' => ['nullable', Rule::exists('zones', 'id')->where('property_id', session('current_property_id'))],
+            'moved_at' => 'nullable|date|before_or_equal:today',
         ]);
 
         $mob->zoneHistory()->create([
             'zone_id' => $validated['zone_id'] ?? null,
+            'moved_at' => $validated['moved_at'] ?? null,
             'created_by' => $request->user()->id,
         ]);
 
         return back()->with('success', 'Paddock updated.');
+    }
+
+    /**
+     * Corrects the effective date of a past paddock move - the only field
+     * editable here, since the move itself (which zone) isn't in scope for
+     * a "fix the date" action.
+     */
+    public function updateZoneHistoryDate(Request $request, Mob $mob, MobZoneHistory $zoneHistory)
+    {
+        abort_unless($mob->property_id === (int) session('current_property_id'), 404);
+        abort_unless($zoneHistory->mob_id === $mob->id, 404);
+
+        $validated = $request->validate([
+            'moved_at' => 'required|date|before_or_equal:today',
+        ]);
+
+        $zoneHistory->update($validated);
+
+        return back()->with('success', 'Paddock history date updated.');
     }
 
     /**

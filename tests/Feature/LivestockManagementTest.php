@@ -34,6 +34,58 @@ test('an admin can create a mob and move it between paddocks, building history',
     expect(MobZoneHistory::where('mob_id', $mob->id)->count())->toBe(2);
 });
 
+test('moving a mob accepts a backdated date and the current paddock follows it, not entry order', function () {
+    $user = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $north = Zone::create(['property_id' => $property->id, 'name' => 'North Paddock', 'coordinates' => [[0, 0], [0, 1], [1, 1]]]);
+    $south = Zone::create(['property_id' => $property->id, 'name' => 'South Paddock', 'coordinates' => [[0, 0], [0, 1], [1, 1]]]);
+    $mob = Mob::create(['property_id' => $property->id, 'created_by' => $user->id, 'name' => 'Breeding Mob']);
+    $mob->zoneHistory()->create(['zone_id' => $north->id, 'created_by' => $user->id]); // today
+
+    $session = fn () => $this->actingAs($user)->withSession(['current_property_id' => $property->id]);
+
+    // Logged after the North entry, but backdated to before it.
+    $session()->put(route('mobs.update-zone', $mob), [
+        'zone_id' => $south->id,
+        'moved_at' => now()->subDays(3)->toDateString(),
+    ])->assertSessionHasNoErrors();
+
+    expect($mob->fresh()->currentZone->zone_id)->toBe($north->id);
+});
+
+test('a paddock history entry\'s date can be corrected after the fact', function () {
+    $user = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $north = Zone::create(['property_id' => $property->id, 'name' => 'North Paddock', 'coordinates' => [[0, 0], [0, 1], [1, 1]]]);
+    $mob = Mob::create(['property_id' => $property->id, 'created_by' => $user->id, 'name' => 'Breeding Mob']);
+    $entry = $mob->zoneHistory()->create(['zone_id' => $north->id, 'created_by' => $user->id]);
+
+    $correctedDate = now()->subDays(5)->toDateString();
+
+    $this->actingAs($user)
+        ->withSession(['current_property_id' => $property->id])
+        ->patch(route('mobs.zone-history.update', [$mob, $entry]), ['moved_at' => $correctedDate])
+        ->assertSessionHasNoErrors();
+
+    expect($entry->fresh()->moved_at->toDateString())->toBe($correctedDate);
+});
+
+test('a history entry belonging to a different mob is rejected', function () {
+    $user = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $mobA = Mob::create(['property_id' => $property->id, 'created_by' => $user->id, 'name' => 'Mob A']);
+    $mobB = Mob::create(['property_id' => $property->id, 'created_by' => $user->id, 'name' => 'Mob B']);
+    $entry = $mobB->zoneHistory()->create(['zone_id' => null, 'created_by' => $user->id]);
+
+    $this->actingAs($user)
+        ->withSession(['current_property_id' => $property->id])
+        ->patch(route('mobs.zone-history.update', [$mobA, $entry]), ['moved_at' => now()->toDateString()])
+        ->assertNotFound();
+});
+
 test('an admin can create an individual animal within a mob', function () {
     $user = User::factory()->create();
     $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
