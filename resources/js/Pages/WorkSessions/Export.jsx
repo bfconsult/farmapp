@@ -112,10 +112,16 @@ export default function Export({ currentDateFrom, currentDateTo, draftCount, exp
                         <span className="text-gray-500">Total hours</span>
                         <span className="font-medium text-gray-900">{formatNumber(exportSummary.hours)}h</span>
                     </div>
-                    <div className="flex justify-between text-sm mb-4">
+                    <div className={`flex justify-between text-sm ${exportSummary.reimbursableCount > 0 ? 'mb-2' : 'mb-4'}`}>
                         <span className="text-gray-500">Total billing (Ex GST)</span>
                         <span className="font-medium text-green-700">${formatNumber(exportSummary.billing)}</span>
                     </div>
+                    {exportSummary.reimbursableCount > 0 && (
+                        <div className="flex justify-between text-sm mb-4">
+                            <span className="text-gray-500">Reimbursable expenses</span>
+                            <span className="font-medium text-green-700">${formatNumber(exportSummary.reimbursableTotal)}</span>
+                        </div>
+                    )}
 
                     <div className="flex items-center justify-between mb-4">
                         <span className="text-sm font-medium text-gray-700">Show billing amounts</span>

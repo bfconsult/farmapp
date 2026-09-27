@@ -15,7 +15,7 @@ class Expense extends Model
     protected $fillable = [
         'farm_job_id', 'supplier_id', 'created_by', 'quote_id',
         'name', 'date', 'description', 'amount', 'gst_inclusive', 'reimburse',
-        'invoice_file', 'invoice_original_name', 'status',
+        'reimburse_to_user_id', 'invoice_file', 'invoice_original_name', 'status',
     ];
 
     protected $casts = [
@@ -43,6 +43,16 @@ class Expense extends Model
     }
 
     /**
+     * Who should actually be paid back - distinct from createdBy(), which is
+     * only ever whoever was logged in when the expense was typed into the
+     * app (see ExpenseController).
+     */
+    public function reimburseTo()
+    {
+        return $this->belongsTo(User::class, 'reimburse_to_user_id');
+    }
+
+    /**
      * Set when this expense was submitted by a supplier via their
      * Request-an-Invoice share link, rather than entered in-app - see
      * SupplierExpenseController.
@@ -55,6 +65,11 @@ class Expense extends Model
     public function photos()
     {
         return $this->hasMany(Photo::class);
+    }
+
+    public function scopeReimbursable($query)
+    {
+        return $query->where('reimburse', true);
     }
 
     /**

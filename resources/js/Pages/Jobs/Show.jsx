@@ -89,7 +89,7 @@ function ExpenseRow({ expense, onEdit }) {
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     {expense.reimburse && (
                         <span className="text-xs px-2 py-1 rounded-full font-medium bg-amber-100 text-amber-700">
-                            Reimburse
+                            Reimburse{expense.reimburse_to?.name ? ` – ${expense.reimburse_to.name}` : ''}
                         </span>
                     )}
                     {expense.quote_id && (
@@ -265,7 +265,7 @@ function EmptySectionTile({ label, actionLabel, onAction }) {
 export default function Show({ job, seenBy, checklistTemplates, suppliers, labourTotal, labourEntries }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
-    const { flash, currentUserRole, errors } = usePage().props;
+    const { flash, currentUserRole, errors, auth } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canCreateNote = canManage || currentUserRole === 'worker';
     const [uploading, setUploading] = useState(false);
@@ -276,7 +276,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
     const [showExpenseModal, setShowExpenseModal] = useState(false);
     const [editingExpense, setEditingExpense] = useState(null);
     const todayIso = () => new Date().toISOString().slice(0, 10);
-    const [expenseForm, setExpenseForm] = useState({ name: '', date: todayIso(), description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
+    const [expenseForm, setExpenseForm] = useState({ name: '', date: todayIso(), description: '', amount: '', gst_inclusive: true, reimburse: false, reimburse_to_user_id: String(auth.user.id), supplier_id: '' });
     const [invoiceFile, setInvoiceFile] = useState(null);
     const [creatingSupplier, setCreatingSupplier] = useState(false);
     const [newSupplierName, setNewSupplierName] = useState('');
@@ -383,7 +383,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
 
     const openAddExpense = () => {
         setEditingExpense(null);
-        setExpenseForm({ name: '', date: todayIso(), description: '', amount: '', gst_inclusive: true, reimburse: false, supplier_id: '' });
+        setExpenseForm({ name: '', date: todayIso(), description: '', amount: '', gst_inclusive: true, reimburse: false, reimburse_to_user_id: String(auth.user.id), supplier_id: '' });
         setInvoiceFile(null);
         setShowExpenseModal(true);
     };
@@ -397,6 +397,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
             amount: expense.amount ?? '',
             gst_inclusive: expense.gst_inclusive,
             reimburse: expense.reimburse,
+            reimburse_to_user_id: expense.reimburse_to_user_id ? String(expense.reimburse_to_user_id) : String(auth.user.id),
             supplier_id: expense.supplier_id ? String(expense.supplier_id) : '',
         });
         setInvoiceFile(null);
@@ -419,6 +420,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
             amount: expenseForm.amount,
             gst_inclusive: expenseForm.gst_inclusive,
             reimburse: expenseForm.reimburse,
+            reimburse_to_user_id: expenseForm.reimburse ? (expenseForm.reimburse_to_user_id || null) : null,
             supplier_id: expenseForm.supplier_id || null,
         };
         if (invoiceFile) payload.invoice = invoiceFile;
@@ -1185,6 +1187,25 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                             />
                             Reimburse this expense
                         </label>
+
+                        {expenseForm.reimburse && (
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Reimburse to</label>
+                                {(job.assignees ?? []).length > 0 ? (
+                                    <select
+                                        value={expenseForm.reimburse_to_user_id}
+                                        onChange={(e) => setExpenseForm({ ...expenseForm, reimburse_to_user_id: e.target.value })}
+                                        className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                                    >
+                                        {job.assignees.map((user) => (
+                                            <option key={user.id} value={user.id}>{user.name}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <p className="text-xs text-gray-400">No one is assigned to this job yet.</p>
+                                )}
+                            </div>
+                        )}
 
                         <div className="flex gap-2 pt-2">
                             <button onClick={saveExpense} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium">

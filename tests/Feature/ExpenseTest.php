@@ -223,3 +223,56 @@ test('editing an expense without choosing a new file leaves its existing invoice
     expect($expense->invoice_original_name)->toBe('invoice.jpg');
     Storage::disk('public')->assertExists($path);
 });
+
+test('an expense can be marked reimbursable to one of the job\'s assignees', function () {
+    [$admin, $property, $job] = createJobWithAdmin();
+    $worker = User::factory()->create();
+    $job->assignees()->attach($worker->id);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('expenses.store', $job->id), [
+            'name' => 'Fuel', 'date' => '2026-06-15', 'amount' => 45.50,
+            'reimburse' => true, 'reimburse_to_user_id' => $worker->id,
+        ])
+        ->assertSessionHasNoErrors();
+
+    $expense = Expense::firstOrFail();
+    expect($expense->reimburse_to_user_id)->toBe($worker->id);
+});
+
+test('a user not assigned to the job is rejected as a reimburse-to target', function () {
+    [$admin, $property, $job] = createJobWithAdmin();
+    $outsider = User::factory()->create();
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->post(route('expenses.store', $job->id), [
+            'name' => 'Fuel', 'date' => '2026-06-15', 'amount' => 45.50,
+            'reimburse' => true, 'reimburse_to_user_id' => $outsider->id,
+        ])
+        ->assertSessionHasErrors('reimburse_to_user_id');
+
+    expect(Expense::count())->toBe(0);
+});
+
+test('editing an expense\'s reimburse-to target is scoped to the job\'s assignees too', function () {
+    [$admin, $property, $job] = createJobWithAdmin();
+    $worker = User::factory()->create();
+    $job->assignees()->attach($worker->id);
+    $expense = Expense::create([
+        'farm_job_id' => $job->id, 'name' => 'Fuel', 'date' => '2026-06-15', 'amount' => 45.50,
+        'gst_inclusive' => true, 'status' => Expense::COMPLETE, 'reimburse' => true,
+        'reimburse_to_user_id' => $admin->id,
+    ]);
+
+    $this->actingAs($admin)
+        ->withSession(['current_property_id' => $property->id])
+        ->patch(route('expenses.update', $expense->id), [
+            'name' => 'Fuel', 'date' => '2026-06-15', 'amount' => 45.50,
+            'reimburse' => true, 'reimburse_to_user_id' => $worker->id,
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($expense->fresh()->reimburse_to_user_id)->toBe($worker->id);
+});

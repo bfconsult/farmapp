@@ -19,6 +19,7 @@ class ExpenseController extends Controller
             'amount' => 'required|numeric|min:0',
             'gst_inclusive' => 'boolean',
             'reimburse' => 'boolean',
+            'reimburse_to_user_id' => ['nullable', $this->assigneeRule($farmJob)],
             'supplier_id' => 'nullable|exists:suppliers,id',
             // Covers the case where a supplier emails/hands over an invoice
             // directly instead of using their Request-an-Invoice link (see
@@ -57,6 +58,7 @@ class ExpenseController extends Controller
             'amount' => 'nullable|numeric|min:0',
             'gst_inclusive' => 'boolean',
             'reimburse' => 'boolean',
+            'reimburse_to_user_id' => ['nullable', $this->assigneeRule($expense->farmJob)],
             'supplier_id' => 'nullable|exists:suppliers,id',
             // Lets a manager attach the invoice after the fact too - e.g.
             // it arrived by email instead of through the supplier's own
@@ -76,6 +78,20 @@ class ExpenseController extends Controller
         }
 
         return back();
+    }
+
+    /**
+     * A "reimburse to" pick must be one of the job's actual assignees - the
+     * dropdown is already scoped to them, but the server shouldn't trust
+     * that alone (same reasoning as zone_ids/asset_id elsewhere in the app).
+     */
+    private function assigneeRule(FarmJob $farmJob)
+    {
+        return function ($attribute, $value, $fail) use ($farmJob) {
+            if ($value && !$farmJob->assignees()->where('users.id', $value)->exists()) {
+                $fail('The selected user is not assigned to this job.');
+            }
+        };
     }
 
     /**

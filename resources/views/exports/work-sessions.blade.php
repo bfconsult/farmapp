@@ -14,6 +14,7 @@
     .billing-header { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
     .billing-name { font-size: 16px; font-weight: bold; margin: 0 0 4px; }
     .billing-line { margin: 0; color: #4b5563; }
+    h2.section { font-size: 14px; margin-top: 24px; border-bottom: 1px solid #1f2937; padding-bottom: 4px; }
 </style>
 </head>
 <body>
@@ -73,5 +74,35 @@
             </tr>
         </tfoot>
     </table>
+
+    @if ($reimbursableExpenses->isNotEmpty())
+        <h2 class="section">Reimbursable Expenses</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Job</th>
+                    <th>Description</th>
+                    <th class="amount">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach ($reimbursableExpenses as $expense)
+                    <tr>
+                        <td>{{ $expense['date'] }}</td>
+                        <td>{{ $expense['job'] }}</td>
+                        <td>{{ $expense['description'] }}</td>
+                        <td class="amount">${{ format_number($expense['amount']) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3">Total</td>
+                    <td class="amount">${{ format_number($totalReimbursable) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    @endif
 </body>
 </html>

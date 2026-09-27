@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\Expense;
 use App\Models\FarmJob;
 use App\Models\JobStatus;
 use App\Models\Property;
@@ -10,10 +11,15 @@ use App\Models\RecurringJob;
 use App\Models\Role;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use setasign\Fpdi\Fpdi;
+use setasign\Fpdi\PdfParser\StreamReader;
 
 class WorkSessionController extends Controller
 {
@@ -522,6 +528,7 @@ class WorkSessionController extends Controller
         [$dateFrom, $dateTo] = $this->parseDateRange($request);
 
         $exportable = $this->exportableSessionsQuery($currentPropertyId, $dateFrom, $dateTo)->get();
+        $reimbursableExpenses = $this->reimbursableExpensesQuery($currentPropertyId, $dateFrom, $dateTo)->get();
 
         $draftCount = Auth::user()->workSessions()
             ->where('status', WorkSession::DRAFT)
@@ -538,6 +545,8 @@ class WorkSessionController extends Controller
                 'count' => $exportable->count(),
                 'hours' => round($exportable->sum('duration_in_hours'), 2),
                 'billing' => round($exportable->sum('billing_amount'), 2),
+                'reimbursableCount' => $reimbursableExpenses->count(),
+                'reimbursableTotal' => round($reimbursableExpenses->sum('amount'), 2),
             ],
         ]);
     }
@@ -609,6 +618,15 @@ class WorkSessionController extends Controller
         $totalBilling = round($rows->sum('amount'), 2);
         $filename = "work-sessions_{$dateFrom->toDateString()}_{$dateTo->toDateString()}";
 
+        $reimbursableExpenseModels = $this->reimbursableExpensesQuery($currentPropertyId, $dateFrom, $dateTo)->get();
+        $reimbursableExpenses = $reimbursableExpenseModels->map(fn ($expense) => [
+            'date' => $expense->date->format('d/m/Y'),
+            'job' => $expense->farmJob?->name ?? 'Ad-hoc',
+            'description' => $expense->description ?: $expense->name,
+            'amount' => (float) $expense->amount,
+        ]);
+        $totalReimbursable = round($reimbursableExpenses->sum('amount'), 2);
+
         if ($request->format === 'pdf') {
             // Vapor never inspects Content-Type to decide whether a response
             // needs base64 encoding for API Gateway - only this header does
@@ -617,7 +635,7 @@ class WorkSessionController extends Controller
             // because a plain table with no embedded images/fonts happens to
             // produce a byte stream that survives as valid UTF-8 - one logo
             // added to this template would break it the same way.
-            return \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.work-sessions', [
+            $pdfBytes = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.work-sessions', [
                 'rows' => $rows,
                 'rateMode' => $rateMode,
                 'dateFrom' => $dateFrom->toDateString(),
@@ -626,7 +644,20 @@ class WorkSessionController extends Controller
                 'totalBilling' => $totalBilling,
                 'billingDetails' => $billingDetails,
                 'fromLine' => $fromLine,
-            ])->download("{$filename}.pdf")->header('X-Vapor-Base64-Encode', 'True');
+                'reimbursableExpenses' => $reimbursableExpenses,
+                'totalReimbursable' => $totalReimbursable,
+            ])->output();
+
+            $mergedBytes = $this->appendInvoicePages($pdfBytes, $reimbursableExpenseModels);
+
+            // Same base64 header the Excel branch below already needs, and for
+            // the same reason (see its own comment) - now load-bearing here
+            // too, since appendInvoicePages embeds real images/PDF pages.
+            return response($mergedBytes, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "attachment; filename=\"{$filename}.pdf\"",
+                'X-Vapor-Base64-Encode' => 'True',
+            ]);
         }
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -715,6 +746,26 @@ class WorkSessionController extends Controller
             $totalRow[] = $totalBilling;
         }
         $sheet->fromArray($totalRow, null, "A{$rowNumber}");
+        $rowNumber++;
+
+        if ($reimbursableExpenses->isNotEmpty()) {
+            $rowNumber++; // blank row separating the hours table from this section
+
+            $sheet->setCellValue("A{$rowNumber}", 'Reimbursable Expenses');
+            $sheet->getStyle("A{$rowNumber}")->getFont()->setBold(true);
+            $rowNumber++;
+
+            $sheet->fromArray(['Date', 'Job', 'Description', 'Amount'], null, "A{$rowNumber}");
+            $rowNumber++;
+
+            foreach ($reimbursableExpenses as $expense) {
+                $sheet->fromArray([$expense['date'], $expense['job'], $expense['description'], $expense['amount']], null, "A{$rowNumber}");
+                $rowNumber++;
+            }
+
+            $sheet->fromArray(['', '', 'Total', $totalReimbursable], null, "A{$rowNumber}");
+            $sheet->getStyle("A{$rowNumber}:D{$rowNumber}")->getFont()->setBold(true);
+        }
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 
@@ -890,5 +941,108 @@ class WorkSessionController extends Controller
             ->whereBetween('started_at', [$dateFrom, $dateTo])
             ->with('farmJob')
             ->latest('started_at');
+    }
+
+    /**
+     * This worker's own reimbursable expenses for the export period - not
+     * every reimbursable expense on the property, since this export is a
+     * personal timesheet/invoice. Filtered on reimburse_to_user_id, not
+     * created_by - created_by is only ever whoever typed the expense into
+     * the app (could be an admin entering it on this worker's behalf).
+     * whereNotNull('amount') excludes needs_review expenses, same
+     * convention as ReportController::index().
+     */
+    private function reimbursableExpensesQuery($currentPropertyId, $dateFrom, $dateTo)
+    {
+        return Expense::where('reimburse_to_user_id', Auth::id())
+            ->reimbursable()
+            ->whereNotNull('amount')
+            ->whereHas('farmJob', fn ($query) => $query->when($currentPropertyId, fn ($q) => $q->where('property_id', $currentPropertyId)))
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->with('farmJob')
+            ->orderBy('date');
+    }
+
+    /**
+     * Appends each reimbursable expense's invoice as extra pages after the
+     * main report - an image becomes one page, a real PDF has its actual
+     * pages imported, so the export is a single self-contained document
+     * (hours + expenses + attachments) ready to send for payment. A missing
+     * or unreadable invoice file is skipped rather than failing the whole
+     * export - the itemized expense row still lists the amount either way.
+     */
+    private function appendInvoicePages(string $pdfBytes, Collection $expenses): string
+    {
+        $pdf = new Fpdi();
+        $pageCount = $pdf->setSourceFile(StreamReader::createByString($pdfBytes));
+        for ($i = 1; $i <= $pageCount; $i++) {
+            $pdf->AddPage();
+            $pdf->useTemplate($pdf->importPage($i));
+        }
+
+        foreach ($expenses as $expense) {
+            if (!$expense->invoice_file) {
+                continue;
+            }
+
+            try {
+                $this->appendInvoiceFile($pdf, $expense);
+            } catch (\Throwable $e) {
+                Log::warning("Skipped invoice attachment for expense {$expense->id} in export: {$e->getMessage()}");
+            }
+        }
+
+        return $pdf->Output('S');
+    }
+
+    private function appendInvoiceFile(Fpdi $pdf, Expense $expense): void
+    {
+        $extension = strtolower(pathinfo($expense->invoice_file, PATHINFO_EXTENSION));
+        $bytes = Storage::disk(config('filesystems.default'))->get($expense->invoice_file);
+        // Plain hyphen, not an em dash - FPDF's core fonts are cp1252/Latin-1,
+        // not UTF-8, so a multi-byte character here would render as mojibake.
+        $caption = "Invoice - {$expense->name}, {$expense->date->format('d/m/Y')}";
+
+        if ($extension === 'pdf') {
+            $importPageCount = $pdf->setSourceFile(StreamReader::createByString($bytes));
+            for ($i = 1; $i <= $importPageCount; $i++) {
+                $template = $pdf->importPage($i);
+                $pdf->AddPage();
+                if ($i === 1) {
+                    $pdf->SetFont('Helvetica', '', 10);
+                    $pdf->SetXY(10, 5);
+                    $pdf->Cell(0, 6, $caption);
+                }
+                $pdf->useTemplate($template, ['adjustPageSize' => true]);
+            }
+
+            return;
+        }
+
+        if (!in_array($extension, ['jpg', 'jpeg', 'png'], true)) {
+            return;
+        }
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'invoice');
+        file_put_contents($tmpFile, $bytes);
+
+        try {
+            [$pixelWidth, $pixelHeight] = getimagesize($tmpFile);
+            $pdf->AddPage();
+            $pdf->SetFont('Helvetica', '', 10);
+            $pdf->SetXY(10, 5);
+            $pdf->Cell(0, 6, $caption);
+
+            $pageWidth = $pdf->GetPageWidth() - 20; // 10mm margin either side
+            $pageHeight = $pdf->GetPageHeight() - 30; // leave room for the caption
+            $ratio = min($pageWidth / $pixelWidth, $pageHeight / $pixelHeight);
+            $width = $pixelWidth * $ratio;
+            $height = $pixelHeight * $ratio;
+
+            $type = $extension === 'jpg' ? 'JPEG' : strtoupper($extension);
+            $pdf->Image($tmpFile, 10, 20, $width, $height, $type);
+        } finally {
+            unlink($tmpFile);
+        }
     }
 }

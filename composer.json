@@ -17,6 +17,8 @@
         "league/flysystem-aws-s3-v3": "^3.35",
         "phpoffice/phpspreadsheet": "^5.8",
         "resend/resend-laravel": "^1.4",
+        "setasign/fpdf": "^1.9",
+        "setasign/fpdi": "^2.6",
         "tightenco/ziggy": "^2.0"
     },
     "require-dev": {
