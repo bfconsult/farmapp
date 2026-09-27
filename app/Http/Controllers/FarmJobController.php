@@ -364,6 +364,7 @@ class FarmJobController extends Controller
                 ->get(),
             'properties' => Auth::user()->properties()->with('zones')->get(),
             'teamRoles' => Property::find($farmJob->property_id)->roles()->with('user')->get(),
+            'assets' => Asset::where('property_id', $farmJob->property_id)->orderBy('name')->get(),
         ]);
     }
 
@@ -380,6 +381,7 @@ class FarmJobController extends Controller
             'job_status_id' => 'nullable|exists:job_statuses,id',
             'zone_ids' => 'nullable|array',
             'zone_ids.*' => Rule::exists('zones', 'id')->where('property_id', $farmJob->property_id),
+            'asset_id' => ['nullable', Rule::exists('assets', 'id')->where('property_id', $farmJob->property_id)],
             'assignee_ids' => 'nullable|array',
             'assignee_ids.*' => 'exists:users,id',
             'repeats' => 'boolean',

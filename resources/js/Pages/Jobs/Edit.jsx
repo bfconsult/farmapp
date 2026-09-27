@@ -15,7 +15,7 @@ const ROLE_COLORS = {
     approver: 'bg-yellow-100 text-yellow-700',
 };
 
-export default function Edit({ job, priorities, jobTypes, jobStatuses, properties, teamRoles, checklistTemplates }) {
+export default function Edit({ job, priorities, jobTypes, jobStatuses, properties, teamRoles, checklistTemplates, assets }) {
     const { currentUserRole } = usePage().props;
     const canManageRecurring = currentUserRole === 'admin' || currentUserRole === 'manager';
 
@@ -33,6 +33,7 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
         job_type_id: job.job_type_id ?? '',
         job_status_id: job.job_status_id ?? '',
         zone_ids: (job.zones ?? []).map((zone) => zone.id),
+        asset_id: job.asset_id ?? '',
         assignee_ids: job.assignees.map((user) => user.id),
         repeats: false,
         interval: 'monthly',
@@ -182,6 +183,25 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                                 )}
                                 {errors.zone_ids && <p className="mt-1 text-sm text-red-600">{errors.zone_ids}</p>}
                             </div>
+
+                            {assets.length > 0 && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Asset <span className="text-gray-400">optional</span>
+                                    </label>
+                                    <select
+                                        value={data.asset_id}
+                                        onChange={(e) => setData('asset_id', e.target.value)}
+                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                    >
+                                        <option value="">Not related to an asset</option>
+                                        {assets.map((asset) => (
+                                            <option key={asset.id} value={asset.id}>{asset.name}</option>
+                                        ))}
+                                    </select>
+                                    {errors.asset_id && <p className="mt-1 text-sm text-red-600">{errors.asset_id}</p>}
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-3 gap-4 mb-6">
                                 <div>
