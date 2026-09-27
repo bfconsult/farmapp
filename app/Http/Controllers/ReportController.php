@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DiaryShare;
 use App\Models\Expense;
+use App\Models\FarmJob;
 use App\Models\Metric;
 use App\Models\Property;
 use App\Models\WorkSession;
@@ -35,6 +36,8 @@ class ReportController extends Controller
                 'currentDateFrom' => $dateFrom->toDateString(),
                 'currentDateTo' => $dateTo->toDateString(),
                 'metrics' => Metric::forDiaryPeriod($currentPropertyId, $dateFrom, $dateTo),
+                'completedJobs' => FarmJob::completedDuringPeriod($currentPropertyId, $dateFrom, $dateTo),
+                'openJobs' => FarmJob::openAsOf($currentPropertyId, $dateTo),
             ]);
         }
 
@@ -149,6 +152,8 @@ class ReportController extends Controller
             'dateTo' => $dateTo->toDateString(),
             'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo),
             'metrics' => Metric::forDiaryPeriod($currentPropertyId, $dateFrom, $dateTo),
+            'completedJobs' => FarmJob::completedDuringPeriod($currentPropertyId, $dateFrom, $dateTo),
+            'openJobs' => FarmJob::openAsOf($currentPropertyId, $dateTo),
             'logoUrl' => asset('favicon.svg'),
             'backUrl' => route('reports.index', [
                 'date_from' => $dateFrom->toDateString(),
@@ -184,6 +189,8 @@ class ReportController extends Controller
             'dateTo' => $dateTo->toDateString(),
             'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo, forPdf: true),
             'metrics' => Metric::forDiaryPeriodExport($currentPropertyId, $dateFrom, $dateTo),
+            'completedJobs' => FarmJob::completedDuringPeriodExport($currentPropertyId, $dateFrom, $dateTo),
+            'openJobs' => FarmJob::openAsOfExport($currentPropertyId, $dateTo),
         ])->download("diary_{$dateFrom->toDateString()}_{$dateTo->toDateString()}.pdf");
     }
 

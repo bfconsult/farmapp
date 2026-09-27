@@ -21,6 +21,11 @@
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
     th, td { border-bottom: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; }
     th { background-color: #f9fafb; font-size: 11px; text-transform: uppercase; color: #6b7280; }
+    td.amount, th.amount { text-align: right; }
+    .job-card { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #f3f4f6; }
+    .job-name { font-weight: bold; }
+    .job-description { white-space: pre-line; margin-top: 4px; color: #4b5563; }
+    .job-totals { color: #6b7280; font-size: 11px; margin-top: 6px; }
 </style>
 </head>
 <body>
@@ -80,6 +85,44 @@
                                 {{ $metric['measurement']['value_text'] ?: 'No value recorded' }}
                             @endif
                         </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    @if (count($completedJobs) > 0)
+        <h2 class="section">Completed Jobs</h2>
+        @foreach ($completedJobs as $job)
+            <div class="job-card">
+                <p class="job-name">{{ $job['name'] }}</p>
+                @if (!empty($job['description']))
+                    <p class="job-description">{{ $job['description'] }}</p>
+                @endif
+                @if (!empty($job['photos']))
+                    <div class="entry-photos">
+                        @foreach ($job['photos'] as $photo)
+                            <img src="{{ $photo['pdf_thumbnail'] }}" class="entry-photo">
+                        @endforeach
+                    </div>
+                @endif
+                <p class="job-totals">{{ format_number($job['total_hours']) }}h booked &middot; ${{ format_number($job['total_expenses']) }} expenses</p>
+            </div>
+        @endforeach
+    @endif
+
+    @if (count($openJobs) > 0)
+        <h2 class="section">Open Jobs</h2>
+        <table>
+            <thead>
+                <tr><th>Job</th><th class="amount">Hours</th><th class="amount">Expenses</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($openJobs as $job)
+                    <tr>
+                        <td>{{ $job['name'] }}</td>
+                        <td class="amount">{{ format_number($job['total_hours']) }}</td>
+                        <td class="amount">${{ format_number($job['total_expenses']) }}</td>
                     </tr>
                 @endforeach
             </tbody>
