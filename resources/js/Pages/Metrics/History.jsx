@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
 import BackLink from '@/Components/BackLink';
+import MetricHistoryChart from '@/Components/MetricHistoryChart';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
@@ -169,7 +170,10 @@ export default function History({ metric, measurements }) {
                         No measurements yet.
                     </div>
                 ) : metric.answer_type === 'number' ? (
-                    <NumberHistoryTable measurements={measurements} canMeasure={canMeasure} />
+                    <>
+                        <MetricHistoryChart measurements={measurements} />
+                        <NumberHistoryTable measurements={measurements} canMeasure={canMeasure} />
+                    </>
                 ) : (
                     <TextHistoryCards measurements={measurements} canMeasure={canMeasure} />
                 )}
