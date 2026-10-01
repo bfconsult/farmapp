@@ -72,6 +72,33 @@ class MetricController extends Controller
         return back()->with('success', 'Metric deleted. Measurements it already created are unaffected.');
     }
 
+    /**
+     * Lets someone recording a measurement jump straight to a past period's
+     * measurement instead (e.g. catching up on a metric missed last month)
+     * rather than hunting for it on the History page - creating it first if
+     * that period was never opened (the scheduler missed it, or the metric
+     * didn't exist yet), using Metric::periodStartFor()'s calendar-aligned
+     * period for the given date.
+     */
+    public function measurementForDate(Request $request, Metric $metric)
+    {
+        abort_unless($metric->property_id === (int) session('current_property_id'), 404);
+
+        $validated = $request->validate([
+            'date' => 'required|date|before_or_equal:today',
+        ]);
+
+        $date = \Carbon\Carbon::parse($validated['date']);
+
+        $measurement = $metric->measurements()
+            ->where('period_start', '<=', $date)
+            ->where('period_end', '>=', $date)
+            ->first()
+            ?? $metric->createMeasurement($metric->periodStartFor($date));
+
+        return redirect()->route('metric-measurements.show', $measurement);
+    }
+
     private function validated(Request $request): array
     {
         return $request->validate([

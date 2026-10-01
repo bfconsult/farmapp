@@ -116,6 +116,27 @@ class Metric extends Model
     }
 
     /**
+     * The period_start a brand-new measurement should use to cover the given
+     * date - calendar-aligned for monthly/quarterly/yearly/daily, so this is
+     * safe to use for an arbitrary past date (e.g. backfilling a missed
+     * month), unlike the day-after-the-last-period chaining the scheduler
+     * uses for its own next-period rows. Weekly snaps to the calendar week
+     * (Mon-Sun) for the same reason - a reasonable default for an ad hoc
+     * backfill, even though it may not align with this metric's existing
+     * week-to-week chain if one exists.
+     */
+    public function periodStartFor(Carbon $date): Carbon
+    {
+        return match ($this->reporting_period) {
+            self::DAILY => $date->copy(),
+            self::WEEKLY => $date->copy()->startOfWeek(),
+            self::MONTHLY => $date->copy()->startOfMonth(),
+            self::QUARTERLY => $date->copy()->startOfQuarter(),
+            self::YEARLY => $date->copy()->startOfYear(),
+        };
+    }
+
+    /**
      * Create this metric's measurement for the period starting on the given
      * date - used both by the daily scheduler and to open the first
      * measurement immediately when a metric is created. name/answer_type are

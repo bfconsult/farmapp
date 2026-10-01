@@ -1,11 +1,12 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import { formatDate } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 import BackLink from '@/Components/BackLink';
 import UploadingOverlay from '@/Components/UploadingOverlay';
+import SingleDateCalendar from '@/Components/SingleDateCalendar';
 
 const STATUS_LABELS = {
     incomplete: 'Incomplete',
@@ -18,10 +19,12 @@ const STATUS_COLORS = {
 };
 
 export default function Show({ measurement }) {
+    const { errors } = usePage().props;
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
     const [uploading, setUploading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
     const [value, setValue] = useState(
         measurement.answer_type === 'number'
             ? (measurement.value_number != null ? formatNumber(measurement.value_number) : '')
@@ -50,6 +53,14 @@ export default function Show({ measurement }) {
         router.patch(route('metric-measurements.update', measurement.id), {
             status: 'incomplete',
         }, { preserveScroll: true });
+    };
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    // A plain day-button click from SingleDateCalendar, unlike a native
+    // <input type="date">, only ever fires once a date is actually chosen.
+    const goToDate = (date) => {
+        router.get(route('metrics.measurement-for-date', measurement.metric_id), { date });
     };
 
     const destroyPhoto = (photoId) => {
@@ -94,9 +105,26 @@ export default function Show({ measurement }) {
                             {STATUS_LABELS[measurement.status]}
                         </span>
                     </div>
-                    <p className="text-sm text-gray-500">
-                        {formatDate(measurement.period_start.slice(0, 10), { year: 'numeric' })} – {formatDate(measurement.period_end.slice(0, 10), { year: 'numeric' })}
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-gray-500">
+                            {formatDate(measurement.period_start.slice(0, 10), { year: 'numeric' })} – {formatDate(measurement.period_end.slice(0, 10), { year: 'numeric' })}
+                        </p>
+                        {!showDatePicker && (
+                            <button
+                                onClick={() => setShowDatePicker(true)}
+                                className="text-xs text-green-600 flex-shrink-0"
+                            >
+                                Record for previous date
+                            </button>
+                        )}
+                    </div>
+
+                    {showDatePicker && (
+                        <div className="mt-2 border border-gray-200 rounded-lg p-3">
+                            <SingleDateCalendar value="" onChange={goToDate} max={today} />
+                        </div>
+                    )}
+                    {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date}</p>}
                 </div>
 
                 {/* Value entry */}

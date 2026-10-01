@@ -200,6 +200,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker'])->group(functio
     Route::get('metric-measurements/{metricMeasurement}', [MetricMeasurementController::class, 'show'])->name('metric-measurements.show');
     Route::patch('metric-measurements/{metricMeasurement}', [MetricMeasurementController::class, 'update'])->name('metric-measurements.update');
     Route::post('metric-measurements/{metricMeasurement}/photos', [PhotoController::class, 'storeForMetricMeasurement'])->name('photos.store-metric-measurement');
+    Route::get('metrics/{metric}/measurement-for-date', [MetricController::class, 'measurementForDate'])->name('metrics.measurement-for-date');
     Route::post('checklists', [ChecklistController::class, 'store'])->name('checklists.store');
     Route::delete('checklists/{checklist}', [ChecklistController::class, 'destroy'])->name('checklists.destroy');
     Route::get('checklists/{checklist}', [ChecklistController::class, 'show'])->name('checklists.show');
