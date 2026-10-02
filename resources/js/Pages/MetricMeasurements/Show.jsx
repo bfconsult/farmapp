@@ -41,9 +41,9 @@ export default function Show({ measurement }) {
         }, {
             preserveScroll: true,
             onFinish: () => setSubmitting(false),
-            // Land back on the Measure list (not this measurement's own
+            // Land back on the metrics list (not this measurement's own
             // page) so submitting one flows straight into the next.
-            onSuccess: () => router.visit(route('metrics.index', { tab: 'measure' })),
+            onSuccess: () => router.visit(route('metrics.index')),
         });
     };
 

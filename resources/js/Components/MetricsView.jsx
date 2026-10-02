@@ -21,7 +21,7 @@ const STATUS_COLORS = {
     complete: 'bg-green-100 text-green-700',
 };
 
-function formatMeasurementValue(measurement) {
+export function formatMeasurementValue(measurement) {
     // Data isn't final until the measurement is marked complete, so don't
     // show a possibly-in-progress value as if it were the recorded figure.
     if (measurement.status !== 'complete') {

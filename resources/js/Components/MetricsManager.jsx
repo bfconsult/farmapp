@@ -1,6 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import MetricsView from '@/Components/MetricsView';
+import { formatMeasurementValue } from '@/Components/MetricsView';
 
 const REPORTING_PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
@@ -68,33 +68,14 @@ function MetricFields({ values, setValues }) {
     );
 }
 
-/** Measure tab row - data entry only, no metric-definition controls. */
-function MeasureRow({ metric }) {
-    return (
-        <div className="flex items-center justify-between gap-2 px-4 py-3">
-            <div className="min-w-0">
-                <p className="text-sm text-gray-900">{metric.name}</p>
-                <p className="text-xs text-gray-500 mt-1">{REPORTING_PERIOD_LABELS[metric.reporting_period]}</p>
-            </div>
-            {metric.latest_measurement && (
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[metric.latest_measurement.status]}`}>
-                        {STATUS_LABELS[metric.latest_measurement.status]}
-                    </span>
-                    <Link
-                        href={route('metric-measurements.show', metric.latest_measurement.id)}
-                        className="text-xs px-3 py-1.5 bg-green-600 text-white rounded-lg font-medium"
-                    >
-                        Measure
-                    </Link>
-                </div>
-            )}
-        </div>
-    );
-}
-
-/** Manage tab row (admin/manager only) - the metric definition itself. */
-function ManageRow({ metric }) {
+/**
+ * One metric's row - what used to be split across the View/Measure/Manage
+ * tabs (MeasureRow/ManageRow/MetricsView's own rendering) now all live
+ * together: the latest value and status for everyone, a Measure link for
+ * whoever can log one, and inline edit/pause/delete for admin/manager.
+ * History stays available to every role, same as the old View tab default.
+ */
+function MetricRow({ metric, canMeasure, canManage }) {
     const [editing, setEditing] = useState(false);
     const [values, setValues] = useState({
         name: metric.name,
@@ -136,24 +117,43 @@ function ManageRow({ metric }) {
         );
     }
 
+    const measurement = metric.latest_measurement;
+
     return (
-        <div className="flex items-center justify-between gap-2 px-4 py-3">
-            <div className="min-w-0">
-                <p className="text-sm text-gray-900">{metric.name}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                    {REPORTING_PERIOD_LABELS[metric.reporting_period]} · {ANSWER_TYPE_LABELS[metric.answer_type]}
-                </p>
-                <div className="flex gap-3 mt-1 text-xs">
-                    <button onClick={() => setEditing(true)} className="text-green-600">Edit</button>
-                    <button onClick={toggleActive} className="text-blue-600">{metric.is_active ? 'Pause' : 'Resume'}</button>
-                    <button onClick={destroy} className="text-red-500">Delete</button>
+        <div className="px-4 py-3">
+            <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                    <p className="text-sm text-gray-900">{metric.name}</p>
+                    {measurement && (
+                        <p className="text-xs text-gray-500 mt-1">{formatMeasurementValue(measurement)}</p>
+                    )}
+                    {!metric.is_active && (
+                        <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500 mt-1">
+                            Paused
+                        </span>
+                    )}
                 </div>
+                {measurement && (
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[measurement.status]}`}>
+                        {STATUS_LABELS[measurement.status]}
+                    </span>
+                )}
             </div>
-            {!metric.is_active && (
-                <span className="text-xs px-2 py-1 rounded-full font-medium bg-gray-100 text-gray-500 flex-shrink-0">
-                    Paused
-                </span>
-            )}
+            <div className="flex flex-wrap gap-3 mt-2 text-xs">
+                {canMeasure && measurement && (
+                    <Link href={route('metric-measurements.show', measurement.id)} className="text-green-600 font-medium">
+                        Measure
+                    </Link>
+                )}
+                <Link href={route('metrics.history', metric.id)} className="text-green-600">History</Link>
+                {canManage && (
+                    <>
+                        <button onClick={() => setEditing(true)} className="text-green-600">Edit</button>
+                        <button onClick={toggleActive} className="text-blue-600">{metric.is_active ? 'Pause' : 'Resume'}</button>
+                        <button onClick={destroy} className="text-red-500">Delete</button>
+                    </>
+                )}
+            </div>
         </div>
     );
 }
@@ -162,26 +162,6 @@ export default function MetricsManager({ metrics }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canMeasure = canManage || currentUserRole === 'worker';
-
-    // Every role reaches this page, but only sees the tabs relevant to it -
-    // approver only ever gets View, worker gets View + Measure, admin/manager get all three.
-    const tabs = [
-        { id: 'view', label: 'View' },
-        ...(canMeasure ? [{ id: 'measure', label: 'Measure' }] : []),
-        ...(canManage ? [{ id: 'manage', label: 'Manage' }] : []),
-    ];
-    // Lets a caller (e.g. submitting a measurement) land back on a specific
-    // tab via ?tab=measure, rather than always resetting to View. A property
-    // with no metrics at all opens straight on Manage instead - View's "no
-    // metrics set up yet" dead end left a first-time admin/manager with no
-    // obvious way to discover that creating one happens on a different tab
-    // entirely. Only applies if they can actually reach Manage - a worker/
-    // approver with nothing to view yet has no create action to jump to.
-    const defaultTab = (metrics.length === 0 && canManage) ? 'manage' : tabs[0].id;
-    const [activeTab, setActiveTab] = useState(() => {
-        const requested = new URLSearchParams(window.location.search).get('tab');
-        return tabs.some((tab) => tab.id === requested) ? requested : defaultTab;
-    });
 
     const [adding, setAdding] = useState(false);
     const [values, setValues] = useState({
@@ -202,70 +182,36 @@ export default function MetricsManager({ metrics }) {
         });
     };
 
+    const groups = REPORTING_PERIOD_ORDER
+        .map((period) => ({ period, metrics: metrics.filter((m) => m.reporting_period === period) }))
+        .filter((group) => group.metrics.length > 0);
+
     return (
         <div className="space-y-4">
-            {tabs.length > 1 && (
-                <div className="flex items-center gap-6 border-b border-gray-200">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`pb-2 text-[13px] border-b-2 -mb-px ${
-                                activeTab === tab.id
-                                    ? 'text-green-700 font-semibold border-green-600'
-                                    : 'text-gray-400 font-medium border-transparent'
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            {activeTab === 'measure' && (
-                <>
-                    <p className="text-sm text-gray-500">
-                        Add a measurement for the current period of each metric.
-                    </p>
-
-                    {metrics.length === 0 ? (
-                        <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-                            No metrics set up yet.
-                        </div>
-                    ) : (
-                        <div className="bg-white rounded-lg shadow divide-y divide-gray-100">
-                            {metrics.map((metric) => (
-                                <MeasureRow key={metric.id} metric={metric} />
-                            ))}
-                        </div>
-                    )}
-                </>
-            )}
-
-            {activeTab === 'manage' && (
-                <>
-                    {metrics.length === 0 && !adding ? (
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-                            <h2 className="text-base font-semibold text-gray-900 mb-1">Create your first metric</h2>
-                            <p className="text-sm text-gray-600 mb-4">
-                                Metrics are used to track important data over time — tractor hours, water
-                                storage, hay bales on hand. Each metric creates a new reminder to record a
-                                measurement at the interval you define.
-                            </p>
-                            <button
-                                onClick={() => setAdding(true)}
-                                className="inline-block px-6 py-3 bg-green-600 text-white rounded-lg font-medium"
-                            >
-                                + Add Metric
-                            </button>
-                        </div>
-                    ) : (
-                        <p className="text-sm text-gray-500">
-                            Metrics track property-level figures over time - tractor hours, water storage, hay bales on hand. Each metric opens a new measurement automatically at the start of every period.
+            {metrics.length === 0 && !adding ? (
+                canManage ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                        <h2 className="text-base font-semibold text-gray-900 mb-1">Create your first metric</h2>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Metrics are used to track important data over time — tractor hours, water
+                            storage, hay bales on hand. Each metric creates a new reminder to record a
+                            measurement at the interval you define.
                         </p>
-                    )}
-
-                    {(metrics.length > 0 || adding) && (adding ? (
+                        <button
+                            onClick={() => setAdding(true)}
+                            className="inline-block px-6 py-3 bg-green-600 text-white rounded-lg font-medium"
+                        >
+                            + Add Metric
+                        </button>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+                        No metrics set up yet.
+                    </div>
+                )
+            ) : (
+                canManage && (
+                    adding ? (
                         <div className="bg-white rounded-lg shadow p-4 space-y-3">
                             <MetricFields values={values} setValues={setValues} />
                             <div className="flex gap-2">
@@ -280,44 +226,24 @@ export default function MetricsManager({ metrics }) {
                         >
                             + Add Metric
                         </button>
-                    ))}
-
-                    {metrics.length === 0 ? null : (
-                        <div className="space-y-4">
-                            {REPORTING_PERIOD_ORDER
-                                .map((period) => ({
-                                    period,
-                                    metrics: metrics.filter((m) => m.reporting_period === period),
-                                }))
-                                .filter((group) => group.metrics.length > 0)
-                                .map((group) => (
-                                    <div key={group.period} className="bg-white rounded-lg shadow overflow-hidden">
-                                        <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                                            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                                {REPORTING_PERIOD_LABELS[group.period]}
-                                            </p>
-                                        </div>
-                                        <div className="divide-y divide-gray-100">
-                                            {group.metrics.map((metric) => (
-                                                <ManageRow key={metric.id} metric={metric} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                        </div>
-                    )}
-                </>
+                    )
+                )
             )}
 
-            {activeTab === 'view' && (
-                <>
-                    <p className="text-sm text-gray-500">
-                        The most recent measurement for each metric, grouped by how often it's measured.
-                    </p>
-
-                    <MetricsView metrics={metrics} />
-                </>
-            )}
+            {groups.map((group) => (
+                <div key={group.period} className="bg-white rounded-lg shadow overflow-hidden">
+                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                            {REPORTING_PERIOD_LABELS[group.period]}
+                        </p>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                        {group.metrics.map((metric) => (
+                            <MetricRow key={metric.id} metric={metric} canMeasure={canMeasure} canManage={canManage} />
+                        ))}
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }
