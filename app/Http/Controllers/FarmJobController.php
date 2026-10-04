@@ -85,7 +85,7 @@ class FarmJobController extends Controller
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
-            ->when($dateFrom && $dateTo, fn ($query) => $query->whereBetween('created_at', [$dateFrom, $dateTo]))
+            ->when($dateFrom && $dateTo, fn ($query) => $this->applyDateRangeFilter($query, $dateFrom, $dateTo))
             ->with(['priority', 'jobType', 'jobStatus', 'property', 'user', 'zones', 'workSessions.user', 'expenses', 'notes.views'])
             ->withCount('incompleteChecklists')
             ->whereIn('job_status_id', $statusIds);
@@ -96,7 +96,7 @@ class FarmJobController extends Controller
             ->when($currentPropertyId, function ($query) use ($currentPropertyId) {
                 $query->where('property_id', $currentPropertyId);
             })
-            ->when($dateFrom && $dateTo, fn ($query) => $query->whereBetween('created_at', [$dateFrom, $dateTo]))
+            ->when($dateFrom && $dateTo, fn ($query) => $this->applyDateRangeFilter($query, $dateFrom, $dateTo))
             ->with('jobStatus')
             ->get();
 
@@ -440,6 +440,29 @@ class FarmJobController extends Controller
         $this->attachChecklistTemplates($farmJob, array_diff($checklistTemplateIds, $alreadyAttached), $request->user());
 
         return redirect()->route('jobs.show', $farmJob);
+    }
+
+    /**
+     * The Jobs list's date range is meant for reviewing historical/completed
+     * work, not for hiding an ongoing job just because it was created
+     * outside the window - a job can sit open for months (as this one did,
+     * created in July, still "in progress" in October with no scheduled_date
+     * to go by) and "last month" shouldn't make it disappear. So a job
+     * stays visible regardless of date if it isn't finished yet, or if it
+     * was finished within the range (completed_at). A finished job from
+     * before completed_at existed (no backfill - see FarmJob::booted())
+     * falls back to the old created_at check, so already-historical data
+     * doesn't go invisible under every date filter.
+     */
+    private function applyDateRangeFilter($query, $dateFrom, $dateTo)
+    {
+        return $query->where(function ($query) use ($dateFrom, $dateTo) {
+            $query->whereDoesntHave('jobStatus', fn ($q) => $q->where('is_finished_default', true))
+                ->orWhereBetween('completed_at', [$dateFrom, $dateTo])
+                ->orWhere(function ($query) use ($dateFrom, $dateTo) {
+                    $query->whereNull('completed_at')->whereBetween('created_at', [$dateFrom, $dateTo]);
+                });
+        });
     }
 
     /**
