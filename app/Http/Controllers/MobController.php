@@ -91,6 +91,22 @@ class MobController extends Controller
     }
 
     /**
+     * Removes a past paddock-history entry - never the current one, which
+     * the "Move" action owns and the history list itself never shows (the
+     * frontend only renders pastZones, i.e. zoneHistory minus index 0).
+     */
+    public function destroyZoneHistory(Mob $mob, MobZoneHistory $zoneHistory)
+    {
+        abort_unless($mob->property_id === (int) session('current_property_id'), 404);
+        abort_unless($zoneHistory->mob_id === $mob->id, 404);
+        abort_if($mob->currentZone?->id === $zoneHistory->id, 422, "Can't delete the current paddock entry.");
+
+        $zoneHistory->delete();
+
+        return back()->with('success', 'Paddock history entry deleted.');
+    }
+
+    /**
      * Bulk-creates animals into this mob from a single starting tag number,
      * for the common case of populating a freshly-created mob in one go.
      * Every field but tag_number is copied unchanged onto each animal;

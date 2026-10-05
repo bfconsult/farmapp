@@ -86,6 +86,41 @@ test('a history entry belonging to a different mob is rejected', function () {
         ->assertNotFound();
 });
 
+test('an admin can delete a past paddock history entry', function () {
+    $user = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $north = Zone::create(['property_id' => $property->id, 'name' => 'North Paddock', 'coordinates' => [[0, 0], [0, 1], [1, 1]]]);
+    $south = Zone::create(['property_id' => $property->id, 'name' => 'South Paddock', 'coordinates' => [[0, 0], [0, 1], [1, 1]]]);
+    $mob = Mob::create(['property_id' => $property->id, 'created_by' => $user->id, 'name' => 'Breeding Mob']);
+    $oldEntry = $mob->zoneHistory()->create(['zone_id' => $north->id, 'moved_at' => now()->subDays(10), 'created_by' => $user->id]);
+    $mob->zoneHistory()->create(['zone_id' => $south->id, 'moved_at' => now()->subDays(2), 'created_by' => $user->id]);
+
+    $this->actingAs($user)
+        ->withSession(['current_property_id' => $property->id])
+        ->delete(route('mobs.zone-history.destroy', [$mob, $oldEntry]))
+        ->assertSessionHasNoErrors();
+
+    expect(MobZoneHistory::find($oldEntry->id))->toBeNull();
+    expect(MobZoneHistory::where('mob_id', $mob->id)->count())->toBe(1);
+});
+
+test('the current paddock history entry cannot be deleted', function () {
+    $user = User::factory()->create();
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $north = Zone::create(['property_id' => $property->id, 'name' => 'North Paddock', 'coordinates' => [[0, 0], [0, 1], [1, 1]]]);
+    $mob = Mob::create(['property_id' => $property->id, 'created_by' => $user->id, 'name' => 'Breeding Mob']);
+    $entry = $mob->zoneHistory()->create(['zone_id' => $north->id, 'created_by' => $user->id]);
+
+    $this->actingAs($user)
+        ->withSession(['current_property_id' => $property->id])
+        ->delete(route('mobs.zone-history.destroy', [$mob, $entry]))
+        ->assertStatus(422);
+
+    expect(MobZoneHistory::find($entry->id))->not->toBeNull();
+});
+
 test('an admin can create an individual animal within a mob', function () {
     $user = User::factory()->create();
     $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);

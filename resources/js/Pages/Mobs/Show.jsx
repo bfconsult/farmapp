@@ -66,6 +66,15 @@ export default function Show({ mob }) {
         });
     };
 
+    const deleteHistoryEntry = (entry) => {
+        if (!confirm(`Delete this paddock history entry (${entry.zone?.name ?? 'No paddock'}, ${formatDate(entry.moved_at)})?`)) return;
+
+        router.delete(route('mobs.zone-history.destroy', [mob.id, entry.id]), {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    };
+
     return (
         <AuthenticatedLayout>
             <Head title={mob.name} />
@@ -130,7 +139,7 @@ export default function Show({ mob }) {
                     </div>
                 </div>
 
-                {pastZones.length > 0 && (
+                {(pastZones.length > 0 || showHistory) && (
                     <div className="bg-white rounded-lg shadow overflow-hidden">
                         <button
                             onClick={() => setShowHistory((v) => !v)}
@@ -140,7 +149,10 @@ export default function Show({ mob }) {
                                 {showHistory ? '▾' : '▸'} Paddock History ({pastZones.length})
                             </h2>
                         </button>
-                        {showHistory && (
+                        {showHistory && pastZones.length === 0 && (
+                            <p className="text-sm text-gray-400 p-4">No past paddock entries.</p>
+                        )}
+                        {showHistory && pastZones.length > 0 && (
                             <div className="divide-y divide-gray-100">
                                 {pastZones.map((entry) => (
                                     <div key={entry.id} className="px-4 py-2 text-sm text-gray-700 flex justify-between items-center">
@@ -159,12 +171,21 @@ export default function Show({ mob }) {
                                                 <button onClick={() => setEditingHistoryId(null)} className="text-xs text-gray-400 px-1">Cancel</button>
                                             </span>
                                         ) : canManage ? (
-                                            <button
-                                                onClick={() => startEditingHistoryDate(entry)}
-                                                className="text-xs text-gray-400 hover:text-green-600"
-                                            >
-                                                {formatDate(entry.moved_at)}
-                                            </button>
+                                            <span className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => startEditingHistoryDate(entry)}
+                                                    className="text-xs text-gray-400 hover:text-green-600"
+                                                >
+                                                    {formatDate(entry.moved_at)}
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteHistoryEntry(entry)}
+                                                    className="text-red-500 hover:text-red-700"
+                                                    title="Delete this entry"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </span>
                                         ) : (
                                             <span className="text-xs text-gray-400">{formatDate(entry.moved_at)}</span>
                                         )}
