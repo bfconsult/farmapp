@@ -30,6 +30,7 @@ export default function Show({ mob }) {
 
     const [zoneId, setZoneId] = useState(mob.current_zone?.zone_id ?? '');
     const [moveDate, setMoveDate] = useState(today);
+    const [moving, setMoving] = useState(false);
     const [addingNote, setAddingNote] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [editingHistoryId, setEditingHistoryId] = useState(null);
@@ -46,10 +47,21 @@ export default function Show({ mob }) {
     };
 
     const moveZone = () => {
+        if (moving) return; // guards against a second click firing while the first request is still in flight
+
+        setMoving(true);
         router.put(route('mobs.update-zone', mob.id), { zone_id: zoneId || null, moved_at: moveDate }, {
             preserveScroll: true,
             preserveState: true,
-            onSuccess: () => setMoveDate(today),
+            // zoneId is read from the fresh page props, not the stale `mob`
+            // closure, since a backdated move doesn't necessarily become the
+            // new current paddock - the field should reflect whatever's
+            // actually current now, not just echo what was just submitted.
+            onSuccess: (page) => {
+                setMoveDate(today);
+                setZoneId(page.props.mob.current_zone?.zone_id ?? '');
+            },
+            onFinish: () => setMoving(false),
         });
     };
 
@@ -131,8 +143,12 @@ export default function Show({ mob }) {
                                     onChange={(e) => setMoveDate(e.target.value)}
                                     className="border-gray-300 rounded-lg p-2 text-sm"
                                 />
-                                <button onClick={moveZone} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm">
-                                    Move
+                                <button
+                                    onClick={moveZone}
+                                    disabled={moving}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm disabled:opacity-50"
+                                >
+                                    {moving ? 'Moving...' : 'Move'}
                                 </button>
                             </div>
                         )}
