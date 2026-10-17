@@ -661,7 +661,7 @@ export default function Show({ job, seenBy, checklistTemplates, suppliers, labou
                         )}
                         {job.asset && (
                             <div className="flex justify-between">
-                                <span className="text-sm text-gray-500">Asset</span>
+                                <span className="text-sm text-gray-500">Maintaining</span>
                                 <Link href={route('assets.show', job.asset.id)} className="text-sm text-green-600">
                                     {job.asset.name}
                                 </Link>

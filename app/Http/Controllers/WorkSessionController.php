@@ -13,6 +13,7 @@ use App\Models\WorkSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -94,6 +95,7 @@ class WorkSessionController extends Controller
         return Inertia::render('WorkSessions/Create', [
             'plannedJobs' => $plannedJobs,
             'assets' => Asset::where('property_id', $currentPropertyId)->orderBy('name')->get(),
+            'jobEquipment' => $this->equipmentByJob($plannedJobs),
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
         ]);
     }
@@ -103,7 +105,7 @@ class WorkSessionController extends Controller
         $validated = $request->validate([
             'description' => 'nullable|string',
             'farm_job_id' => 'nullable|exists:farm_jobs,id',
-            'asset_id' => 'nullable|exists:assets,id',
+            ...$this->assetIdsRules(session('current_property_id')),
             'started_at' => 'nullable|date',
             'ended_at' => 'nullable|date|after:started_at',
             'latitude' => 'nullable|numeric|between:-90,90',
@@ -124,6 +126,7 @@ class WorkSessionController extends Controller
         $validated['status'] = WorkSession::DRAFT;
 
         $session = WorkSession::create($validated);
+        $session->assets()->sync($validated['asset_ids'] ?? []);
 
         if ($session->farm_job_id) {
             $this->promoteJobToInProgress($session->farm_job_id);
@@ -160,7 +163,7 @@ class WorkSessionController extends Controller
             return redirect()->route('work-sessions.edit', $workSession);
         }
 
-        $workSession->load(['farmJob', 'asset', 'property.zones', 'photos', 'user', 'waypoints', 'notes.photos', 'notes.createdBy', 'notes.views']);
+        $workSession->load(['farmJob', 'assets', 'property.zones', 'photos', 'user', 'waypoints', 'notes.photos', 'notes.createdBy', 'notes.views']);
         $workSession->has_conflict = $workSession->status === WorkSession::DRAFT
             && $workSession->overlapsFinalisedSession();
         $workSession->notes->each(fn ($note) => $note->is_unread = $note->isUnreadBy(Auth::id()));
@@ -218,10 +221,13 @@ class WorkSessionController extends Controller
             $plannedJobs->push($workSession->farmJob);
         }
 
+        $workSession->load('assets');
+
         return Inertia::render('WorkSessions/Edit', [
             'session' => $workSession,
             'plannedJobs' => $plannedJobs,
             'assets' => Asset::where('property_id', $workSession->property_id)->orderBy('name')->get(),
+            'jobEquipment' => $this->equipmentByJob($plannedJobs, $workSession),
             'waypoints' => $workSession->waypoints,
             'zones' => $workSession->property->zones,
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
@@ -241,7 +247,7 @@ class WorkSessionController extends Controller
         $validated = $request->validate([
             'description' => 'nullable|string',
             'farm_job_id' => 'nullable|exists:farm_jobs,id',
-            'asset_id' => 'nullable|exists:assets,id',
+            ...$this->assetIdsRules(session('current_property_id')),
             'started_at' => 'required|date',
             'ended_at' => 'nullable|date|after:started_at',
             'latitude' => 'nullable|numeric|between:-90,90',
@@ -256,6 +262,7 @@ class WorkSessionController extends Controller
         }
 
         $workSession->update([...$validated, 'reviewed_at' => $workSession->reviewed_at ?? now()]);
+        $workSession->assets()->sync($validated['asset_ids'] ?? []);
 
         if ($workSession->farm_job_id) {
             $this->promoteJobToInProgress($workSession->farm_job_id);
@@ -439,7 +446,7 @@ class WorkSessionController extends Controller
         $validated = $request->validate([
             'user_id' => ['required', 'integer', Rule::exists('roles', 'user_id')->where('property_id', $propertyId)],
             'farm_job_id' => ['nullable', Rule::exists('farm_jobs', 'id')->where('property_id', $propertyId)],
-            'asset_id' => ['nullable', Rule::exists('assets', 'id')->where('property_id', $propertyId)],
+            ...$this->assetIdsRules($propertyId),
             'description' => 'nullable|string',
             'started_at' => 'required|date',
             'ended_at' => 'required|date|after:started_at',
@@ -465,6 +472,7 @@ class WorkSessionController extends Controller
             // nothing left to review the way an auto-tracked visit needs.
             'reviewed_at' => now(),
         ]);
+        $session->assets()->sync($validated['asset_ids'] ?? []);
 
         if ($session->farm_job_id) {
             $this->promoteJobToInProgress($session->farm_job_id);
@@ -858,6 +866,72 @@ class WorkSessionController extends Controller
      * recurring job's most recently closed instance, until the end of the
      * following period (e.g. July's instance stays bookable through August).
      */
+    /**
+     * Validation for a session's "equipment used" (WorkSession::assets()) -
+     * any number of the property's own assets.
+     */
+    private function assetIdsRules($propertyId): array
+    {
+        return [
+            'asset_ids' => 'nullable|array',
+            'asset_ids.*' => ['integer', Rule::exists('assets', 'id')->where('property_id', $propertyId)],
+        ];
+    }
+
+    /**
+     * Job id => asset ids to pre-fill a session's "equipment used" with when
+     * that job is picked: the equipment on the most recent other session on
+     * the same job, else (for a recurring instance) on the most recent
+     * session of any instance of the same recurring job - so re-mowing the
+     * same paddock doesn't mean re-picking the tractor and mower every time.
+     * Jobs with no such earlier session are simply left out.
+     */
+    private function equipmentByJob(Collection $jobs, ?WorkSession $except = null): array
+    {
+        if ($jobs->isEmpty()) {
+            return [];
+        }
+
+        $recurringIds = $jobs->pluck('recurring_job_id')->filter()->unique();
+
+        $rows = DB::table('asset_work_session')
+            ->join('work_sessions', 'work_sessions.id', '=', 'asset_work_session.work_session_id')
+            ->join('farm_jobs', 'farm_jobs.id', '=', 'work_sessions.farm_job_id')
+            ->where(function ($query) use ($jobs, $recurringIds) {
+                $query->whereIn('farm_jobs.id', $jobs->pluck('id'))
+                    ->orWhereIn('farm_jobs.recurring_job_id', $recurringIds);
+            })
+            ->when($except, fn ($query) => $query->where('work_sessions.id', '!=', $except->id))
+            ->orderByDesc('work_sessions.started_at')
+            ->orderByDesc('work_sessions.id')
+            ->get(['work_sessions.id as session_id', 'farm_jobs.id as job_id', 'farm_jobs.recurring_job_id', 'asset_work_session.asset_id']);
+
+        // Rows are newest-session-first, so the first session seen per job /
+        // per recurring job is its latest.
+        $sessions = $rows->groupBy('session_id');
+        $latestByJob = [];
+        $latestByRecurring = [];
+        foreach ($sessions as $sessionRows) {
+            $first = $sessionRows->first();
+            $assetIds = $sessionRows->pluck('asset_id')->map(fn ($id) => (int) $id)->values()->all();
+            $latestByJob[$first->job_id] ??= $assetIds;
+            if ($first->recurring_job_id) {
+                $latestByRecurring[$first->recurring_job_id] ??= $assetIds;
+            }
+        }
+
+        $map = [];
+        foreach ($jobs as $job) {
+            $assetIds = $latestByJob[$job->id]
+                ?? ($job->recurring_job_id ? ($latestByRecurring[$job->recurring_job_id] ?? null) : null);
+            if ($assetIds) {
+                $map[$job->id] = $assetIds;
+            }
+        }
+
+        return $map;
+    }
+
     private function bookableJobs($currentPropertyId)
     {
         $normal = FarmJob::whereHas('assignees', fn ($q) => $q->where('users.id', Auth::id()))

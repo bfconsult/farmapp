@@ -2,7 +2,8 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import WaypointTrail from '@/Components/WaypointTrail';
 import BackLink from '@/Components/BackLink';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import EquipmentPicker, { prefillEquipment } from '@/Components/EquipmentPicker';
 import {
     toLocalInputValue,
     fromLocalInputValue,
@@ -14,7 +15,7 @@ import {
     ceilToBillingBlock,
 } from '@/dateInput';
 
-export default function Edit({ session, plannedJobs, assets, waypoints, zones, billingBlockMinutes }) {
+export default function Edit({ session, plannedJobs, assets, jobEquipment, waypoints, zones, billingBlockMinutes }) {
     const { flash } = usePage().props;
     // The exact recorded moment (e.g. an auto-tracked visit's GPS timestamp)
     // never needs to be shown or selectable - the start suggests the block
@@ -32,12 +33,29 @@ export default function Edit({ session, plannedJobs, assets, waypoints, zones, b
     const { data, setData, patch, processing, errors, transform } = useForm({
         description: session.description ?? '',
         farm_job_id: session.farm_job_id ?? '',
-        asset_id: session.asset_id ?? '',
+        asset_ids: (session.assets ?? []).map((asset) => asset.id),
         started_date: startedLocal.date,
         started_time: startedLocal.time,
         ended_date: endedLocal.date,
         ended_time: endedLocal.time,
     });
+
+    // Equipment already recorded on the session counts as a deliberate
+    // choice - picking a different job never overwrites it.
+    const [equipmentTouched, setEquipmentTouched] = useState((session.assets ?? []).length > 0);
+    const [equipmentPrefilled, setEquipmentPrefilled] = useState(false);
+
+    const pickJob = (jobId) => {
+        const prefill = prefillEquipment(jobEquipment, jobId, equipmentTouched);
+        setData((prev) => ({ ...prev, farm_job_id: jobId, ...(prefill ? { asset_ids: prefill } : {}) }));
+        if (prefill) setEquipmentPrefilled(prefill.length > 0);
+    };
+
+    const pickEquipment = (assetIds) => {
+        setData('asset_ids', assetIds);
+        setEquipmentTouched(true);
+        setEquipmentPrefilled(false);
+    };
 
     const baseTimeOptions = useMemo(() => timeOptionsForBlock(billingBlockMinutes), [billingBlockMinutes]);
     const startedTimeOptions = baseTimeOptions;
@@ -160,7 +178,7 @@ export default function Edit({ session, plannedJobs, assets, waypoints, zones, b
                             <label className="block text-sm font-medium text-gray-700 mb-1">Link to Planned Job (optional)</label>
                             <select
                                 value={data.farm_job_id}
-                                onChange={(e) => setData('farm_job_id', e.target.value)}
+                                onChange={(e) => pickJob(e.target.value)}
                                 className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
                             >
                                 <option value="">Ad hoc work (no planned job)</option>
@@ -170,28 +188,13 @@ export default function Edit({ session, plannedJobs, assets, waypoints, zones, b
                             </select>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Asset (optional)</label>
-                            {assets.length > 0 ? (
-                                <select
-                                    value={data.asset_id}
-                                    onChange={(e) => setData('asset_id', e.target.value)}
-                                    className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
-                                >
-                                    <option value="">No specific asset</option>
-                                    {assets.map((asset) => (
-                                        <option key={asset.id} value={asset.id}>{asset.name}</option>
-                                    ))}
-                                </select>
-                            ) : (
-                                <p className="text-sm text-gray-500">
-                                    Once you set up assets for this property, you'll be able to link work to them here.{' '}
-                                    <Link href={route('manage.assets')} className="text-green-600 font-medium">
-                                        Add an asset
-                                    </Link>
-                                </p>
-                            )}
-                        </div>
+                        <EquipmentPicker
+                            assets={assets}
+                            value={data.asset_ids}
+                            onChange={pickEquipment}
+                            prefilled={equipmentPrefilled}
+                            error={errors.asset_ids ?? errors['asset_ids.0']}
+                        />
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>

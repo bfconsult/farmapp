@@ -187,18 +187,19 @@ export default function Edit({ job, priorities, jobTypes, jobStatuses, propertie
                             {assets.length > 0 && (
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Asset <span className="text-gray-400">optional</span>
+                                        Asset being maintained <span className="text-gray-400">optional</span>
                                     </label>
                                     <select
                                         value={data.asset_id}
                                         onChange={(e) => setData('asset_id', e.target.value)}
                                         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
                                     >
-                                        <option value="">Not related to an asset</option>
+                                        <option value="">Not maintaining an asset</option>
                                         {assets.map((asset) => (
                                             <option key={asset.id} value={asset.id}>{asset.name}</option>
                                         ))}
                                     </select>
+                                    <p className="mt-1 text-xs text-gray-500">For servicing or repairing an asset. Equipment used to do the work is recorded on each work session.</p>
                                     {errors.asset_id && <p className="mt-1 text-sm text-red-600">{errors.asset_id}</p>}
                                 </div>
                             )}

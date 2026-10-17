@@ -532,7 +532,7 @@ function AddMaintenanceItemForm({ asset, onClose }) {
     );
 }
 
-export default function Show({ asset, recentJobs, jobsCount, bookedHours, workSessions }) {
+export default function Show({ asset, recentJobs, jobsCount, usageHours, maintenanceHours, workSessions }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canConvert = canManage || currentUserRole === 'worker';
@@ -785,9 +785,15 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours, workSe
                         <p className="text-sm text-gray-400 p-4">No work sessions logged yet.</p>
                     ) : (
                         <div className="flex items-center justify-between px-4 py-3">
-                            <div>
-                                <p className="text-lg font-semibold text-gray-900">{formatNumber(bookedHours)}h</p>
-                                <p className="text-xs text-gray-500">total logged</p>
+                            <div className="flex gap-6">
+                                <div>
+                                    <p className="text-lg font-semibold text-gray-900">{formatNumber(usageHours)}h</p>
+                                    <p className="text-xs text-gray-500">used</p>
+                                </div>
+                                <div>
+                                    <p className="text-lg font-semibold text-gray-900">{formatNumber(maintenanceHours)}h</p>
+                                    <p className="text-xs text-gray-500">maintenance</p>
+                                </div>
                             </div>
                             <button onClick={() => setShowSessionHistory(true)} className="text-sm text-green-600 font-medium">
                                 View history →
@@ -809,14 +815,16 @@ export default function Show({ asset, recentJobs, jobsCount, bookedHours, workSe
                                 <tr className="bg-gray-50 border-b border-gray-100 text-left text-gray-500 uppercase tracking-wide">
                                     <th className="px-2 py-2 font-medium">User</th>
                                     <th className="px-2 py-2 font-medium">Date</th>
+                                    <th className="px-2 py-2 font-medium">Type</th>
                                     <th className="px-2 py-2 font-medium text-right">Hours</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {workSessions.map((session) => (
-                                    <tr key={session.id}>
+                                    <tr key={`${session.kind}-${session.id}`}>
                                         <td className="px-2 py-2 text-gray-900 whitespace-nowrap">{session.user_name}</td>
                                         <td className="px-2 py-2 text-gray-500 whitespace-nowrap">{formatDate(session.started_at.slice(0, 10))}</td>
+                                        <td className="px-2 py-2 text-gray-500 whitespace-nowrap">{session.kind === 'usage' ? 'Used' : 'Maintenance'}</td>
                                         <td className="px-2 py-2 text-gray-900 font-medium text-right">{formatNumber(session.hours)}h</td>
                                     </tr>
                                 ))}

@@ -107,23 +107,36 @@ class AssetController extends Controller
 
         $jobIds = $asset->jobs()->pluck('farm_jobs.id');
 
-        $workSessions = $asset->workSessionsQuery()
-            ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
+        $counted = [WorkSession::FINALISED, WorkSession::APPROVED];
+
+        $usageSessions = $asset->workSessions()
+            ->whereIn('status', $counted)
             ->with('user')
-            ->orderByDesc('started_at')
             ->get();
+
+        $maintenanceSessions = $asset->maintenanceSessionsQuery()
+            ->whereIn('status', $counted)
+            ->with('user')
+            ->get();
+
+        $toRow = fn (string $kind) => fn ($session) => [
+            'id' => $session->id,
+            'kind' => $kind,
+            'user_name' => $session->user->name,
+            'started_at' => $session->started_at,
+            'hours' => $session->duration_in_hours,
+        ];
 
         return Inertia::render('Assets/Show', [
             'asset' => $asset,
             'recentJobs' => FarmJob::whereIn('id', $jobIds)->with('jobStatus')->latest()->take(5)->get(),
             'jobsCount' => $jobIds->count(),
-            'bookedHours' => round($workSessions->sum('duration_in_hours'), 2),
-            'workSessions' => $workSessions->map(fn ($session) => [
-                'id' => $session->id,
-                'user_name' => $session->user->name,
-                'started_at' => $session->started_at,
-                'hours' => $session->duration_in_hours,
-            ]),
+            'usageHours' => round($usageSessions->sum('duration_in_hours'), 2),
+            'maintenanceHours' => round($maintenanceSessions->sum('duration_in_hours'), 2),
+            'workSessions' => $usageSessions->map($toRow('usage'))
+                ->concat($maintenanceSessions->map($toRow('maintenance')))
+                ->sortByDesc('started_at')
+                ->values(),
         ]);
     }
 

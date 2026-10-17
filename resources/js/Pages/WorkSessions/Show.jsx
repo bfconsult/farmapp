@@ -270,15 +270,19 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                                     </Link>
                                 </div>
                             )}
-                            {session.asset && (
-                                <div className="flex justify-between">
-                                    <span className="text-sm text-gray-500">Asset</span>
-                                    <Link
-                                        href={route('assets.show', session.asset.id)}
-                                        className="text-sm text-green-600"
-                                    >
-                                        {session.asset.name}
-                                    </Link>
+                            {session.assets?.length > 0 && (
+                                <div className="flex justify-between gap-4">
+                                    <span className="text-sm text-gray-500 flex-shrink-0">Equipment used</span>
+                                    <span className="text-sm text-right">
+                                        {session.assets.map((asset, i) => (
+                                            <span key={asset.id}>
+                                                {i > 0 && <span className="text-gray-400">, </span>}
+                                                <Link href={route('assets.show', asset.id)} className="text-green-600">
+                                                    {asset.name}
+                                                </Link>
+                                            </span>
+                                        ))}
+                                    </span>
                                 </div>
                             )}
                             {session.description && (

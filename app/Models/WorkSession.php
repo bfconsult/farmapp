@@ -15,7 +15,6 @@ class WorkSession extends Model
     protected $fillable = [
         'property_id',
         'farm_job_id',
-        'asset_id',
         'zone_id',
         'user_id',
         'created_by',
@@ -47,13 +46,14 @@ class WorkSession extends Model
     }
 
     /**
-     * Direct link for ad-hoc work not tied to a job - a session reached via
-     * farmJob->asset already counts toward an asset's time; this covers
-     * sessions with no job at all. See Asset::workSessions().
+     * Equipment *used* during this session (e.g. tractor + flail mower).
+     * Maintaining an asset is recorded on the job instead (FarmJob.asset_id
+     * / maintenance items) - see Asset::usageSessions() vs
+     * Asset::maintenanceSessionsQuery().
      */
-    public function asset()
+    public function assets()
     {
-        return $this->belongsTo(Asset::class);
+        return $this->belongsToMany(Asset::class)->withTimestamps()->orderBy('name');
     }
 
     public function zone()

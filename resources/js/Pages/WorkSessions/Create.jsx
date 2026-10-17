@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
+import EquipmentPicker, { prefillEquipment } from '@/Components/EquipmentPicker';
 import {
     toLocalInputValue,
     fromLocalInputValue,
@@ -11,11 +12,11 @@ import {
     floorToBillingBlock,
 } from '@/dateInput';
 
-export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
+export default function Create({ plannedJobs, assets, jobEquipment, billingBlockMinutes }) {
     const { data, setData, post, processing, errors, transform } = useForm({
         description: '',
         farm_job_id: '',
-        asset_id: '',
+        asset_ids: [],
         started_date: '',
         started_time: '',
         ended_date: '',
@@ -27,6 +28,20 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
     const [locationStatus, setLocationStatus] = useState('getting');
     const [mode, setMode] = useState('now'); // 'now' or 'manual'
     const [now, setNow] = useState(() => new Date());
+    const [equipmentTouched, setEquipmentTouched] = useState(false);
+    const [equipmentPrefilled, setEquipmentPrefilled] = useState(false);
+
+    const pickJob = (jobId) => {
+        const prefill = prefillEquipment(jobEquipment, jobId, equipmentTouched);
+        setData((prev) => ({ ...prev, farm_job_id: jobId, ...(prefill ? { asset_ids: prefill } : {}) }));
+        if (prefill) setEquipmentPrefilled(prefill.length > 0);
+    };
+
+    const pickEquipment = (assetIds) => {
+        setData('asset_ids', assetIds);
+        setEquipmentTouched(true);
+        setEquipmentPrefilled(false);
+    };
 
     const baseTimeOptions = useMemo(() => timeOptionsForBlock(billingBlockMinutes), [billingBlockMinutes]);
     const endedTimeOptions = data.ended_time
@@ -230,7 +245,7 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
                         </label>
                         <select
                             value={data.farm_job_id}
-                            onChange={(e) => setData('farm_job_id', e.target.value)}
+                            onChange={(e) => pickJob(e.target.value)}
                             className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
                         >
                             <option value="">Ad-hoc work (no planned job)</option>
@@ -254,30 +269,15 @@ export default function Create({ plannedJobs, assets, billingBlockMinutes }) {
                         />
                     </div>
 
-                    {/* Link to asset - for ad-hoc work not tied to a planned job */}
+                    {/* Equipment used - maintaining an asset is recorded on the job instead */}
                     <div className="bg-white rounded-lg shadow p-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Asset (optional)
-                        </label>
-                        {assets.length > 0 ? (
-                            <select
-                                value={data.asset_id}
-                                onChange={(e) => setData('asset_id', e.target.value)}
-                                className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
-                            >
-                                <option value="">No specific asset</option>
-                                {assets.map((asset) => (
-                                    <option key={asset.id} value={asset.id}>{asset.name}</option>
-                                ))}
-                            </select>
-                        ) : (
-                            <p className="text-sm text-gray-500">
-                                Once you set up assets for this property, you'll be able to link work to them here.{' '}
-                                <Link href={route('manage.assets')} className="text-green-600 font-medium">
-                                    Add an asset
-                                </Link>
-                            </p>
-                        )}
+                        <EquipmentPicker
+                            assets={assets}
+                            value={data.asset_ids}
+                            onChange={pickEquipment}
+                            prefilled={equipmentPrefilled}
+                            error={errors.asset_ids ?? errors['asset_ids.0']}
+                        />
                     </div>
                 </form>
             </div>

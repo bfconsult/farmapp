@@ -116,8 +116,10 @@ class FarmJob extends Model
     }
 
     /**
-     * Direct asset link for ad-hoc work not tied to a maintenance schedule -
-     * see Asset::jobs().
+     * The asset this job *maintains* (services/repairs), for ad-hoc
+     * maintenance not tied to a maintenance schedule - see Asset::jobs().
+     * Equipment merely *used* on the job is recorded per work session
+     * instead (WorkSession::assets()).
      */
     public function asset()
     {
