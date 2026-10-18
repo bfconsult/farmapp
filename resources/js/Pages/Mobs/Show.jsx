@@ -125,31 +125,35 @@ export default function Show({ mob }) {
                             {mob.current_zone?.zone?.name ?? 'No paddock assigned'}
                         </p>
                         {canManage && (
-                            <div className="flex gap-2">
+                            // Stacks on a phone (paddock on its own row, date + Move
+                            // below) - a single row pushes Move off-screen in portrait.
+                            <div className="flex flex-col sm:flex-row gap-2">
                                 <select
                                     value={zoneId}
                                     onChange={(e) => setZoneId(e.target.value)}
-                                    className="flex-1 border-gray-300 rounded-lg p-2 text-sm"
+                                    className="w-full sm:flex-1 min-w-0 border-gray-300 rounded-lg p-2 text-sm"
                                 >
                                     <option value="">No paddock</option>
                                     {(mob.property?.zones ?? []).map((zone) => (
                                         <option key={zone.id} value={zone.id}>{zone.name}</option>
                                     ))}
                                 </select>
-                                <input
-                                    type="date"
-                                    value={moveDate}
-                                    max={today}
-                                    onChange={(e) => setMoveDate(e.target.value)}
-                                    className="border-gray-300 rounded-lg p-2 text-sm"
-                                />
-                                <button
-                                    onClick={moveZone}
-                                    disabled={moving}
-                                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm disabled:opacity-50"
-                                >
-                                    {moving ? 'Moving...' : 'Move'}
-                                </button>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="date"
+                                        value={moveDate}
+                                        max={today}
+                                        onChange={(e) => setMoveDate(e.target.value)}
+                                        className="flex-1 min-w-0 border-gray-300 rounded-lg p-2 text-sm"
+                                    />
+                                    <button
+                                        onClick={moveZone}
+                                        disabled={moving}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm disabled:opacity-50"
+                                    >
+                                        {moving ? 'Moving...' : 'Move'}
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
