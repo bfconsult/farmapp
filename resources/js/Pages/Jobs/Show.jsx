@@ -35,6 +35,7 @@ function ExpenseRow({ expense, onEdit }) {
     const cameraInput = useRef(null);
     const galleryInput = useRef(null);
     const [uploading, setUploading] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState(null);
 
     const uploadPhotos = async (e) => {
         const files = e.target.files;
@@ -73,6 +74,16 @@ function ExpenseRow({ expense, onEdit }) {
     const photo = expense.photos?.[0];
     const needsReview = expense.status === 'needs_review';
 
+    // An image invoice opens in the same pan/zoom viewer as the photo (so
+    // the detail on it is actually readable on a phone); a PDF can't, so it
+    // still opens in a new tab.
+    const invoiceIsImage = expense.invoice_url
+        && !/\.pdf$/i.test(expense.invoice_file ?? expense.invoice_original_name ?? '');
+    const viewable = [
+        ...(invoiceIsImage ? [{ id: `invoice-${expense.id}`, url: expense.invoice_url }] : []),
+        ...(photo ? [photo] : []),
+    ];
+
     return (
         <div className="border border-gray-200 rounded-lg p-3">
             <div className="flex items-start justify-between gap-2">
@@ -109,7 +120,15 @@ function ExpenseRow({ expense, onEdit }) {
                 <p className="text-sm text-gray-500 mt-2">{expense.description}</p>
             )}
 
-            {expense.invoice_url && (
+            {expense.invoice_url && (invoiceIsImage ? (
+                <button
+                    type="button"
+                    onClick={() => setLightboxIndex(0)}
+                    className="text-xs text-green-600 font-medium mt-2 inline-block text-left"
+                >
+                    View Invoice{expense.invoice_original_name ? ` (${expense.invoice_original_name})` : ''}
+                </button>
+            ) : (
                 <a
                     href={expense.invoice_url}
                     target="_blank"
@@ -118,11 +137,15 @@ function ExpenseRow({ expense, onEdit }) {
                 >
                     View Invoice{expense.invoice_original_name ? ` (${expense.invoice_original_name})` : ''}
                 </a>
-            )}
+            ))}
 
             {photo && (
                 <div className="relative w-20 h-20 mt-2">
-                    <img src={photo.url} className="w-full h-full object-cover rounded-lg" />
+                    <img
+                        src={photo.url}
+                        onClick={() => setLightboxIndex(viewable.indexOf(photo))}
+                        className="w-full h-full object-cover rounded-lg cursor-pointer"
+                    />
                     <button
                         onClick={() => destroyPhoto(photo.id)}
                         className="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
@@ -185,6 +208,15 @@ function ExpenseRow({ expense, onEdit }) {
                 onChange={uploadPhotos}
                 className="hidden"
             />
+
+            {viewable.length > 0 && (
+                <PhotoLightbox
+                    photos={viewable}
+                    index={lightboxIndex}
+                    onClose={() => setLightboxIndex(null)}
+                    onIndexChange={setLightboxIndex}
+                />
+            )}
         </div>
     );
 }
