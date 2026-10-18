@@ -54,7 +54,7 @@ export default function Export({ currentDateFrom, currentDateTo, draftCount, exp
 
             <div className="max-w-lg mx-auto pb-24">
                 <div className="flex items-center justify-between mb-4">
-                    <BackLink href={route('work-sessions.index')}>Work</BackLink>
+                    <BackLink href={route('work-sessions.index', { date_from: currentDateFrom, date_to: currentDateTo })}>Work</BackLink>
                 </div>
 
                 {/* Filters toggle */}

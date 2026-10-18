@@ -207,7 +207,7 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1 px-3 py-2 bg-white rounded-lg shadow">
                             <Link
-                                href={route('work-sessions.finalise-and-share')}
+                                href={route('work-sessions.finalise-and-share', { date_from: currentDateFrom, date_to: currentDateTo })}
                                 className="text-sm font-medium text-green-600"
                             >
                                 Finalise & Share →
@@ -215,7 +215,9 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
                             <HelpTip messageKey="work-sessions.finalise-and-share" />
                         </div>
                         <Link
-                            href={route('work-sessions.export')}
+                            // Carries the Work page's date filter across, so Export
+                            // starts on the sessions the user was just looking at.
+                            href={route('work-sessions.export', { date_from: currentDateFrom, date_to: currentDateTo })}
                             className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600"
                         >
                             Export →
