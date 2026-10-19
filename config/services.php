@@ -28,6 +28,12 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    // Shared secret the LoRaWAN gateway sends in X-Fieldwerkz-Ingest-Key - see
+    // VerifyLorawanKey. Set in the environment only, never committed.
+    'lorawan' => [
+        'key' => env('LORAWAN_INGEST_KEY'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
