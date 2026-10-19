@@ -36,7 +36,7 @@ class Asset extends Model
 
     public function maintenanceItems()
     {
-        return $this->hasMany(MaintenanceItem::class)->orderBy('next_due_date');
+        return $this->hasMany(MaintenanceItem::class)->orderByRaw('next_due_date is null')->orderBy('next_due_date');
     }
 
     public function notes()
@@ -80,6 +80,20 @@ class Asset extends Model
     public function workSessions()
     {
         return $this->belongsToMany(WorkSession::class)->withTimestamps();
+    }
+
+    /**
+     * Total hours this asset has been used - finalised/approved sessions
+     * only, matching the "used" figure on the asset's page. Drives
+     * usage-based maintenance (MaintenanceItem::isDue()).
+     */
+    public function usageHours(): float
+    {
+        return round($this->workSessions()
+            ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
+            ->with('user')
+            ->get()
+            ->sum('duration_in_hours'), 2);
     }
 
     /**

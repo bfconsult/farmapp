@@ -48,8 +48,9 @@ function AssetFields({ values, setValues, assetTypes }) {
 
 function nearestDueDate(asset) {
     if (!asset.maintenance_items || asset.maintenance_items.length === 0) return null;
+    // Hours-of-use-only items have no date - see usage_maintenance_due.
     return asset.maintenance_items.reduce((earliest, item) =>
-        !earliest || item.next_due_date < earliest ? item.next_due_date : earliest,
+        item.next_due_date && (!earliest || item.next_due_date < earliest) ? item.next_due_date : earliest,
         null
     );
 }
@@ -98,7 +99,17 @@ function AssetRow({ asset, canManage, assetTypes }) {
                 <p className="text-sm text-gray-900">{asset.name}</p>
                 <div className="flex items-center gap-2 mt-1">
                     {asset.value && <span className="text-xs text-gray-500">${formatNumber(asset.value)}</span>}
-                    {dueDate && (
+                    {asset.maintenance_job_open && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
+                            Maintenance job open
+                        </span>
+                    )}
+                    {asset.usage_maintenance_due && !isOverdue && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
+                            Maintenance due
+                        </span>
+                    )}
+                    {dueDate && !(asset.usage_maintenance_due && !isOverdue) && (
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
                             {isOverdue ? 'Overdue' : 'Due'} {formatDate(dueDate)}
                         </span>

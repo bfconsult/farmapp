@@ -21,7 +21,7 @@ function HubCard({ href, icon, title, subtitle }) {
     );
 }
 
-export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, suppliersCount, mobsCount, livestockCount, canManage, canReviewWorkSessions }) {
+export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, assetsJobsOpen, suppliersCount, mobsCount, livestockCount, canManage, canReviewWorkSessions }) {
     return (
         <AuthenticatedLayout title="Manage">
             <Head title="Manage" />
@@ -69,7 +69,11 @@ export default function Index({ metricsTracked, metricsDue, checklistTemplatesCo
                 <HubCard
                     href={route('manage.assets')}
                     title="Assets"
-                    subtitle={assetsOverdue > 0 ? `${assetsCount} items · ${assetsOverdue} overdue` : `${assetsCount} items`}
+                    subtitle={[
+                        `${assetsCount} items`,
+                        assetsOverdue > 0 && `${assetsOverdue} overdue`,
+                        assetsJobsOpen > 0 && `${assetsJobsOpen} job${assetsJobsOpen === 1 ? '' : 's'} open`,
+                    ].filter(Boolean).join(' · ')}
                     icon={
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="7" cy="17" r="3" />

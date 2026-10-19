@@ -43,9 +43,28 @@ class ManageController extends Controller
             : 0;
 
         $assetsCount = Asset::where('property_id', $currentPropertyId)->count();
-        $assetsOverdue = MaintenanceItem::whereHas('asset', fn ($q) => $q->where('property_id', $currentPropertyId))
-            ->where('next_due_date', '<', now()->toDateString())
+        // Overdue by date (past its due date), or due by hours of use.
+        $usageByAsset = [];
+        $maintenanceItems = MaintenanceItem::whereHas('asset', fn ($q) => $q->where('property_id', $currentPropertyId))
+            ->with('asset')
+            ->get();
+        $assetsOverdue = $maintenanceItems
+            ->filter(function (MaintenanceItem $item) use (&$usageByAsset) {
+                if ($item->next_due_date && $item->next_due_date->lt(today())) {
+                    return true;
+                }
+                if ($item->next_due_usage_hours === null) {
+                    return false;
+                }
+                $usage = $usageByAsset[$item->asset_id] ??= $item->asset->usageHours();
+
+                return $usage >= $item->next_due_usage_hours;
+            })
             ->count();
+
+        // Maintenance jobs started but never finished - flagged here so one
+        // left on a hidden status (e.g. "Cancelled") doesn't go unnoticed.
+        $assetsJobsOpen = $maintenanceItems->filter(fn (MaintenanceItem $item) => $item->openJob() !== null)->count();
 
         $suppliersCount = $canManage
             ? Supplier::where('property_id', $currentPropertyId)->count()
@@ -60,6 +79,7 @@ class ManageController extends Controller
             'checklistTemplatesCount' => $checklistTemplatesCount,
             'assetsCount' => $assetsCount,
             'assetsOverdue' => $assetsOverdue,
+            'assetsJobsOpen' => $assetsJobsOpen,
             'suppliersCount' => $suppliersCount,
             'mobsCount' => $mobsCount,
             'livestockCount' => $livestockCount,

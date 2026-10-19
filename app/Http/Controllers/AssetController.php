@@ -26,6 +26,21 @@ class AssetController extends Controller
             ->orderBy('name')
             ->get();
 
+        // Flags assets with an item due by hours of use (the list's date
+        // badge can't show those on its own), and assets with a maintenance
+        // job that was started but never finished - e.g. left on a
+        // "Cancelled" status that's hidden from the Jobs list.
+        $assets->each(function (Asset $asset) {
+            $asset->maintenance_job_open = $asset->maintenanceItems->contains(fn ($item) => $item->openJob() !== null);
+
+            $usage = $asset->maintenanceItems->contains(fn ($item) => $item->repeat_usage_hours !== null)
+                ? $asset->usageHours()
+                : 0;
+            $asset->usage_maintenance_due = $asset->maintenanceItems->contains(
+                fn ($item) => $item->next_due_usage_hours !== null && $usage >= $item->next_due_usage_hours
+            );
+        });
+
         return Inertia::render('Manage/Assets', [
             'assets' => $assets,
             'assetTypes' => $canManage ? AssetType::where('property_id', $currentPropertyId)->orderBy('name')->get() : [],
@@ -119,6 +134,17 @@ class AssetController extends Controller
             ->with('user')
             ->get();
 
+        $usageHours = round($usageSessions->sum('duration_in_hours'), 2);
+        $asset->maintenanceItems->each(function ($item) use ($usageHours) {
+            $item->is_due = $item->isDue($usageHours);
+            $openJob = $item->openJob();
+            $item->open_job = $openJob ? [
+                'id' => $openJob->id,
+                'status' => $openJob->jobStatus?->name,
+                'days_open' => (int) $openJob->created_at->diffInDays(now()),
+            ] : null;
+        });
+
         $toRow = fn (string $kind) => fn ($session) => [
             'id' => $session->id,
             'kind' => $kind,
@@ -131,7 +157,7 @@ class AssetController extends Controller
             'asset' => $asset,
             'recentJobs' => FarmJob::whereIn('id', $jobIds)->with('jobStatus')->latest()->take(5)->get(),
             'jobsCount' => $jobIds->count(),
-            'usageHours' => round($usageSessions->sum('duration_in_hours'), 2),
+            'usageHours' => $usageHours,
             'maintenanceHours' => round($maintenanceSessions->sum('duration_in_hours'), 2),
             'workSessions' => $usageSessions->map($toRow('usage'))
                 ->concat($maintenanceSessions->map($toRow('maintenance')))

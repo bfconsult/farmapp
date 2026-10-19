@@ -19,19 +19,28 @@ class GenerateMaintenanceJobs extends Command
      *
      * @var string
      */
-    protected $description = 'Turn each auto-generate maintenance item into a job once its next due date arrives';
+    protected $description = 'Turn each auto-generate maintenance item into a job once it is due by date or hours of use, unless it already has an open job';
 
     /**
      * Execute the console command.
      */
     public function handle(): void
     {
+        // Usage is per asset, so it's computed once per asset rather than
+        // once per item.
+        $usageByAsset = [];
+
         MaintenanceItem::where('auto_generate', true)
-            ->where('next_due_date', '<=', now()->toDateString())
+            ->with('asset')
             ->get()
+            ->filter(function (MaintenanceItem $item) use (&$usageByAsset) {
+                $usage = $usageByAsset[$item->asset_id] ??= $item->asset->usageHours();
+
+                return $item->isDue($usage) && !$item->openJob();
+            })
             ->each(function (MaintenanceItem $item) {
                 $job = $item->convertToJob();
-                $this->info("Created \"{$job->name}\" (maintenance item #{$item->id}), next due {$item->next_due_date->toDateString()}.");
+                $this->info("Created \"{$job->name}\" (maintenance item #{$item->id}).");
             });
     }
 }

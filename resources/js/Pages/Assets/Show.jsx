@@ -342,13 +342,80 @@ function AssetFields({ values, setValues }) {
     );
 }
 
-function MaintenanceItemRow({ item, canManage, canConvert }) {
+/**
+ * Due by date, by hours of use, or both (whichever comes first) - shared by
+ * the add and edit forms. A blank field means that trigger isn't used.
+ */
+function MaintenanceTriggerFields({ values, setValues }) {
+    const { errors } = usePage().props;
+
+    return (
+        <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+                <div>
+                    <label className="block text-xs text-gray-500 mb-1">Every (days)</label>
+                    <input
+                        type="number"
+                        min="1"
+                        value={values.repeat_period_days}
+                        onChange={(e) => setValues({ ...values, repeat_period_days: e.target.value })}
+                        className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                        placeholder="e.g. 90"
+                    />
+                </div>
+                <div>
+                    <label className="block text-xs text-gray-500 mb-1">Every (hours of use)</label>
+                    <input
+                        type="number"
+                        min="0.25"
+                        step="0.25"
+                        value={values.repeat_usage_hours}
+                        onChange={(e) => setValues({ ...values, repeat_usage_hours: e.target.value })}
+                        className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                        placeholder="e.g. 10"
+                    />
+                </div>
+            </div>
+            {values.repeat_period_days !== '' && (
+                <div>
+                    <label className="block text-xs text-gray-500 mb-1">First due</label>
+                    <input
+                        type="date"
+                        value={values.start_date}
+                        onChange={(e) => setValues({ ...values, start_date: e.target.value })}
+                        className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                    />
+                </div>
+            )}
+            <p className="text-xs text-gray-500">
+                Fill in either or both - it's due at whichever comes first. Hours of use come from finalised work
+                sessions using this asset, counted from when the item is added or its last job is completed.
+            </p>
+            {(errors.repeat_period_days || errors.repeat_usage_hours || errors.start_date) && (
+                <p className="text-sm text-red-600">
+                    {errors.repeat_period_days || errors.repeat_usage_hours || errors.start_date}
+                </p>
+            )}
+        </div>
+    );
+}
+
+/** How often an item repeats, e.g. "every 90d or 10h of use". */
+function repeatLabel(item) {
+    const parts = [];
+    if (item.repeat_period_days) parts.push(`${item.repeat_period_days}d`);
+    if (item.repeat_usage_hours != null) parts.push(`${formatNumber(item.repeat_usage_hours)}h of use`);
+    return `every ${parts.join(' or ')}`;
+}
+
+function MaintenanceItemRow({ item, usageHours, canManage, canConvert }) {
     const [editing, setEditing] = useState(false);
     const [values, setValues] = useState({
         name: item.name,
         description: item.description ?? '',
-        start_date: item.start_date.slice(0, 10),
-        repeat_period_days: item.repeat_period_days,
+        start_date: item.start_date ? item.start_date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        repeat_period_days: item.repeat_period_days ?? '',
+        repeat_usage_hours: item.repeat_usage_hours ?? '',
         auto_generate: item.auto_generate,
     });
 
@@ -372,7 +439,10 @@ function MaintenanceItemRow({ item, canManage, canConvert }) {
         }
     };
 
-    const isOverdue = item.next_due_date.slice(0, 10) < new Date().toISOString().slice(0, 10);
+    const isOverdue = item.next_due_date && item.next_due_date.slice(0, 10) < new Date().toISOString().slice(0, 10);
+    const hasUsageTrigger = item.next_due_usage_hours != null;
+    const usageReached = hasUsageTrigger && usageHours >= item.next_due_usage_hours;
+    const hoursToGo = hasUsageTrigger ? Math.round((item.next_due_usage_hours - usageHours) * 100) / 100 : null;
 
     if (editing) {
         return (
@@ -391,27 +461,7 @@ function MaintenanceItemRow({ item, canManage, canConvert }) {
                     placeholder="Description (optional)"
                     rows={2}
                 />
-                <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className="block text-xs text-gray-500 mb-1">Start date</label>
-                        <input
-                            type="date"
-                            value={values.start_date}
-                            onChange={(e) => setValues({ ...values, start_date: e.target.value })}
-                            className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs text-gray-500 mb-1">Repeat (days)</label>
-                        <input
-                            type="number"
-                            min="1"
-                            value={values.repeat_period_days}
-                            onChange={(e) => setValues({ ...values, repeat_period_days: e.target.value })}
-                            className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                        />
-                    </div>
-                </div>
+                <MaintenanceTriggerFields values={values} setValues={setValues} />
                 <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input
                         type="checkbox"
@@ -436,19 +486,38 @@ function MaintenanceItemRow({ item, canManage, canConvert }) {
                 {item.description && (
                     <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
                 )}
-                <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {isOverdue ? 'Overdue' : 'Due'} {formatDate(item.next_due_date.slice(0, 10))}
-                    </span>
-                    <span className="text-xs text-gray-400">every {item.repeat_period_days}d</span>
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                    {item.next_due_date && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {isOverdue ? 'Overdue' : 'Due'} {formatDate(item.next_due_date.slice(0, 10))}
+                        </span>
+                    )}
+                    {hasUsageTrigger && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${usageReached ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {usageReached
+                                ? `Due - ${formatNumber(item.next_due_usage_hours)}h of use reached`
+                                : `Due at ${formatNumber(item.next_due_usage_hours)}h · ${formatNumber(hoursToGo)}h to go`}
+                        </span>
+                    )}
+                    <span className="text-xs text-gray-400">{repeatLabel(item)}</span>
                     {item.auto_generate && (
                         <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
                             Auto
                         </span>
                     )}
                 </div>
+                {/* Shows the open job's status and age, so one left on e.g.
+                    "Cancelled" (hidden from the Jobs list) stands out. */}
+                {item.open_job && (
+                    <Link
+                        href={route('jobs.show', item.open_job.id)}
+                        className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700"
+                    >
+                        Job open{item.open_job.status ? `: ${item.open_job.status}` : ''} · {item.open_job.days_open} day{item.open_job.days_open === 1 ? '' : 's'} →
+                    </Link>
+                )}
                 <div className="flex gap-3 mt-1 text-xs">
-                    {canConvert && (
+                    {!item.open_job && canConvert && (
                         <button onClick={convert} className="text-green-600 font-medium">Turn into Job</button>
                     )}
                     {canManage && (
@@ -465,7 +534,8 @@ function MaintenanceItemRow({ item, canManage, canConvert }) {
 
 function AddMaintenanceItemForm({ asset, onClose }) {
     const todayIso = () => new Date().toISOString().slice(0, 10);
-    const [values, setValues] = useState({ name: '', description: '', start_date: todayIso(), repeat_period_days: 90, auto_generate: false });
+    const blank = () => ({ name: '', description: '', start_date: todayIso(), repeat_period_days: 90, repeat_usage_hours: '', auto_generate: false });
+    const [values, setValues] = useState(blank);
 
     const create = () => {
         router.post(route('maintenance-items.store', asset.id), values, {
@@ -473,7 +543,7 @@ function AddMaintenanceItemForm({ asset, onClose }) {
             preserveState: true,
             onSuccess: () => {
                 onClose();
-                setValues({ name: '', description: '', start_date: todayIso(), repeat_period_days: 90, auto_generate: false });
+                setValues(blank());
             },
         });
     };
@@ -494,27 +564,7 @@ function AddMaintenanceItemForm({ asset, onClose }) {
                 placeholder="Description (optional)"
                 rows={2}
             />
-            <div className="grid grid-cols-2 gap-2">
-                <div>
-                    <label className="block text-xs text-gray-500 mb-1">Start date</label>
-                    <input
-                        type="date"
-                        value={values.start_date}
-                        onChange={(e) => setValues({ ...values, start_date: e.target.value })}
-                        className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                    />
-                </div>
-                <div>
-                    <label className="block text-xs text-gray-500 mb-1">Repeat (days)</label>
-                    <input
-                        type="number"
-                        min="1"
-                        value={values.repeat_period_days}
-                        onChange={(e) => setValues({ ...values, repeat_period_days: e.target.value })}
-                        className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                    />
-                </div>
-            </div>
+            <MaintenanceTriggerFields values={values} setValues={setValues} />
             <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                     type="checkbox"
@@ -705,7 +755,7 @@ export default function Show({ asset, recentJobs, jobsCount, usageHours, mainten
                     ) : (
                         <div className="divide-y divide-gray-100">
                             {asset.maintenance_items.map((item) => (
-                                <MaintenanceItemRow key={item.id} item={item} canManage={canManage} canConvert={canConvert} />
+                                <MaintenanceItemRow key={item.id} item={item} usageHours={usageHours} canManage={canManage} canConvert={canConvert} />
                             ))}
                         </div>
                     )}

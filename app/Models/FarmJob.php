@@ -65,6 +65,14 @@ class FarmJob extends Model
                 $job->completed_at = $isFinished ? ($job->completed_at ?? now()) : null;
             }
         });
+
+        // A maintenance item's next interval counts from when its job is
+        // completed, not from when the job was created.
+        static::saved(function (FarmJob $job) {
+            if ($job->maintenance_item_id && $job->wasChanged('completed_at') && $job->completed_at) {
+                $job->maintenanceItem?->resetAfterCompletion(\Illuminate\Support\Carbon::parse($job->completed_at));
+            }
+        });
     }
 
     public function getRouteKeyName()
