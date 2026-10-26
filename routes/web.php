@@ -7,6 +7,7 @@ use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\FarmJobController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\WorkSessionController;
+use App\Http\Controllers\SensorController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\ShapeController;
@@ -168,6 +169,8 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::patch('livestock/{livestock}', [LivestockController::class, 'update'])->name('livestock.update');
     Route::delete('livestock/{livestock}', [LivestockController::class, 'destroy'])->name('livestock.destroy');
     Route::resource('manage/suppliers', SupplierController::class)->names('manage.suppliers');
+    Route::resource('manage/sensors', SensorController::class)->names('manage.sensors')->parameters(['sensors' => 'device']);
+    Route::patch('manage/sensors/{device}/shown-metrics', [SensorController::class, 'updateShownMetrics'])->name('manage.sensors.shown-metrics');
     Route::post('jobs/{farmJob}/quotes', [QuoteController::class, 'store'])->name('quotes.store');
     Route::patch('quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
     Route::patch('quotes/{quote}/decline', [QuoteController::class, 'decline'])->name('quotes.decline');

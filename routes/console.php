@@ -14,3 +14,4 @@ Schedule::command('maintenance:generate-jobs')->daily();
 Schedule::command('reminders:send')->daily();
 Schedule::command('reports:send-weekly-summary')->weeklyOn(1, '07:00');
 Schedule::command('reports:send-weekly-worker-summary')->weeklyOn(1, '07:00');
+Schedule::command('lorawan:prune')->daily();

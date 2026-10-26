@@ -57,7 +57,7 @@ Everything from the gateway is outbound-only (Starlink uses CGNAT, no inbound ne
    ```
    Expect 204 and a new row.
 
-Stop after Phase 1. Wait for a real uplink and paste its stored `body` into this file under "Captured samples" before starting Phase 2.
+Phase 1 is complete: real uplinks were captured on 2026-10-26 (see "Captured samples").
 
 ## Phase 2: parse and store (after a real payload is captured)
 
@@ -85,6 +85,17 @@ Use the app's existing notification mechanism.
 - Device card per property (latest value, sparkline, battery, signal quality).
 - Pins on the existing Leaflet map.
 
+### Progress (2026-10-26)
+Done: steps 1 and 2 of Phase 2 (backend, plus Manage -> Sensors with the inspector). Not done yet: device cards and map pins (UI above) and alerts.
+
+Built differently from the plan above:
+- **Every decoded field is stored**, one `sensor_readings` row per field. `devices.config.shown_metrics` picks which ones to show (defaults come from `App\Services\Lorawan\DeviceModels`). New sensor types need a decoder class plus a `DeviceModels` entry; then `php artisan lorawan:reprocess` decodes anything they sent earlier.
+- `devices.type` became `model` (e.g. `dragino_lds02`), because the decoder depends on the hardware model, not on what the sensor is used for. The device's purpose goes in its name.
+- No `app_key` column. The gateway's network server does the LoRaWAN crypto, so the app never needs the key, and storing a secret nothing uses only adds risk.
+- Unique index is (device_id, f_cnt, recorded_at, metric), not (device_id, f_cnt). f_cnt restarts at 0 when a device rejoins. A gateway retry repeats both f_cnt and the gateway timestamp.
+- Processing runs through Laravel's `defer()` after the response is sent, not a queued job. No queue worker is running in production.
+- `lorawan_events` gained `dev_eui`, `processed_at` and `error`. Uplinks from unregistered DevEUIs are kept unprocessed (and exempt from `lorawan:prune`, which runs daily with 30-day retention). The Sensors page lists them as "Unrecognised devices" for app admins only, because gateway events aren't tied to a property.
+
 ## Security notes
 - Shared-secret header only; endpoint is outside session auth and CSRF.
 - Rate limit; validate event names; never log the secret or AppKeys.
@@ -97,4 +108,45 @@ Use the app's existing notification mechanism.
 - Take a gateway backup after each configuration change.
 
 ## Captured samples
-(Paste real uplink / join bodies here once the sensor reports. Remove any keys.)
+
+### Door sensor (Dragino LDS02), 2026-10-26
+The first two events stored on production, as the gateway sent them (no keys included). The gateway is a RAK device with built-in network server, using the ChirpStack v3-style HTTP integration: `data` is a hex string (`data_encode: "hexstring"`), `timestamp` is epoch seconds, and `devEUI` is lowercase.
+
+```json
+{
+    "adr": true,
+    "data": "8C960100000800000000",
+    "fCnt": 9,
+    "fPort": 10,
+    "devEUI": "a84041210862a0ce",
+    "rxInfo": [
+        {
+            "rssi": -57,
+            "loRaSNR": 12,
+            "location": { "altitude": 0, "latitude": 0, "longitude": 0 },
+            "gatewayID": "ac1f09fffe291787"
+        }
+    ],
+    "txInfo": { "dr": 5, "frequency": 917200000 },
+    "timestamp": 1792998613,
+    "deviceName": "door1",
+    "data_encode": "hexstring",
+    "applicationID": "1",
+    "applicationName": "Farm_Sensors"
+}
+```
+
+The second event, 12 seconds later, has the same shape: `data` `0C9C0100000800000000`, `fCnt` 10, rssi -50, SNR 14.2, frequency 916800000, timestamp 1792998625.
+
+Decoded with the LDS02 fPort 10 layout (10 bytes; confirm against Dragino's published decoder before relying on it):
+
+| Bytes | Field | `8C96 01 000008 000000 00` | `0C9C 01 000008 000000 00` |
+|---|---|---|---|
+| 0-1, bit 15 | Door status (1 = open) | open | closed |
+| 0-1, bits 13-0 | Battery (mV) | 3222 | 3228 |
+| 2 | Mode | 1 | 1 |
+| 3-5 | Total open count | 8 | 8 |
+| 6-8 | Last open duration (min) | 0 | 0 |
+| 9, bit 0 | Alarm | 0 | 0 |
+
+That fits an open followed by a close 12 seconds later (under a minute, so the duration rounds to 0).

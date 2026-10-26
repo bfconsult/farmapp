@@ -21,7 +21,7 @@ function HubCard({ href, icon, title, subtitle }) {
     );
 }
 
-export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, assetsJobsOpen, suppliersCount, mobsCount, livestockCount, canManage, canReviewWorkSessions }) {
+export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, assetsJobsOpen, suppliersCount, mobsCount, livestockCount, sensorsCount, canManage, canReviewWorkSessions }) {
     return (
         <AuthenticatedLayout title="Manage">
             <Head title="Manage" />
@@ -93,6 +93,20 @@ export default function Index({ metricsTracked, metricsDue, checklistTemplatesCo
                         </svg>
                     }
                 />
+
+                {canManage && (
+                    <HubCard
+                        href={route('manage.sensors.index')}
+                        title="Sensors"
+                        subtitle={`${sensorsCount} sensor${sensorsCount === 1 ? '' : 's'}`}
+                        icon={
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="14" r="1.5" />
+                                <path d="M8.5 10.5a5 5 0 017 0M5.5 7.5a9 9 0 0113 0M12 15.5V21" />
+                            </svg>
+                        }
+                    />
+                )}
 
                 {canManage && (
                     <HubCard

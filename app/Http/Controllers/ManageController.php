@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\ChecklistTemplate;
+use App\Models\Device;
 use App\Models\Livestock;
 use App\Models\MaintenanceItem;
 use App\Models\Metric;
@@ -70,6 +71,10 @@ class ManageController extends Controller
             ? Supplier::where('property_id', $currentPropertyId)->count()
             : 0;
 
+        $sensorsCount = $canManage
+            ? Device::where('property_id', $currentPropertyId)->count()
+            : 0;
+
         $mobsCount = Mob::where('property_id', $currentPropertyId)->count();
         $livestockCount = Livestock::where('property_id', $currentPropertyId)->count();
 
@@ -83,6 +88,7 @@ class ManageController extends Controller
             'suppliersCount' => $suppliersCount,
             'mobsCount' => $mobsCount,
             'livestockCount' => $livestockCount,
+            'sensorsCount' => $sensorsCount,
             'canManage' => $canManage,
             'canReviewWorkSessions' => $canReviewWorkSessions,
         ]);
