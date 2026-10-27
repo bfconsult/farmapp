@@ -14,9 +14,10 @@ beforeEach(function () {
 });
 
 // The first real uplink from the farm's door sensor (docs/lorawan-ingest-spec.md).
-function capturedUplink(string $devEui = 'a84041210862a0ce'): LorawanEvent
+function capturedUplink(Property $property, string $devEui = 'a84041210862a0ce'): LorawanEvent
 {
     return LorawanEvent::create([
+        'property_id' => $property->id,
         'event' => 'uplink',
         'dev_eui' => $devEui,
         'body' => [
@@ -38,7 +39,7 @@ function asAdmin($test)
 }
 
 test('adding a sensor decodes what the gateway already captured from it', function () {
-    capturedUplink();
+    capturedUplink($this->property);
 
     asAdmin($this)->post(route('manage.sensors.store'), [
         'name' => 'Shed door',
@@ -59,19 +60,19 @@ test('adding a sensor decodes what the gateway already captured from it', functi
         ->and(SensorReading::where('device_id', $device->id)->count())->toBe(5);
 });
 
-test('a DevEUI can only be registered once', function () {
+test('a DevEUI can be added once per property', function () {
     $other = Property::create(['name' => 'Other Farm', 'address' => '2 Test Rd']);
     Device::create(['property_id' => $other->id, 'name' => 'Theirs', 'model' => 'dragino_lds02', 'dev_eui' => 'a84041210862a0ce']);
+    $sensor = ['name' => 'Mine', 'model' => 'dragino_lds02', 'dev_eui' => 'A84041210862A0CE'];
 
-    asAdmin($this)->post(route('manage.sensors.store'), [
-        'name' => 'Mine',
-        'model' => 'dragino_lds02',
-        'dev_eui' => 'A84041210862A0CE',
-    ])->assertSessionHasErrors('dev_eui');
+    asAdmin($this)->post(route('manage.sensors.store'), $sensor)->assertSessionHasNoErrors();
+    asAdmin($this)->post(route('manage.sensors.store'), $sensor)->assertSessionHasErrors('dev_eui');
+
+    expect(Device::where('property_id', $this->property->id)->count())->toBe(1);
 });
 
 test('the inspector shows each uplink raw alongside what it decoded to', function () {
-    capturedUplink();
+    capturedUplink($this->property);
     asAdmin($this)->post(route('manage.sensors.store'), ['name' => 'Shed door', 'model' => 'dragino_lds02', 'dev_eui' => 'a84041210862a0ce']);
 
     asAdmin($this)->get(route('manage.sensors.show', Device::sole()))
@@ -98,7 +99,7 @@ test('the fields shown can be chosen per sensor', function () {
 });
 
 test('removing a sensor leaves its uplinks to be decoded again if re-added', function () {
-    $event = capturedUplink();
+    $event = capturedUplink($this->property);
     asAdmin($this)->post(route('manage.sensors.store'), ['name' => 'Shed door', 'model' => 'dragino_lds02', 'dev_eui' => 'a84041210862a0ce']);
 
     asAdmin($this)->delete(route('manage.sensors.destroy', Device::sole()))
@@ -119,16 +120,15 @@ test('another property\'s sensor is not visible or editable', function () {
     expect($device->fresh()->name)->toBe('Theirs');
 });
 
-test('unrecognised devices are listed for app admins only', function () {
-    capturedUplink('a840410000000001');
-
-    asAdmin($this)->get(route('manage.sensors.index'))
-        ->assertInertia(fn ($page) => $page->where('unrecognised', []));
-
-    $this->user->forceFill(['app_admin' => true])->save();
+test('unrecognised devices are those this property\'s gateway heard but it hasn\'t added', function () {
+    capturedUplink($this->property, 'a840410000000001');
+    capturedUplink($this->property, 'a84041210862a0ce');
+    Device::create(['property_id' => $this->property->id, 'name' => 'Shed door', 'model' => 'dragino_lds02', 'dev_eui' => 'a84041210862a0ce']);
+    capturedUplink(Property::create(['name' => 'Other Farm', 'address' => '2 Test Rd']), 'a840410000000002');
 
     asAdmin($this)->get(route('manage.sensors.index'))
         ->assertInertia(fn ($page) => $page
+            ->has('unrecognised', 1)
             ->where('unrecognised.0.dev_eui', 'a840410000000001')
             ->where('unrecognised.0.device_name', 'door1')
             ->where('unrecognised.0.uplinks', 1)

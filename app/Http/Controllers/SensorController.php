@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
+use App\Models\Gateway;
 use App\Models\LorawanEvent;
 use App\Models\SensorReading;
 use App\Services\Lorawan\DeviceModels;
@@ -18,9 +19,11 @@ use Inertia\Inertia;
  */
 class SensorController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $devices = Device::where('property_id', session('current_property_id'))
+        $propertyId = session('current_property_id');
+
+        $devices = Device::where('property_id', $propertyId)
             ->orderBy('name')
             ->get()
             ->map(fn (Device $device) => [
@@ -30,11 +33,8 @@ class SensorController extends Controller
 
         return Inertia::render('Manage/Sensors/Index', [
             'devices' => $devices,
-            'models' => DeviceModels::options(),
-            // The gateway's events aren't tied to a property, so a DevEUI no
-            // one has registered could belong to any of them - only an app
-            // admin sees these, not every property's admins.
-            'unrecognised' => $request->user()->app_admin ? $this->unrecognised() : [],
+            'gateways' => Gateway::where('property_id', $propertyId)->orderBy('name')->get(['id', 'name', 'gateway_eui', 'last_seen_at']),
+            'unrecognised' => $this->unrecognised($propertyId),
         ]);
     }
 
@@ -66,9 +66,9 @@ class SensorController extends Controller
         $validated['dev_eui'] = strtolower($validated['dev_eui']);
 
         $request->merge(['dev_eui' => $validated['dev_eui']])->validate([
-            'dev_eui' => 'unique:devices,dev_eui',
+            'dev_eui' => Rule::unique('devices')->where('property_id', session('current_property_id')),
         ], [
-            'dev_eui.unique' => 'A sensor with this DevEUI is already registered.',
+            'dev_eui.unique' => 'A sensor with this DevEUI has already been added.',
         ]);
 
         $device = Device::create([
@@ -163,7 +163,7 @@ class SensorController extends Controller
     {
         $this->authorizeDevice($device);
 
-        LorawanEvent::where('dev_eui', $device->dev_eui)->update(['processed_at' => null, 'error' => null]);
+        $device->events()->update(['processed_at' => null, 'error' => null]);
         $device->delete();
 
         return redirect()->route('manage.sensors.index')->with('success', 'Sensor removed.');
@@ -240,14 +240,15 @@ class SensorController extends Controller
     }
 
     /**
-     * DevEUIs the gateway has heard that no property has registered, with
-     * their newest uplink so you can see what they send.
+     * DevEUIs this property's gateways have heard that it hasn't added,
+     * with their newest uplink so you can see what they send.
      */
-    private function unrecognised(): array
+    private function unrecognised(?int $propertyId): array
     {
-        $registered = Device::pluck('dev_eui');
+        $registered = Device::where('property_id', $propertyId)->pluck('dev_eui');
 
-        return LorawanEvent::where('event', 'uplink')
+        return LorawanEvent::where('property_id', $propertyId)
+            ->where('event', 'uplink')
             ->whereNotNull('dev_eui')
             ->whereNotIn('dev_eui', $registered)
             ->selectRaw('dev_eui, count(*) as uplinks, max(id) as latest_id')

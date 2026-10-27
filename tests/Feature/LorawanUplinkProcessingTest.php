@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Device;
+use App\Models\Gateway;
 use App\Models\LorawanEvent;
 use App\Models\Property;
 use App\Models\SensorReading;
@@ -9,6 +10,7 @@ use App\Services\Lorawan\UplinkProcessor;
 beforeEach(function () {
     config(['services.lorawan.key' => 'test-secret']);
     $this->property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    $this->gatewayKey = (new Gateway(['property_id' => $this->property->id, 'name' => 'Shed', 'gateway_eui' => 'ac1f09fffe291787']))->issueKey();
 });
 
 // The first real uplink from the farm's door sensor (docs/lorawan-ingest-spec.md).
@@ -37,7 +39,7 @@ function doorUplink(array $overrides = []): array
 
 function postUplink($test, array $body)
 {
-    return $test->postJson('/api/lorawan/uplink', $body, ['X-Fieldwerkz-Ingest-Key' => 'test-secret']);
+    return $test->postJson('/api/lorawan/uplink', $body, ['X-Fieldwerkz-Ingest-Key' => $test->gatewayKey]);
 }
 
 function doorDevice(Property $property): Device
@@ -148,6 +150,16 @@ test('reprocessing retries uplinks that failed to decode', function () {
 
     expect(LorawanEvent::sole()->error)->toBeNull()
         ->and(SensorReading::count())->toBe(5);
+});
+
+test('a sensor registered on another property is not decoded from this gateway', function () {
+    $other = Property::create(['name' => 'Other Farm', 'address' => '2 Test Rd']);
+    doorDevice($other);
+
+    postUplink($this, doorUplink());
+
+    expect(SensorReading::count())->toBe(0)
+        ->and(LorawanEvent::sole()->property_id)->toBe($this->property->id);
 });
 
 test('a gateway timestamp from before clock sync falls back to when it was received', function () {

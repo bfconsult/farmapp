@@ -42,7 +42,7 @@ function UnrecognisedDevice({ device }) {
     );
 }
 
-export default function Index({ devices, unrecognised }) {
+export default function Index({ devices, gateways, unrecognised }) {
     return (
         <AuthenticatedLayout title="Sensors">
             <Head title="Sensors" />
@@ -102,7 +102,7 @@ export default function Index({ devices, unrecognised }) {
                     <div>
                         <h2 className="text-sm font-semibold text-gray-900">Unrecognised devices</h2>
                         <p className="text-xs text-gray-500 mb-2">
-                            The gateway has heard these, but no property has added them. Only app admins see this list.
+                            Your gateway has heard these, but they haven't been added as sensors.
                         </p>
                         <div className="bg-white rounded-lg shadow divide-y divide-gray-100 overflow-hidden">
                             {unrecognised.map((device) => (
@@ -111,6 +111,36 @@ export default function Index({ devices, unrecognised }) {
                         </div>
                     </div>
                 )}
+
+                <div>
+                    <h2 className="text-sm font-semibold text-gray-900">Gateways</h2>
+                    <p className="text-xs text-gray-500 mb-2">
+                        Sensors report through your own LoRaWAN gateway. Add it here to get the key it sends with each message.
+                    </p>
+                    {gateways.length > 0 && (
+                        <div className="bg-white rounded-lg shadow divide-y divide-gray-100 overflow-hidden mb-2">
+                            {gateways.map((gateway) => (
+                                <Link
+                                    key={gateway.id}
+                                    href={route('manage.gateways.show', gateway.id)}
+                                    className="flex items-center justify-between gap-2 px-4 py-3 hover:bg-gray-50"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="text-sm text-gray-900 truncate">{gateway.name}</p>
+                                        <p className="text-xs text-gray-500 font-mono">{gateway.gateway_eui}</p>
+                                    </div>
+                                    <span className="text-xs text-gray-400 flex-shrink-0">{timeAgo(gateway.last_seen_at)}</span>
+                                </Link>
+                            ))}
+                        </div>
+                    )}
+                    <Link
+                        href={route('manage.gateways.create')}
+                        className="block w-full py-2 text-center text-sm text-green-600 border border-dashed border-green-300 rounded-lg"
+                    >
+                        + Add Gateway
+                    </Link>
+                </div>
             </div>
         </AuthenticatedLayout>
     );

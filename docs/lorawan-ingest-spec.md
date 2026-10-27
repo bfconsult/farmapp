@@ -94,10 +94,20 @@ Built differently from the plan above:
 - No `app_key` column. The gateway's network server does the LoRaWAN crypto, so the app never needs the key, and storing a secret nothing uses only adds risk.
 - Unique index is (device_id, f_cnt, recorded_at, metric), not (device_id, f_cnt). f_cnt restarts at 0 when a device rejoins. A gateway retry repeats both f_cnt and the gateway timestamp.
 - Processing runs through Laravel's `defer()` after the response is sent, not a queued job. No queue worker is running in production.
-- `lorawan_events` gained `dev_eui`, `processed_at` and `error`. Uplinks from unregistered DevEUIs are kept unprocessed (and exempt from `lorawan:prune`, which runs daily with 30-day retention). The Sensors page lists them as "Unrecognised devices" for app admins only, because gateway events aren't tied to a property.
+- `lorawan_events` gained `dev_eui`, `processed_at` and `error`. Uplinks from unregistered DevEUIs are kept unprocessed (and exempt from `lorawan:prune`, which runs daily with 30-day retention). The Sensors page lists them as "Unrecognised devices". (At first only app admins saw this list; since 2026-10-27 each property sees its own.)
+
+### Per-property gateways (2026-10-27)
+Customers bring their own gateways; Fieldwerkz doesn't host them. The single shared key is replaced by a key per gateway:
+- A property admin or manager adds a gateway under Manage -> Sensors -> Gateways by its Gateway EUI. The app issues a random key (`fwz_` + 40 characters) and shows it once with the header name and event URLs. Only a sha256 hash is stored. Keys can be reissued, and the old one stops working straight away.
+- The ingest endpoint looks up the gateway by its key, and that decides which property an event belongs to (`lorawan_events.property_id`, `gateway_id`). If an uplink's `rxInfo` names gateways and none of them is the key's gateway, the request is rejected with 403. That catches a key pasted into the wrong gateway. A multi-gateway network server would need to relax this check.
+- The Gateway EUI alone isn't accepted as authentication. It isn't secret: it's printed on the label and sent in every message.
+- Unrecognised devices, DevEUI uniqueness and decoding are all scoped to the property. The app-admin-only restriction is gone.
+- Rate limit: 120 per minute per gateway key, not per IP.
+
+**Moving off the shared key.** `LORAWAN_INGEST_KEY` keeps working while it's set. Its events are tied to whichever property registered the Gateway EUI in the body, and are stored without a property if none has. Adding the gateway claims those unassigned events and decodes them. Then: paste the gateway's own key into its header, check that messages arrive (the gateway's "last message" time updates), and remove `LORAWAN_INGEST_KEY` from the Cloud environment (followed by `config:clear`). After that, only gateway keys work.
 
 ## Security notes
-- Shared-secret header only; endpoint is outside session auth and CSRF.
+- Per-gateway key in a header (see "Per-property gateways"); endpoint is outside session auth and CSRF.
 - Rate limit; validate event names; never log the secret or AppKeys.
 - Only point the gateway at servers we control (it sends the secret header on every request).
 

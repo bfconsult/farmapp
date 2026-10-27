@@ -20,8 +20,10 @@ use Illuminate\Support\Facades\Log;
 class UplinkProcessor
 {
     /**
-     * Uplinks from an unregistered DevEUI are left unprocessed, so they show
-     * up as unrecognised and can be decoded once the device is added.
+     * Uplinks from a DevEUI the property hasn't registered are left
+     * unprocessed, so they show up as unrecognised and can be decoded once
+     * the device is added. So are uplinks not yet tied to a property (sent
+     * with the old shared key by a gateway no property has registered).
      */
     public function process(LorawanEvent $event): void
     {
@@ -29,7 +31,9 @@ class UplinkProcessor
             return;
         }
 
-        $device = $event->dev_eui ? Device::where('dev_eui', $event->dev_eui)->first() : null;
+        $device = $event->dev_eui && $event->property_id
+            ? Device::where('property_id', $event->property_id)->where('dev_eui', $event->dev_eui)->first()
+            : null;
         if (!$device) {
             return;
         }
@@ -84,7 +88,8 @@ class UplinkProcessor
     public function processBacklog(Device $device): int
     {
         $count = 0;
-        LorawanEvent::where('dev_eui', $device->dev_eui)
+        LorawanEvent::where('property_id', $device->property_id)
+            ->where('dev_eui', $device->dev_eui)
             ->where('event', 'uplink')
             ->whereNull('processed_at')
             ->orderBy('id')

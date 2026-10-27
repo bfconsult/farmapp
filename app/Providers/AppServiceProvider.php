@@ -28,5 +28,11 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
+
+        // Per gateway key, not per IP - a farm's gateway sits behind the
+        // same Starlink/4G address as everything else there.
+        RateLimiter::for('lorawan', function (Request $request) {
+            return Limit::perMinute(120)->by(hash('sha256', (string) $request->header('X-Fieldwerkz-Ingest-Key')));
+        });
     }
 }

@@ -37,9 +37,12 @@ class Device extends Model
         return $this->hasMany(SensorReading::class);
     }
 
+    /**
+     * Raw events from this DevEUI that reached its own property's gateway.
+     */
     public function events()
     {
-        return $this->hasMany(LorawanEvent::class, 'dev_eui', 'dev_eui');
+        return $this->hasMany(LorawanEvent::class, 'dev_eui', 'dev_eui')->where('property_id', $this->property_id);
     }
 
     /**

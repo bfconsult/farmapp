@@ -22,8 +22,13 @@ class LorawanEvent extends Model
         'processed_at' => 'datetime',
     ];
 
-    public function device()
+    public function property()
     {
-        return $this->belongsTo(Device::class, 'dev_eui', 'dev_eui');
+        return $this->belongsTo(Property::class);
+    }
+
+    public function gateway()
+    {
+        return $this->belongsTo(Gateway::class);
     }
 }

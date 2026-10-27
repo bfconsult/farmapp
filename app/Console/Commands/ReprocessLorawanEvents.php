@@ -21,7 +21,8 @@ class ReprocessLorawanEvents extends Command
 
         foreach ($devices as $device) {
             // Failed ones get another go - the decoder may have been fixed.
-            LorawanEvent::where('dev_eui', $device->dev_eui)
+            LorawanEvent::where('property_id', $device->property_id)
+                ->where('dev_eui', $device->dev_eui)
                 ->whereNotNull('error')
                 ->update(['processed_at' => null, 'error' => null]);
 
