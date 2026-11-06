@@ -76,6 +76,7 @@ test('openAsOf excludes finished jobs and caps totals at the period end', functi
     [$admin, $property, $finishedStatus] = createPropertyWithFinishedStatus();
 
     $open = FarmJob::create(['name' => 'Fence the paddock', 'property_id' => $property->id, 'user_id' => $admin->id]);
+    $open->forceFill(['created_at' => '2026-06-01 09:00:00'])->save();
     WorkSession::create([
         'property_id' => $property->id, 'user_id' => $admin->id, 'farm_job_id' => $open->id,
         'started_at' => '2026-06-10 08:00:00', 'ended_at' => '2026-06-10 10:00:00', 'status' => WorkSession::FINALISED,
@@ -89,10 +90,40 @@ test('openAsOf excludes finished jobs and caps totals at the period end', functi
     $finished = FarmJob::create(['name' => 'Mow the lawn', 'property_id' => $property->id, 'user_id' => $admin->id]);
     $finished->update(['job_status_id' => $finishedStatus->id]);
 
-    $result = FarmJob::openAsOf($property->id, '2026-06-30');
+    $result = FarmJob::openAsOf($property->id, '2026-06-30 23:59:59');
 
     expect($result->pluck('id')->all())->toBe([$open->id]);
     expect($result->first()->total_hours)->toBe(2.0);
+});
+
+test('openAsOf excludes jobs created after the period end', function () {
+    [$admin, $property] = createPropertyWithFinishedStatus();
+
+    $lastDay = FarmJob::create(['name' => 'Fence the paddock', 'property_id' => $property->id, 'user_id' => $admin->id]);
+    $lastDay->forceFill(['created_at' => '2026-06-30 17:00:00'])->save();
+
+    $afterPeriod = FarmJob::create(['name' => 'Mow the lawn', 'property_id' => $property->id, 'user_id' => $admin->id]);
+    $afterPeriod->forceFill(['created_at' => '2026-07-01 08:00:00'])->save();
+
+    $result = FarmJob::openAsOf($property->id, \Carbon\Carbon::parse('2026-06-30')->endOfDay());
+
+    expect($result->pluck('id')->all())->toBe([$lastDay->id]);
+});
+
+test('openAsOf includes jobs finished after the period end, but not those finished within it', function () {
+    [$admin, $property, $finishedStatus] = createPropertyWithFinishedStatus();
+
+    $finishedLater = FarmJob::create(['name' => 'Fence the paddock', 'property_id' => $property->id, 'user_id' => $admin->id]);
+    $finishedLater->update(['job_status_id' => $finishedStatus->id]);
+    $finishedLater->forceFill(['created_at' => '2026-06-01 09:00:00', 'completed_at' => '2026-07-05 12:00:00'])->save();
+
+    $finishedWithin = FarmJob::create(['name' => 'Mow the lawn', 'property_id' => $property->id, 'user_id' => $admin->id]);
+    $finishedWithin->update(['job_status_id' => $finishedStatus->id]);
+    $finishedWithin->forceFill(['created_at' => '2026-06-01 09:00:00', 'completed_at' => '2026-06-20 12:00:00'])->save();
+
+    $result = FarmJob::openAsOf($property->id, \Carbon\Carbon::parse('2026-06-30')->endOfDay());
+
+    expect($result->pluck('id')->all())->toBe([$finishedLater->id]);
 });
 
 test('the diary PDF renders without error when Completed and Open Jobs sections are present', function () {

@@ -252,16 +252,23 @@ class FarmJob extends Model
     }
 
     /**
-     * Every job on the property not currently on its "finished" status
-     * (including one with no status at all), for the Diary report's Open
-     * Jobs section - each annotated with total_hours/total_expenses booked
-     * up to the end of the report period only (no lower bound - an open
-     * job's running total as of that date, not scoped to the period start).
+     * Every job on the property that was open as of the end of the report
+     * period, for the Diary report's Open Jobs section - not on its
+     * "finished" status (including one with no status at all), or finished
+     * only after the period end (completed_at). A finished job with no
+     * completed_at stamp is treated as already finished. Jobs created after
+     * the period end are left out - they didn't exist yet as of that date.
+     * Each is annotated with total_hours/total_expenses booked up to the end
+     * of the report period only (no lower bound - an open job's running
+     * total as of that date, not scoped to the period start).
      */
     public static function openAsOf(int $propertyId, $dateTo)
     {
         return static::where('property_id', $propertyId)
-            ->whereDoesntHave('jobStatus', fn ($query) => $query->where('is_finished_default', true))
+            ->where('created_at', '<=', $dateTo)
+            ->where(fn ($query) => $query
+                ->whereDoesntHave('jobStatus', fn ($query) => $query->where('is_finished_default', true))
+                ->orWhere('completed_at', '>', $dateTo))
             ->orderBy('name')
             ->get()
             ->each(fn (self $job) => $job->annotateTotals(upTo: $dateTo));
