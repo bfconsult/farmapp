@@ -47,8 +47,16 @@ class GenerateRecurringJobs extends Command
                     ->where('is_recurring_closed_default', true)
                     ->value('id');
 
+                // Stamp completed_at as the period's own end, not the day this
+                // runs (the day after, at the earliest) - otherwise September's
+                // instance reads as finished in October on the Diary report.
+                // FarmJob's saving hook keeps it if the closed status is also
+                // the finished one, and clears it if not.
                 if ($closedStatusId) {
-                    $latest->update(['job_status_id' => $closedStatusId]);
+                    $latest->forceFill([
+                        'job_status_id' => $closedStatusId,
+                        'completed_at' => $latest->period_end->copy()->endOfDay(),
+                    ])->save();
                 }
 
                 $job = $template->createInstance($latest->period_end->copy()->addDay());
