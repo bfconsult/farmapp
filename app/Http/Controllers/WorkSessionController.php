@@ -567,6 +567,7 @@ class WorkSessionController extends Controller
         // Excel only (see the Excel-building block below) - the PDF layout
         // is a single flat table and was never asked to gain this.
         $groupByJob = $request->boolean('group_by_job');
+        $groupByRate = $request->boolean('group_by_rate');
 
         $property = $currentPropertyId ? Property::find($currentPropertyId) : null;
 
@@ -695,14 +696,47 @@ class WorkSessionController extends Controller
         $rowNumber++;
         $lastColumn = $rateMode === 'billing' ? 'F' : 'E';
 
-        if ($groupByJob) {
-            // Grouped by farm_job_id, not name - two distinct jobs (e.g.
-            // separate instances of the same recurring job) can share a
-            // name, and merging those subtotals together would be wrong.
-            // Sorted alphabetically by that name for display, with
-            // unattached "Ad-hoc" work always last - it isn't a real job to
-            // sort among the others.
-            $jobGroups = $sessions->groupBy('farm_job_id')
+        // Shared by the grouped layouts below - a bold subtotal row labelled
+        // in the Job column, and a detail row per session (earliest first
+        // within a group).
+        $writeSubtotal = function (string $label, $groupSessions, bool $shaded = false) use ($sheet, &$rowNumber, $rateMode, $lastColumn) {
+            $subtotalRow = ['', $label, '', '', round($groupSessions->sum('duration_in_hours'), 2)];
+            if ($rateMode === 'billing') {
+                $subtotalRow[] = round($groupSessions->sum('billing_amount'), 2);
+            }
+            $sheet->fromArray($subtotalRow, null, "A{$rowNumber}");
+            $style = $sheet->getStyle("A{$rowNumber}:{$lastColumn}{$rowNumber}");
+            $style->getFont()->setBold(true);
+            if ($shaded) {
+                $style->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setRGB('E5E7EB');
+            }
+            $rowNumber++;
+        };
+
+        $writeSessionLines = function ($groupSessions) use ($sheet, &$rowNumber, $rateMode, $timezone) {
+            foreach ($groupSessions->sortBy('started_at') as $session) {
+                $line = [
+                    $session->started_at->clone()->setTimezone($timezone)->format('d/m/Y'),
+                    $session->farmJob?->name ?? 'Ad-hoc',
+                    $session->started_at->clone()->setTimezone($timezone)->format('H:i'),
+                    $session->ended_at?->clone()->setTimezone($timezone)->format('H:i') ?? '—',
+                    $session->duration_in_hours,
+                ];
+                if ($rateMode === 'billing') {
+                    $line[] = $session->billing_amount;
+                }
+                $sheet->fromArray($line, null, "A{$rowNumber}");
+                $rowNumber++;
+            }
+        };
+
+        // Grouped by farm_job_id, not name - two distinct jobs (e.g.
+        // separate instances of the same recurring job) can share a name,
+        // and merging those subtotals together would be wrong. Sorted
+        // alphabetically by that name for display, with unattached "Ad-hoc"
+        // work always last - it isn't a real job to sort among the others.
+        $writeJobGroups = function ($groupSessions) use ($writeSubtotal, $writeSessionLines) {
+            $jobGroups = $groupSessions->groupBy('farm_job_id')
                 ->sortBy(fn ($group) => $group->first()->farmJob?->name ?? '', SORT_NATURAL | SORT_FLAG_CASE);
             $adHocKey = $jobGroups->search(fn ($group) => $group->first()->farm_job_id === null);
             if ($adHocKey !== false) {
@@ -710,34 +744,32 @@ class WorkSessionController extends Controller
                 $jobGroups->put($adHocKey, $adHoc);
             }
 
-            foreach ($jobGroups as $groupSessions) {
-                $jobName = $groupSessions->first()->farmJob?->name ?? 'Ad-hoc';
-                $groupSessions = $groupSessions->sortBy('started_at');
-                $groupHours = round($groupSessions->sum('duration_in_hours'), 2);
+            foreach ($jobGroups as $jobSessions) {
+                $writeSubtotal($jobSessions->first()->farmJob?->name ?? 'Ad-hoc', $jobSessions);
+                $writeSessionLines($jobSessions);
+            }
+        };
 
-                $subtotalRow = ['', $jobName, '', '', $groupHours];
-                if ($rateMode === 'billing') {
-                    $subtotalRow[] = round($groupSessions->sum('billing_amount'), 2);
-                }
-                $sheet->fromArray($subtotalRow, null, "A{$rowNumber}");
-                $sheet->getStyle("A{$rowNumber}:{$lastColumn}{$rowNumber}")->getFont()->setBold(true);
-                $rowNumber++;
+        if ($groupByRate) {
+            // The applicable rate per session (job rate, else the worker's
+            // default - see WorkSession::getHourlyRateAttribute()), lowest
+            // first, with sessions that have no rate at all last. Shaded so
+            // a rate group stands apart from the job subtotals nested
+            // inside it when Group by Job is on too.
+            $rateGroups = $sessions->groupBy(fn ($session) => $session->hourly_rate === null ? 'none' : (string) (float) $session->hourly_rate)
+                ->sortBy(fn ($group, $key) => $key === 'none' ? PHP_FLOAT_MAX : (float) $key);
 
-                foreach ($groupSessions as $session) {
-                    $line = [
-                        $session->started_at->clone()->setTimezone($timezone)->format('d/m/Y'),
-                        $jobName,
-                        $session->started_at->clone()->setTimezone($timezone)->format('H:i'),
-                        $session->ended_at?->clone()->setTimezone($timezone)->format('H:i') ?? '—',
-                        $session->duration_in_hours,
-                    ];
-                    if ($rateMode === 'billing') {
-                        $line[] = $session->billing_amount;
-                    }
-                    $sheet->fromArray($line, null, "A{$rowNumber}");
-                    $rowNumber++;
+            foreach ($rateGroups as $key => $rateSessions) {
+                $writeSubtotal($key === 'none' ? 'No rate set' : '$'.format_number($key).'/hr', $rateSessions, shaded: true);
+
+                if ($groupByJob) {
+                    $writeJobGroups($rateSessions);
+                } else {
+                    $writeSessionLines($rateSessions);
                 }
             }
+        } elseif ($groupByJob) {
+            $writeJobGroups($sessions);
         } else {
             foreach ($rows as $row) {
                 $line = [$row['date'], $row['job'], $row['start'], $row['end'], $row['duration']];
@@ -1013,7 +1045,7 @@ class WorkSessionController extends Controller
             ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
             ->when($currentPropertyId, fn ($query) => $query->where('property_id', $currentPropertyId))
             ->whereBetween('started_at', [$dateFrom, $dateTo])
-            ->with('farmJob')
+            ->with(['farmJob', 'user'])
             ->latest('started_at');
     }
 

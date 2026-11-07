@@ -125,3 +125,84 @@ test('leaving group_by_job off keeps the flat, ungrouped layout', function () {
     expect($sheet->getCell('A2')->getValue())->toBe('01/06/2026');
     expect($sheet->getCell('B3')->getValue())->toBe('Total');
 });
+
+test('grouping by hourly rate alone produces a shaded subtotal per rate, lowest first, no-rate last', function () {
+    $user = User::factory()->create(['hourly_rate' => 50]);
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+
+    $premium = FarmJob::create(['name' => 'Chainsaw work', 'property_id' => $property->id, 'user_id' => $user->id, 'hourly_rate' => 85]);
+    $standard = FarmJob::create(['name' => 'Fencing', 'property_id' => $property->id, 'user_id' => $user->id]);
+
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'farm_job_id' => $premium->id, 'started_at' => '2026-06-10 01:00:00', 'ended_at' => '2026-06-10 03:00:00', 'status' => WorkSession::FINALISED]);
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'farm_job_id' => $standard->id, 'started_at' => '2026-06-05 01:00:00', 'ended_at' => '2026-06-05 02:00:00', 'status' => WorkSession::FINALISED]);
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'started_at' => '2026-06-01 01:00:00', 'ended_at' => '2026-06-01 02:00:00', 'status' => WorkSession::FINALISED]); // ad-hoc, worker default
+
+    $response = downloadGroupedExport($user, $property, ['group_by_job' => 0, 'group_by_rate' => 1, 'rate' => 'billing']);
+    $response->assertOk();
+    $sheet = loadExportSheet($response);
+
+    // $50/hr subtotal + its 2 rows (earliest first), then $85/hr + 1 row.
+    expect($sheet->getCell('B2')->getValue())->toBe('$50/hr');
+    expect($sheet->getCell('E2')->getValue())->toEqual(2.0);
+    expect($sheet->getCell('F2')->getValue())->toEqual(100.0);
+    expect($sheet->getStyle('B2')->getFont()->getBold())->toBeTrue();
+    expect($sheet->getStyle('B2')->getFill()->getStartColor()->getRGB())->toBe('E5E7EB');
+    expect($sheet->getCell('A3')->getValue())->toBe('01/06/2026');
+    expect($sheet->getCell('B3')->getValue())->toBe('Ad-hoc');
+    expect($sheet->getCell('B4')->getValue())->toBe('Fencing');
+
+    expect($sheet->getCell('B5')->getValue())->toBe('$85/hr');
+    expect($sheet->getCell('F5')->getValue())->toEqual(170.0);
+    expect($sheet->getCell('B6')->getValue())->toBe('Chainsaw work');
+
+    expect($sheet->getCell('B7')->getValue())->toBe('Total');
+});
+
+test('a session with no applicable rate is grouped under No rate set, after the rated groups', function () {
+    $user = User::factory()->create(['hourly_rate' => null]);
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $rated = FarmJob::create(['name' => 'Fencing', 'property_id' => $property->id, 'user_id' => $user->id, 'hourly_rate' => 60]);
+
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'started_at' => '2026-06-01 01:00:00', 'ended_at' => '2026-06-01 02:00:00', 'status' => WorkSession::FINALISED]);
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'farm_job_id' => $rated->id, 'started_at' => '2026-06-02 01:00:00', 'ended_at' => '2026-06-02 02:00:00', 'status' => WorkSession::FINALISED]);
+
+    $sheet = loadExportSheet(downloadGroupedExport($user, $property, ['group_by_job' => 0, 'group_by_rate' => 1]));
+
+    expect($sheet->getCell('B2')->getValue())->toBe('$60/hr');
+    expect($sheet->getCell('B4')->getValue())->toBe('No rate set');
+});
+
+test('grouping by hourly rate and job nests job subtotals inside each rate group', function () {
+    $user = User::factory()->create(['hourly_rate' => 50]);
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+
+    $zebra = FarmJob::create(['name' => 'Zebra fencing', 'property_id' => $property->id, 'user_id' => $user->id]);
+    $apple = FarmJob::create(['name' => 'Apple orchard', 'property_id' => $property->id, 'user_id' => $user->id]);
+    $premium = FarmJob::create(['name' => 'Chainsaw work', 'property_id' => $property->id, 'user_id' => $user->id, 'hourly_rate' => 85]);
+
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'farm_job_id' => $zebra->id, 'started_at' => '2026-06-10 01:00:00', 'ended_at' => '2026-06-10 03:00:00', 'status' => WorkSession::FINALISED]);
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'farm_job_id' => $apple->id, 'started_at' => '2026-06-15 01:00:00', 'ended_at' => '2026-06-15 02:00:00', 'status' => WorkSession::FINALISED]);
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'farm_job_id' => $premium->id, 'started_at' => '2026-06-01 01:00:00', 'ended_at' => '2026-06-01 04:00:00', 'status' => WorkSession::FINALISED]);
+
+    $sheet = loadExportSheet(downloadGroupedExport($user, $property, ['group_by_job' => 1, 'group_by_rate' => 1]));
+
+    // $50/hr (3h) > Apple (1h) + row, Zebra (2h) + row; $85/hr (3h) > Chainsaw (3h) + row.
+    expect($sheet->getCell('B2')->getValue())->toBe('$50/hr');
+    expect($sheet->getCell('E2')->getValue())->toEqual(3.0);
+    expect($sheet->getStyle('B2')->getFill()->getStartColor()->getRGB())->toBe('E5E7EB');
+    expect($sheet->getCell('B3')->getValue())->toBe('Apple orchard');
+    expect($sheet->getCell('E3')->getValue())->toEqual(1.0);
+    expect($sheet->getStyle('B3')->getFont()->getBold())->toBeTrue();
+    expect($sheet->getCell('A4')->getValue())->toBe('15/06/2026');
+    expect($sheet->getCell('B5')->getValue())->toBe('Zebra fencing');
+    expect($sheet->getCell('E5')->getValue())->toEqual(2.0);
+
+    expect($sheet->getCell('B7')->getValue())->toBe('$85/hr');
+    expect($sheet->getCell('B8')->getValue())->toBe('Chainsaw work');
+    expect($sheet->getCell('E8')->getValue())->toEqual(3.0);
+    expect($sheet->getCell('B10')->getValue())->toBe('Total');
+    expect($sheet->getCell('E10')->getValue())->toEqual(6.0);
+});
