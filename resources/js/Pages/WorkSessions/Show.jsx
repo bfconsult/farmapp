@@ -48,9 +48,22 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
     const [startDate, setStartDate] = useState('');
     const [startTime, setStartTime] = useState('');
     const [jobId, setJobId] = useState(session.farm_job_id ?? '');
+    const [description, setDescription] = useState(session.description ?? '');
     const startTimeOptions = useMemo(() => timeOptionsForBlock(billingBlockMinutes), [billingBlockMinutes]);
     const hasLocation = session.latitude && session.longitude;
     const [locating, setLocating] = useState(!hasLocation);
+
+    // Every partial save from this page goes through here. update() requires
+    // started_at, and syncs equipment to whatever asset_ids it's sent (none
+    // if omitted) - so the session's current equipment is always passed
+    // through, or saving just the job/description/location would wipe it.
+    const patchSession = (fields, options) => {
+        router.patch(route('work-sessions.update', session.id), {
+            started_at: session.started_at,
+            asset_ids: (session.assets ?? []).map((asset) => asset.id),
+            ...fields,
+        }, { preserveScroll: true, ...options });
+    };
 
     // The session may have started without a location fix (denied/slow GPS
     // at the time) - keep watching in the background while active and save
@@ -67,11 +80,10 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
             (position) => {
                 navigator.geolocation.clearWatch(watchId);
                 setLocating(false);
-                router.patch(route('work-sessions.update', session.id), {
-                    started_at: session.started_at,
+                patchSession({
                     latitude: position.coords.latitude,
                     longitude: position.coords.longitude,
-                }, { preserveScroll: true, preserveState: true });
+                }, { preserveState: true });
             },
             (error) => {
                 // Permission denial won't ever resolve on its own - stop
@@ -106,20 +118,22 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
     };
 
     const saveStart = () => {
-        router.patch(route('work-sessions.update', session.id), {
+        patchSession({
             started_at: fromLocalInputValue(joinLocalValue(startDate, startTime)),
         }, {
-            preserveScroll: true,
             onSuccess: () => setEditingStart(false),
         });
     };
 
     const saveJob = (newJobId) => {
         setJobId(newJobId);
-        router.patch(route('work-sessions.update', session.id), {
-            started_at: session.started_at,
-            farm_job_id: newJobId || null,
-        }, { preserveScroll: true });
+        patchSession({ farm_job_id: newJobId || null });
+    };
+
+    // Saved on blur rather than per keystroke.
+    const saveDescription = () => {
+        if (description === (session.description ?? '')) return;
+        patchSession({ description: description || null }, { preserveState: true });
     };
 
     const finalise = () => {
@@ -365,6 +379,21 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                                 ))}
                             </select>
                         </div>
+
+                        {/* Description */}
+                        <div className="bg-white rounded-lg shadow p-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                What are you doing? (optional)
+                            </label>
+                            <textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                onBlur={saveDescription}
+                                placeholder="Brief description..."
+                                rows={3}
+                                className="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 p-3"
+                            />
+                        </div>
                     </>
                 )}
 
@@ -475,29 +504,31 @@ export default function Show({ session, durationInHours, billingAmount, waypoint
                     )}
                 </div>
 
-                {/* Notes */}
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
-                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
-                        {canCreateNote && !addingNote && (
-                            <button onClick={() => setAddingNote(true)} className="text-xs text-green-600 font-medium">
-                                + Add
-                            </button>
+                {/* Notes - hidden while the session is still active */}
+                {session.ended_at && (
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+                            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Notes</h2>
+                            {canCreateNote && !addingNote && (
+                                <button onClick={() => setAddingNote(true)} className="text-xs text-green-600 font-medium">
+                                    + Add
+                                </button>
+                            )}
+                        </div>
+                        {session.notes && session.notes.length > 0 ? (
+                            <div className="divide-y divide-gray-100">
+                                {session.notes.map((note) => (
+                                    <NoteRow key={note.id} note={note} canManage={canManage} canCreate={canCreateNote} />
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-400 p-4">No notes yet.</p>
+                        )}
+                        {addingNote && (
+                            <AddNoteForm parentField="work_session_id" parentId={session.id} onClose={() => setAddingNote(false)} />
                         )}
                     </div>
-                    {session.notes && session.notes.length > 0 ? (
-                        <div className="divide-y divide-gray-100">
-                            {session.notes.map((note) => (
-                                <NoteRow key={note.id} note={note} canManage={canManage} canCreate={canCreateNote} />
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-sm text-gray-400 p-4">No notes yet.</p>
-                    )}
-                    {addingNote && (
-                        <AddNoteForm parentField="work_session_id" parentId={session.id} onClose={() => setAddingNote(false)} />
-                    )}
-                </div>
+                )}
 
                 {/* Delete */}
                 <button
