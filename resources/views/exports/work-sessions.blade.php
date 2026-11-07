@@ -46,6 +46,7 @@
                 <th>End</th>
                 <th class="amount">Hours</th>
                 @if ($rateMode === 'billing')
+                    <th class="amount">Rate</th>
                     <th class="amount">Amount (Ex GST)</th>
                 @endif
             </tr>
@@ -59,6 +60,7 @@
                     <td>{{ $row['end'] }}</td>
                     <td class="amount">{{ $row['duration'] }}</td>
                     @if ($rateMode === 'billing')
+                        <td class="amount">{{ $row['rate'] !== null ? '$' . format_number($row['rate']) . '/hr' : '—' }}</td>
                         <td class="amount">{{ $row['amount'] !== null ? '$' . format_number($row['amount']) : '—' }}</td>
                     @endif
                 </tr>
@@ -69,6 +71,7 @@
                 <td colspan="4">Total</td>
                 <td class="amount">{{ format_number($totalHours) }}</td>
                 @if ($rateMode === 'billing')
+                    <td></td>
                     <td class="amount">${{ format_number($totalBilling) }}</td>
                 @endif
             </tr>

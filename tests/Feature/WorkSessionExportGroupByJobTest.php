@@ -104,9 +104,13 @@ test('grouping includes the billing subtotal column when billing rate is request
     $response = downloadGroupedExport($user, $property, ['rate' => 'billing']);
     $sheet = loadExportSheet($response);
 
-    expect($sheet->getCell('F1')->getValue())->toBe('Amount (Ex GST)');
+    expect($sheet->getCell('F1')->getValue())->toBe('Rate ($/hr)');
+    expect($sheet->getCell('G1')->getValue())->toBe('Amount (Ex GST)');
     expect($sheet->getCell('B2')->getValue())->toBe('Fencing');
-    expect($sheet->getCell('F2')->getValue())->toEqual(100.0);
+    expect($sheet->getCell('F2')->getValue())->toBeNull(); // subtotal - no single rate
+    expect($sheet->getCell('G2')->getValue())->toEqual(100.0);
+    expect($sheet->getCell('F3')->getValue())->toEqual(50.0);
+    expect($sheet->getCell('G3')->getValue())->toEqual(100.0);
 });
 
 test('leaving group_by_job off keeps the flat, ungrouped layout', function () {
@@ -145,7 +149,7 @@ test('grouping by hourly rate alone produces a shaded subtotal per rate, lowest 
     // $50/hr subtotal + its 2 rows (earliest first), then $85/hr + 1 row.
     expect($sheet->getCell('B2')->getValue())->toBe('$50/hr');
     expect($sheet->getCell('E2')->getValue())->toEqual(2.0);
-    expect($sheet->getCell('F2')->getValue())->toEqual(100.0);
+    expect($sheet->getCell('G2')->getValue())->toEqual(100.0);
     expect($sheet->getStyle('B2')->getFont()->getBold())->toBeTrue();
     expect($sheet->getStyle('B2')->getFill()->getStartColor()->getRGB())->toBe('E5E7EB');
     expect($sheet->getCell('A3')->getValue())->toBe('01/06/2026');
@@ -153,8 +157,9 @@ test('grouping by hourly rate alone produces a shaded subtotal per rate, lowest 
     expect($sheet->getCell('B4')->getValue())->toBe('Fencing');
 
     expect($sheet->getCell('B5')->getValue())->toBe('$85/hr');
-    expect($sheet->getCell('F5')->getValue())->toEqual(170.0);
+    expect($sheet->getCell('G5')->getValue())->toEqual(170.0);
     expect($sheet->getCell('B6')->getValue())->toBe('Chainsaw work');
+    expect($sheet->getCell('F6')->getValue())->toEqual(85.0);
 
     expect($sheet->getCell('B7')->getValue())->toBe('Total');
 });
@@ -205,4 +210,36 @@ test('grouping by hourly rate and job nests job subtotals inside each rate group
     expect($sheet->getCell('E8')->getValue())->toEqual(3.0);
     expect($sheet->getCell('B10')->getValue())->toBe('Total');
     expect($sheet->getCell('E10')->getValue())->toEqual(6.0);
+});
+
+test('the flat billing export shows the applicable hourly rate on each row', function () {
+    $user = User::factory()->create(['hourly_rate' => 50]);
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    $premium = FarmJob::create(['name' => 'Chainsaw work', 'property_id' => $property->id, 'user_id' => $user->id, 'hourly_rate' => 85]);
+
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'farm_job_id' => $premium->id, 'started_at' => '2026-06-02 01:00:00', 'ended_at' => '2026-06-02 03:00:00', 'status' => WorkSession::FINALISED]);
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'started_at' => '2026-06-01 01:00:00', 'ended_at' => '2026-06-01 02:00:00', 'status' => WorkSession::FINALISED]);
+
+    $sheet = loadExportSheet(downloadGroupedExport($user, $property, ['group_by_job' => 0, 'rate' => 'billing']));
+
+    // Flat layout is newest first.
+    expect($sheet->getCell('F2')->getValue())->toEqual(85.0);
+    expect($sheet->getCell('G2')->getValue())->toEqual(170.0);
+    expect($sheet->getCell('F3')->getValue())->toEqual(50.0);
+    expect($sheet->getCell('B4')->getValue())->toBe('Total');
+    expect($sheet->getCell('F4')->getValue())->toBeNull();
+    expect($sheet->getCell('G4')->getValue())->toEqual(220.0);
+});
+
+test('the time-only export has no rate column', function () {
+    $user = User::factory()->create(['hourly_rate' => 50]);
+    $property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
+    Role::create(['user_id' => $user->id, 'property_id' => $property->id, 'type' => Role::ADMIN]);
+    WorkSession::create(['property_id' => $property->id, 'user_id' => $user->id, 'started_at' => '2026-06-01 01:00:00', 'ended_at' => '2026-06-01 02:00:00', 'status' => WorkSession::FINALISED]);
+
+    $sheet = loadExportSheet(downloadGroupedExport($user, $property, ['group_by_job' => 0]));
+
+    expect($sheet->getCell('E1')->getValue())->toBe('Hours');
+    expect($sheet->getCell('F1')->getValue())->toBeNull();
 });

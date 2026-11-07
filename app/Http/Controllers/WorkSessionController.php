@@ -620,6 +620,7 @@ class WorkSessionController extends Controller
             'start' => $session->started_at->clone()->setTimezone($timezone)->format('H:i'),
             'end' => $session->ended_at?->clone()->setTimezone($timezone)->format('H:i') ?? '—',
             'duration' => $session->duration_in_hours,
+            'rate' => $session->hourly_rate !== null ? (float) $session->hourly_rate : null,
             'amount' => $session->billing_amount,
         ]);
 
@@ -688,13 +689,18 @@ class WorkSessionController extends Controller
             $rowNumber++; // blank row separating the billing header from the table
         }
 
+        // In billing mode, each row's applicable hourly rate (job rate, else
+        // the worker's default) sits between Hours and Amount. Subtotal and
+        // total rows leave it blank (null - fromArray() skips null cells) -
+        // a group can mix rates, so there's no single figure to show.
         $headers = ['Date', 'Job', 'Start', 'End', 'Hours'];
         if ($rateMode === 'billing') {
+            $headers[] = 'Rate ($/hr)';
             $headers[] = 'Amount (Ex GST)';
         }
         $sheet->fromArray($headers, null, "A{$rowNumber}");
         $rowNumber++;
-        $lastColumn = $rateMode === 'billing' ? 'F' : 'E';
+        $lastColumn = $rateMode === 'billing' ? 'G' : 'E';
 
         // Shared by the grouped layouts below - a bold subtotal row labelled
         // in the Job column, and a detail row per session (earliest first
@@ -702,6 +708,7 @@ class WorkSessionController extends Controller
         $writeSubtotal = function (string $label, $groupSessions, bool $shaded = false) use ($sheet, &$rowNumber, $rateMode, $lastColumn) {
             $subtotalRow = ['', $label, '', '', round($groupSessions->sum('duration_in_hours'), 2)];
             if ($rateMode === 'billing') {
+                $subtotalRow[] = null;
                 $subtotalRow[] = round($groupSessions->sum('billing_amount'), 2);
             }
             $sheet->fromArray($subtotalRow, null, "A{$rowNumber}");
@@ -723,6 +730,7 @@ class WorkSessionController extends Controller
                     $session->duration_in_hours,
                 ];
                 if ($rateMode === 'billing') {
+                    $line[] = $session->hourly_rate !== null ? (float) $session->hourly_rate : null;
                     $line[] = $session->billing_amount;
                 }
                 $sheet->fromArray($line, null, "A{$rowNumber}");
@@ -774,6 +782,7 @@ class WorkSessionController extends Controller
             foreach ($rows as $row) {
                 $line = [$row['date'], $row['job'], $row['start'], $row['end'], $row['duration']];
                 if ($rateMode === 'billing') {
+                    $line[] = $row['rate'];
                     $line[] = $row['amount'];
                 }
                 $sheet->fromArray($line, null, "A{$rowNumber}");
@@ -783,6 +792,7 @@ class WorkSessionController extends Controller
 
         $totalRow = ['', 'Total', '', '', $totalHours];
         if ($rateMode === 'billing') {
+            $totalRow[] = null;
             $totalRow[] = $totalBilling;
         }
         $sheet->fromArray($totalRow, null, "A{$rowNumber}");
