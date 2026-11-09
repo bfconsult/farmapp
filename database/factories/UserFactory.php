@@ -32,6 +32,9 @@ class UserFactory extends Factory
             'claimed_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            // The column defaults to 15 for real sign-ups, but tests are
+            // written against unrounded durations unless they opt in.
+            'billing_block_minutes' => null,
         ];
     }
 
