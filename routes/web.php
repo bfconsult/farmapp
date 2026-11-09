@@ -335,12 +335,31 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             ->get()
             ->each(fn ($note) => $note->is_unread = $note->isUnreadBy($user->id));
 
+        // Placed sensors with a kind, each showing the state it's in.
+        $sensors = \App\Models\Device::where('property_id', $currentPropertyId)
+            ->whereNotNull('kind')
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($device) => [
+                'id' => $device->id,
+                'name' => $device->name,
+                'kind' => $device->kind,
+                'kind_label' => \App\Services\Lorawan\SensorKinds::label($device->kind),
+                'latitude' => $device->latitude,
+                'longitude' => $device->longitude,
+                'state' => \App\Services\Lorawan\SensorKinds::state($device),
+                'last_seen_at' => $device->last_seen_at,
+            ]);
+
         return Inertia::render('Map', [
             'jobs' => $jobs,
             'shape' => $currentProperty?->shape,
             'zones' => $currentProperty?->zones ?? [],
             'assets' => $assets,
             'notes' => $notes,
+            'sensors' => $sensors,
             'currentRole' => $currentRole,
             'jobStatuses' => $jobStatuses,
             'defaultJobStatusIds' => $defaultJobStatusIds,

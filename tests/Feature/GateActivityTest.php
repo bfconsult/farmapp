@@ -11,7 +11,7 @@ beforeEach(function () {
     $this->user = User::factory()->create(['timezone' => 'Australia/Adelaide']);
     $this->property = Property::create(['name' => 'Valle Pacis', 'address' => '1 Test Rd']);
     Role::create(['user_id' => $this->user->id, 'property_id' => $this->property->id, 'type' => Role::ADMIN]);
-    $this->device = Device::create(['property_id' => $this->property->id, 'name' => 'Main gate', 'model' => 'dragino_lds02', 'dev_eui' => 'a84041210862a0ce']);
+    $this->device = Device::create(['property_id' => $this->property->id, 'name' => 'Main gate', 'model' => 'dragino_lds02', 'kind' => 'gate', 'dev_eui' => 'a84041210862a0ce']);
     $this->fCnt = 0;
 
     // In UTC like the server - a test-now in another timezone makes Carbon
@@ -50,7 +50,7 @@ test('openings are counted per day in the user\'s timezone, each with when it cl
     gateUplink($this, '2026-11-04 00:40', 0, 13, 10);
 
     gatePage($this)->assertInertia(fn ($page) => $page
-        ->component('Manage/Sensors/Show')
+        ->component('Manage/Sensors/Gate')
         ->where('month', '2026-11')
         ->where('today', '2026-11-20')
         ->where('firstDate', '2026-11-02')

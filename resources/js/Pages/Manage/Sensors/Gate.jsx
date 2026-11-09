@@ -3,6 +3,7 @@ import BackLink from '@/Components/BackLink';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { signalLabel, timeAgo } from '@/Utils/sensorFormat';
+import { SensorStateIcon } from '@/Utils/sensorIcons';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -144,7 +145,7 @@ function Opening({ opening }) {
     );
 }
 
-export default function Show({ device, status, month, today, days, openings, firstDate }) {
+export default function Gate({ device, status, month, today, days, openings, firstDate }) {
     const isCurrentMonth = today.startsWith(month);
     const activeDays = Object.keys(days).filter((day) => days[day] > 0).sort();
     const [selected, setSelected] = useState(isCurrentMonth ? today : (activeDays[activeDays.length - 1] ?? null));
@@ -185,6 +186,7 @@ export default function Show({ device, status, month, today, days, openings, fir
                 <div className="bg-white rounded-lg shadow p-4">
                     {status ? (
                         <div className="flex items-center gap-3">
+                            <SensorStateIcon kind="gate" state={{ key: status.open ? 'open' : 'closed' }} size={36} />
                             <span
                                 className={`px-3 py-1 rounded-full text-sm font-semibold ${
                                     status.open ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700'

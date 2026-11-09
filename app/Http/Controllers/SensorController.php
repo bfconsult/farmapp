@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Device;
 use App\Models\Gateway;
 use App\Models\LorawanEvent;
+use App\Models\Property;
 use App\Models\SensorReading;
 use App\Services\Lorawan\DeviceModels;
 use App\Services\Lorawan\DoorActivity;
+use App\Services\Lorawan\SensorKinds;
 use App\Services\Lorawan\UplinkProcessor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -21,6 +23,11 @@ use Inertia\Inertia;
  */
 class SensorController extends Controller
 {
+    private const LOCATION_RULES = [
+        'latitude' => 'nullable|numeric|between:-90,90|required_with:longitude',
+        'longitude' => 'nullable|numeric|between:-180,180|required_with:latitude',
+    ];
+
     public function index()
     {
         $propertyId = session('current_property_id');
@@ -30,6 +37,7 @@ class SensorController extends Controller
             ->get()
             ->map(fn (Device $device) => [
                 ...$this->summary($device),
+                'state' => SensorKinds::state($device),
                 'latest' => $this->latestValues($device),
             ]);
 
@@ -45,6 +53,8 @@ class SensorController extends Controller
         return Inertia::render('Manage/Sensors/Edit', [
             'device' => null,
             'models' => DeviceModels::options(),
+            'kinds' => SensorKinds::options(),
+            'propertyBoundary' => Property::find(session('current_property_id'))?->shape?->coordinates,
             'prefill' => [
                 'dev_eui' => $request->query('dev_eui', ''),
                 'name' => $request->query('name', ''),
@@ -61,8 +71,11 @@ class SensorController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'model' => ['required', Rule::in(array_keys(DeviceModels::MODELS))],
+            'kind' => ['nullable', Rule::in(SensorKinds::forModel((string) $request->input('model')))],
             'dev_eui' => ['required', 'regex:/^[0-9a-fA-F]{16}$/'],
+            ...self::LOCATION_RULES,
         ], [
+            'kind.in' => 'This sensor can\'t be used as that type.',
             'dev_eui.regex' => 'The DevEUI is 16 hex characters (0-9, A-F), printed on the sensor\'s label.',
         ]);
         $validated['dev_eui'] = strtolower($validated['dev_eui']);
@@ -84,14 +97,14 @@ class SensorController extends Controller
     }
 
     /**
-     * What the sensor has seen, for day-to-day use. Only door/gate sensors
-     * have one so far - anything else goes straight to its trace.
+     * What the sensor has seen, for day-to-day use - its kind's page. One
+     * with no kind has only its trace.
      */
     public function show(Request $request, Device $device)
     {
         $this->authorizeDevice($device);
 
-        if (! array_key_exists('door_open', DeviceModels::metrics($device->model))) {
+        if ($device->kind !== 'gate') {
             return redirect()->route('manage.sensors.trace', $device);
         }
 
@@ -103,7 +116,7 @@ class SensorController extends Controller
 
         $activity = new DoorActivity($device, $timezone);
 
-        return Inertia::render('Manage/Sensors/Show', [
+        return Inertia::render('Manage/Sensors/'.SensorKinds::page($device->kind), [
             'device' => $this->summary($device),
             'status' => $activity->status(),
             'month' => $monthStart->format('Y-m'),
@@ -155,19 +168,27 @@ class SensorController extends Controller
         return Inertia::render('Manage/Sensors/Edit', [
             'device' => $this->summary($device),
             'models' => DeviceModels::options(),
+            'kinds' => SensorKinds::options(),
+            'propertyBoundary' => Property::find(session('current_property_id'))?->shape?->coordinates,
             'prefill' => null,
         ]);
     }
 
     /**
-     * Only the name - the DevEUI and model decide how its stored uplinks
-     * were decoded, so changing them means removing and re-adding it.
+     * Not the DevEUI or model - they decide how its stored uplinks were
+     * decoded, so changing them means removing and re-adding it.
      */
     public function update(Request $request, Device $device)
     {
         $this->authorizeDevice($device);
 
-        $device->update($request->validate(['name' => 'required|string|max:255']));
+        $device->update($request->validate([
+            'name' => 'required|string|max:255',
+            'kind' => ['nullable', Rule::in(SensorKinds::forModel($device->model))],
+            ...self::LOCATION_RULES,
+        ], [
+            'kind.in' => 'This sensor can\'t be used as that type.',
+        ]));
 
         return redirect()->route('manage.sensors.show', $device)->with('success', 'Sensor updated.');
     }
@@ -212,6 +233,10 @@ class SensorController extends Controller
             'name' => $device->name,
             'model' => $device->model,
             'model_label' => DeviceModels::MODELS[$device->model]['label'] ?? $device->model,
+            'kind' => $device->kind,
+            'kind_label' => SensorKinds::label($device->kind),
+            'latitude' => $device->latitude,
+            'longitude' => $device->longitude,
             'dev_eui' => $device->dev_eui,
             'last_seen_at' => $device->last_seen_at,
             'battery' => $device->battery !== null ? (float) $device->battery : null,

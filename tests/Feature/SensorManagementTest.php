@@ -144,3 +144,65 @@ test('workers cannot manage sensors', function () {
         ->get(route('manage.sensors.index'))
         ->assertForbidden();
 });
+
+test('a sensor is added as a kind its model can be, with a location', function () {
+    capturedUplink($this->property);
+
+    asAdmin($this)->post(route('manage.sensors.store'), [
+        'name' => 'Main gate',
+        'model' => 'dragino_lds02',
+        'kind' => 'tank',
+        'dev_eui' => 'a84041210862a0ce',
+    ])->assertSessionHasErrors('kind');
+
+    asAdmin($this)->post(route('manage.sensors.store'), [
+        'name' => 'Main gate',
+        'model' => 'dragino_lds02',
+        'kind' => 'gate',
+        'dev_eui' => 'a84041210862a0ce',
+        'latitude' => -34.9285,
+        'longitude' => 138.6007,
+    ]);
+
+    $device = Device::sole();
+    expect($device->kind)->toBe('gate')
+        ->and($device->latitude)->toBe(-34.9285)
+        ->and($device->longitude)->toBe(138.6007);
+
+    asAdmin($this)->get(route('manage.sensors.show', $device))
+        ->assertInertia(fn ($page) => $page->component('Manage/Sensors/Gate'));
+});
+
+test('a sensor\'s kind and location can be changed, or cleared', function () {
+    $device = Device::create(['property_id' => $this->property->id, 'name' => 'Shed door', 'model' => 'dragino_lds02', 'dev_eui' => 'a84041210862a0ce']);
+
+    asAdmin($this)->get(route('manage.sensors.show', $device))->assertRedirect(route('manage.sensors.trace', $device));
+
+    asAdmin($this)->put(route('manage.sensors.update', $device), ['name' => 'Main gate', 'kind' => 'gate', 'latitude' => -34.9, 'longitude' => 138.6])
+        ->assertSessionHasNoErrors();
+    expect($device->fresh())->kind->toBe('gate')->latitude->toBe(-34.9);
+
+    asAdmin($this)->put(route('manage.sensors.update', $device), ['name' => 'Main gate', 'kind' => 'gate', 'latitude' => -34.9])
+        ->assertSessionHasErrors('longitude');
+
+    asAdmin($this)->put(route('manage.sensors.update', $device), ['name' => 'Main gate', 'kind' => '', 'latitude' => null, 'longitude' => null]);
+    expect($device->fresh())->kind->toBeNull()->latitude->toBeNull();
+});
+
+test('placed sensors show on the map in their current state', function () {
+    capturedUplink($this->property);
+    asAdmin($this)->post(route('manage.sensors.store'), ['name' => 'Main gate', 'model' => 'dragino_lds02', 'kind' => 'gate', 'dev_eui' => 'a84041210862a0ce', 'latitude' => -34.9, 'longitude' => 138.6]);
+    // Not placed, so not on the map.
+    Device::create(['property_id' => $this->property->id, 'name' => 'Shed door', 'model' => 'dragino_lds02', 'kind' => 'gate', 'dev_eui' => 'a840410000000009']);
+
+    asAdmin($this)->get(route('map'))
+        ->assertInertia(fn ($page) => $page
+            ->has('sensors', 1)
+            ->where('sensors.0.name', 'Main gate')
+            ->where('sensors.0.kind', 'gate')
+            ->where('sensors.0.state', ['key' => 'open', 'label' => 'Open'])
+        );
+
+    asAdmin($this)->get(route('manage.sensors.index'))
+        ->assertInertia(fn ($page) => $page->where('devices.0.state.key', 'open'));
+});

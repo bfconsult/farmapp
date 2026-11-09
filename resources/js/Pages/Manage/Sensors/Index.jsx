@@ -3,6 +3,7 @@ import BackLink from '@/Components/BackLink';
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDateTime, formatReading, timeAgo } from '@/Utils/sensorFormat';
+import { SensorStateIcon } from '@/Utils/sensorIcons';
 
 function UnrecognisedDevice({ device }) {
     const [showRaw, setShowRaw] = useState(false);
@@ -81,10 +82,14 @@ export default function Index({ devices, gateways, unrecognised }) {
                                 <Link
                                     key={device.id}
                                     href={route('manage.sensors.show', device.id)}
-                                    className="flex items-center justify-between gap-2 px-4 py-3 hover:bg-gray-50"
+                                    className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50"
                                 >
-                                    <div className="min-w-0">
-                                        <p className="text-sm text-gray-900 truncate">{device.name}</p>
+                                    {device.kind && <SensorStateIcon kind={device.kind} state={device.state} />}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm text-gray-900 truncate">
+                                            {device.name}
+                                            {device.kind_label && <span className="text-gray-400"> · {device.kind_label}</span>}
+                                        </p>
                                         <p className="text-xs text-gray-500 truncate">
                                             {device.latest.length > 0
                                                 ? device.latest.map((reading) => (reading.states || reading.unit ? '' : `${reading.label} `) + formatReading(reading.value, reading)).join(' · ')

@@ -1,15 +1,71 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackLink from '@/Components/BackLink';
+import LocationMap from '@/Components/LocationMap';
+import Modal from '@/Components/Modal';
 import { Head, router, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 
-export default function Edit({ device, models, prefill }) {
+/** Rough centroid of the property boundary, as a starting pin. */
+function boundaryCenter(coordinates) {
+    if (!coordinates || coordinates.length === 0) return null;
+    const lat = coordinates.reduce((sum, [pointLat]) => sum + pointLat, 0) / coordinates.length;
+    const lng = coordinates.reduce((sum, [, pointLng]) => sum + pointLng, 0) / coordinates.length;
+    return { lat, lng };
+}
+
+export default function Edit({ device, models, kinds, prefill, propertyBoundary }) {
     const isNew = !device;
+
+    const kindsFor = (model) => kinds.filter((kind) => kind.models.includes(model));
+    const initialModel = device?.model ?? models[0]?.value ?? '';
 
     const { data, setData, post, put, processing, errors } = useForm({
         name: device?.name ?? prefill?.name ?? '',
-        model: device?.model ?? models[0]?.value ?? '',
+        model: initialModel,
+        kind: isNew ? (kindsFor(initialModel)[0]?.value ?? '') : (device.kind ?? ''),
         dev_eui: device?.dev_eui ?? prefill?.dev_eui ?? '',
+        latitude: device?.latitude ?? null,
+        longitude: device?.longitude ?? null,
     });
+
+    const hasPin = data.latitude !== null && data.longitude !== null;
+    const [showLocationModal, setShowLocationModal] = useState(false);
+    const [pendingLocation, setPendingLocation] = useState(null);
+    const [locating, setLocating] = useState(false);
+    const [locateError, setLocateError] = useState(null);
+
+    const openLocationModal = () => {
+        setPendingLocation(hasPin ? { lat: data.latitude, lng: data.longitude } : boundaryCenter(propertyBoundary));
+        setShowLocationModal(true);
+    };
+
+    const saveLocation = () => {
+        if (pendingLocation) {
+            setData((current) => ({ ...current, latitude: pendingLocation.lat, longitude: pendingLocation.lng }));
+        }
+        setShowLocationModal(false);
+    };
+
+    // For setting it up standing next to the sensor.
+    const useMyLocation = () => {
+        if (!navigator.geolocation) {
+            setLocateError('This device can\'t share its location.');
+            return;
+        }
+        setLocating(true);
+        setLocateError(null);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                setData((current) => ({ ...current, latitude: position.coords.latitude, longitude: position.coords.longitude }));
+                setLocating(false);
+            },
+            () => {
+                setLocateError('Couldn\'t get your location.');
+                setLocating(false);
+            },
+            { timeout: 10000, enableHighAccuracy: true }
+        );
+    };
 
     const submit = (e) => {
         e.preventDefault();
@@ -61,7 +117,11 @@ export default function Edit({ device, models, prefill }) {
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Sensor type</label>
                                         <select
                                             value={data.model}
-                                            onChange={(e) => setData('model', e.target.value)}
+                                            onChange={(e) => setData((current) => ({
+                                                ...current,
+                                                model: e.target.value,
+                                                kind: kindsFor(e.target.value)[0]?.value ?? '',
+                                            }))}
                                             className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
                                         >
                                             {models.map((model) => (
@@ -92,6 +152,63 @@ export default function Edit({ device, models, prefill }) {
                                 </p>
                             )}
 
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Used as</label>
+                                <select
+                                    value={data.kind}
+                                    onChange={(e) => setData('kind', e.target.value)}
+                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                >
+                                    {kindsFor(data.model).map((kind) => (
+                                        <option key={kind.value} value={kind.value}>{kind.label}</option>
+                                    ))}
+                                    <option value="">Other (raw readings only)</option>
+                                </select>
+                                {errors.kind && <p className="mt-1 text-sm text-red-600">{errors.kind}</p>}
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                <div className="rounded-lg border border-gray-200 overflow-hidden">
+                                    {hasPin || propertyBoundary ? (
+                                        <LocationMap
+                                            key={`${data.latitude}-${data.longitude}`}
+                                            latitude={data.latitude}
+                                            longitude={data.longitude}
+                                            propertyBoundary={propertyBoundary}
+                                            interactive={false}
+                                            height="160px"
+                                        />
+                                    ) : (
+                                        <div className="h-24 flex items-center justify-center text-sm text-gray-400">No location set</div>
+                                    )}
+                                    <div className="flex items-center justify-between gap-3 px-3 py-2 bg-white border-t border-gray-200 text-sm">
+                                        <span className="text-xs text-gray-500">{locating && 'Finding your location…'}</span>
+                                        <span className="flex items-center gap-4">
+                                            {hasPin && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setData((current) => ({ ...current, latitude: null, longitude: null }))}
+                                                    className="text-gray-500"
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                            <button type="button" onClick={useMyLocation} className="text-green-600 font-medium">
+                                                Use my location
+                                            </button>
+                                            <button type="button" onClick={openLocationModal} className="text-green-600 font-medium">
+                                                {hasPin ? 'Move' : 'Set on map'}
+                                            </button>
+                                        </span>
+                                    </div>
+                                </div>
+                                {locateError && <p className="mt-1 text-sm text-red-600">{locateError}</p>}
+                                {(errors.latitude || errors.longitude) && (
+                                    <p className="mt-1 text-sm text-red-600">{errors.latitude || errors.longitude}</p>
+                                )}
+                            </div>
+
                             <div className="flex items-center justify-between">
                                 {!isNew ? (
                                     <button type="button" onClick={destroy} className="text-sm text-red-600">
@@ -110,6 +227,36 @@ export default function Edit({ device, models, prefill }) {
                     </div>
                 </div>
             </div>
+
+            <Modal show={showLocationModal} onClose={() => setShowLocationModal(false)} maxWidth="lg">
+                <div className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-gray-700">Sensor location</h3>
+                        <div className="flex items-center gap-3">
+                            <button type="button" onClick={saveLocation} className="text-sm text-green-600 font-medium">Done</button>
+                            <button type="button" onClick={() => setShowLocationModal(false)} className="text-sm text-gray-500">Cancel</button>
+                        </div>
+                    </div>
+                    {showLocationModal && (
+                        pendingLocation ? (
+                            <LocationMap
+                                latitude={pendingLocation.lat}
+                                longitude={pendingLocation.lng}
+                                propertyBoundary={propertyBoundary}
+                                editable
+                                onDragEnd={(lat, lng) => setPendingLocation({ lat, lng })}
+                            />
+                        ) : (
+                            <p className="text-sm text-gray-500 py-8 text-center">
+                                Draw the property boundary first, or use "Use my location" while you're at the sensor.
+                            </p>
+                        )
+                    )}
+                    {pendingLocation && (
+                        <p className="text-xs text-gray-400 mt-2">Tap the map or drag the pin to where the sensor is.</p>
+                    )}
+                </div>
+            </Modal>
         </AuthenticatedLayout>
     );
 }

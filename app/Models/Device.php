@@ -16,8 +16,11 @@ class Device extends Model
         'property_id',
         'name',
         'model',
+        'kind',
         'dev_eui',
         'config',
+        'latitude',
+        'longitude',
     ];
 
     protected $casts = [
@@ -25,6 +28,8 @@ class Device extends Model
         'last_seen_at' => 'datetime',
         'battery' => 'decimal:3',
         'last_snr' => 'decimal:2',
+        'latitude' => 'float',
+        'longitude' => 'float',
     ];
 
     public function property()

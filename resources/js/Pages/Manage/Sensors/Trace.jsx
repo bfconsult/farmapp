@@ -61,8 +61,8 @@ function UplinkRow({ event, metrics }) {
 }
 
 export default function Trace({ device, metrics, events }) {
-    // A door sensor's own page is its activity; anything else has only this.
-    const hasActivity = metrics.some((m) => m.metric === 'door_open');
+    // A sensor with a kind has its own page; anything else has only this.
+    const hasActivity = Boolean(device.kind);
 
     const toggleShown = (metric) => {
         const shownMetrics = metrics

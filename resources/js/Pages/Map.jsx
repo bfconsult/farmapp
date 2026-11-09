@@ -6,6 +6,8 @@ import Modal from '@/Components/Modal';
 import Spinner from '@/Components/Spinner';
 import { formatDate } from '@/dateInput';
 import { pillBadgeClass } from '@/Utils/pillColors';
+import { sensorIconSvg } from '@/Utils/sensorIcons';
+import { timeAgo } from '@/Utils/sensorFormat';
 
 const ZONE_COLOR = '#7c3aed';
 const ASSET_COLOR = '#2563eb';
@@ -34,6 +36,10 @@ function loadLayerPrefs() {
  * different marker style. `scale` is an exception for the in-progress note
  * pin, which needs to stand out from same-colored existing pins while it's
  * being placed. */
+function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
 function pinIcon(L, color, scale = 1) {
     const [w, h] = [25 * scale, 41 * scale];
     return L.icon({
@@ -48,7 +54,7 @@ function pinIcon(L, color, scale = 1) {
 }
 
 export default function Map({
-    jobs, shape, zones, assets, notes, currentRole,
+    jobs, shape, zones, assets, notes, sensors, currentRole,
     jobStatuses, defaultJobStatusIds, currentJobStatusIds, currentJobAge,
 }) {
     const mapRef = useRef(null);
@@ -58,6 +64,7 @@ export default function Map({
     const zoneLayerGroup = useRef(null);
     const assetLayerGroup = useRef(null);
     const noteLayerGroup = useRef(null);
+    const sensorLayerGroup = useRef(null);
     const noteMarkersById = useRef({});
     const noteCameraInput = useRef(null);
     const noteGalleryInput = useRef(null);
@@ -75,6 +82,9 @@ export default function Map({
     const [showZones, setShowZones] = useState(() => loadLayerPrefs().showZones ?? false);
     const [showAssets, setShowAssets] = useState(() => loadLayerPrefs().showAssets ?? false);
     const [showNotes, setShowNotes] = useState(() => loadLayerPrefs().showNotes ?? false);
+    // Sensors default on - seeing at a glance which gates are open is the
+    // point of placing them.
+    const [showSensors, setShowSensors] = useState(() => loadLayerPrefs().showSensors ?? true);
     const [showFiltersPanel, setShowFiltersPanel] = useState(false);
     const [jobStatusIds, setJobStatusIds] = useState(currentJobStatusIds);
     const [jobAge, setJobAge] = useState(currentJobAge);
@@ -98,8 +108,8 @@ export default function Map({
     const jobsWithLocation = jobs.filter(j => j.latitude && j.longitude);
 
     useEffect(() => {
-        localStorage.setItem(LAYER_PREFS_KEY, JSON.stringify({ showJobs, showZones, showAssets, showNotes }));
-    }, [showJobs, showZones, showAssets, showNotes]);
+        localStorage.setItem(LAYER_PREFS_KEY, JSON.stringify({ showJobs, showZones, showAssets, showNotes, showSensors }));
+    }, [showJobs, showZones, showAssets, showNotes, showSensors]);
 
     // The map's height was a flat `100dvh` minus a constant, sized for the
     // fixed top/bottom nav alone - any banner above it (missing-boundary,
@@ -413,6 +423,43 @@ export default function Map({
         if (showNotes) noteLayerGroup.current?.addTo(mapInstance.current);
         else noteLayerGroup.current?.remove();
     }, [showNotes, mapReady]);
+
+    // Rebuilt whenever `sensors` changes (e.g. a reload after a gate
+    // opens), like notes above. Each icon shows the sensor's current state.
+    useEffect(() => {
+        if (!mapReady || !mapInstance.current || !leafletRef.current) return;
+        const L = leafletRef.current;
+
+        sensorLayerGroup.current?.remove();
+        sensorLayerGroup.current = L.layerGroup(
+            (sensors ?? []).map((sensor) => L.marker([sensor.latitude, sensor.longitude], {
+                icon: L.divIcon({
+                    html: sensorIconSvg(sensor.kind, sensor.state?.key),
+                    className: '',
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 17],
+                    popupAnchor: [0, -17],
+                }),
+                zIndexOffset: 500,
+            }).bindPopup(`
+                <div style="min-width:150px">
+                    <strong>${escapeHtml(sensor.name)}</strong><br/>
+                    <span>${escapeHtml(sensor.state?.label ?? 'No reading yet')}</span>
+                    <span style="color:#6b7280"> · ${escapeHtml(timeAgo(sensor.last_seen_at))}</span><br/>
+                    ${isAdminOrManager ? `<a href="${route('manage.sensors.show', sensor.id)}" style="color:#2563eb">View ${escapeHtml(sensor.kind_label.toLowerCase())} →</a>` : ''}
+                </div>
+            `)),
+        );
+
+        if (showSensors) sensorLayerGroup.current.addTo(mapInstance.current);
+    }, [sensors, mapReady]);
+
+    useEffect(() => {
+        if (!mapReady || !mapInstance.current) return;
+
+        if (showSensors) sensorLayerGroup.current?.addTo(mapInstance.current);
+        else sensorLayerGroup.current?.remove();
+    }, [showSensors, mapReady]);
 
     // Keeps the open view modal in sync after a photo upload / body edit
     // triggers a partial reload of the `notes` prop.
@@ -762,6 +809,22 @@ export default function Map({
                                                     }`}
                                                 >
                                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showAssets ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                </button>
+                                            </div>
+                                        )}
+                                        {sensors && sensors.length > 0 && (
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700">Sensors</span>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={showSensors}
+                                                    onClick={() => setShowSensors((v) => !v)}
+                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                                        showSensors ? 'bg-amber-600' : 'bg-gray-300'
+                                                    }`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showSensors ? 'translate-x-6' : 'translate-x-1'}`} />
                                                 </button>
                                             </div>
                                         )}
