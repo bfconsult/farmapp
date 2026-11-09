@@ -7,7 +7,9 @@ use App\Models\Gateway;
 use App\Models\LorawanEvent;
 use App\Models\SensorReading;
 use App\Services\Lorawan\DeviceModels;
+use App\Services\Lorawan\DoorActivity;
 use App\Services\Lorawan\UplinkProcessor;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -82,10 +84,39 @@ class SensorController extends Controller
     }
 
     /**
+     * What the sensor has seen, for day-to-day use. Only door/gate sensors
+     * have one so far - anything else goes straight to its trace.
+     */
+    public function show(Request $request, Device $device)
+    {
+        $this->authorizeDevice($device);
+
+        if (! array_key_exists('door_open', DeviceModels::metrics($device->model))) {
+            return redirect()->route('manage.sensors.trace', $device);
+        }
+
+        $timezone = $request->user()->displayTimezone();
+        $month = $request->validate(['month' => ['nullable', 'date_format:Y-m']])['month'] ?? null;
+        $monthStart = $month
+            ? Carbon::createFromFormat('Y-m-d', $month.'-01', $timezone)->startOfDay()
+            : Carbon::now($timezone)->startOfMonth();
+
+        $activity = new DoorActivity($device, $timezone);
+
+        return Inertia::render('Manage/Sensors/Show', [
+            'device' => $this->summary($device),
+            'status' => $activity->status(),
+            'month' => $monthStart->format('Y-m'),
+            'today' => Carbon::now($timezone)->toDateString(),
+            ...$activity->month($monthStart),
+        ]);
+    }
+
+    /**
      * The inspector: every field the sensor has reported with its latest
      * value, and recent uplinks raw alongside what they decoded to.
      */
-    public function show(Device $device)
+    public function trace(Device $device)
     {
         $this->authorizeDevice($device);
 
@@ -98,7 +129,7 @@ class SensorController extends Controller
             ->get()
             ->groupBy('lorawan_event_id');
 
-        return Inertia::render('Manage/Sensors/Show', [
+        return Inertia::render('Manage/Sensors/Trace', [
             'device' => $this->summary($device),
             'metrics' => $this->metricRows($device),
             'events' => $events->map(fn (LorawanEvent $event) => [

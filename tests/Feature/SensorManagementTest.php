@@ -75,9 +75,9 @@ test('the inspector shows each uplink raw alongside what it decoded to', functio
     capturedUplink($this->property);
     asAdmin($this)->post(route('manage.sensors.store'), ['name' => 'Shed door', 'model' => 'dragino_lds02', 'dev_eui' => 'a84041210862a0ce']);
 
-    asAdmin($this)->get(route('manage.sensors.show', Device::sole()))
+    asAdmin($this)->get(route('manage.sensors.trace', Device::sole()))
         ->assertInertia(fn ($page) => $page
-            ->component('Manage/Sensors/Show')
+            ->component('Manage/Sensors/Trace')
             ->where('device.battery', 3.222)
             ->where('device.shown_metrics', ['door_open', 'battery'])
             ->where('events.0.data', '8C960100000800000000')
@@ -115,6 +115,7 @@ test('another property\'s sensor is not visible or editable', function () {
     $device = Device::create(['property_id' => $other->id, 'name' => 'Theirs', 'model' => 'dragino_lds02', 'dev_eui' => 'a84041210862a0ce']);
 
     asAdmin($this)->get(route('manage.sensors.show', $device))->assertNotFound();
+    asAdmin($this)->get(route('manage.sensors.trace', $device))->assertNotFound();
     asAdmin($this)->patch(route('manage.sensors.update', $device), ['name' => 'Hijacked'])->assertNotFound();
     asAdmin($this)->delete(route('manage.sensors.destroy', $device))->assertNotFound();
     expect($device->fresh()->name)->toBe('Theirs');

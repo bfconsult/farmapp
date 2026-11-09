@@ -175,6 +175,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::get('manage/gateways/{gateway}', [GatewayController::class, 'show'])->name('manage.gateways.show');
     Route::post('manage/gateways/{gateway}/key', [GatewayController::class, 'regenerateKey'])->name('manage.gateways.regenerate-key');
     Route::delete('manage/gateways/{gateway}', [GatewayController::class, 'destroy'])->name('manage.gateways.destroy');
+    Route::get('manage/sensors/{device}/trace', [SensorController::class, 'trace'])->name('manage.sensors.trace');
     Route::patch('manage/sensors/{device}/shown-metrics', [SensorController::class, 'updateShownMetrics'])->name('manage.sensors.shown-metrics');
     Route::post('jobs/{farmJob}/quotes', [QuoteController::class, 'store'])->name('quotes.store');
     Route::patch('quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
