@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 
 /**
@@ -8,6 +8,15 @@ import { router } from '@inertiajs/react';
  */
 export default function AddNoteForm({ parentField, parentId, onClose }) {
     const [body, setBody] = useState('');
+    const formRef = useRef(null);
+
+    // Opening the form near the bottom of a page can leave its buttons
+    // off-screen - scroll just enough to bring the whole form into view.
+    // scroll-mb-24 keeps it clear of the fixed bottom nav, which
+    // scrollIntoView() doesn't know about.
+    useEffect(() => {
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, []);
 
     const create = () => {
         router.post(route('notes.store'), { [parentField]: parentId, body }, {
@@ -21,7 +30,7 @@ export default function AddNoteForm({ parentField, parentId, onClose }) {
     };
 
     return (
-        <div className="p-4 space-y-3 border-t border-gray-100">
+        <div ref={formRef} className="p-4 space-y-3 border-t border-gray-100 scroll-mb-24">
             <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
