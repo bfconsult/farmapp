@@ -4,7 +4,7 @@ import { formatNumber } from '@/numberFormat';
  * The two Jobs sections appended to a Diary report - Completed Jobs (one
  * card per job finished in the period, all-time hours/expenses/photos) and
  * Open Jobs (a compact row per still-open job, totals as of the period end,
- * no photos). Used identically by Reports/Diary.jsx and Diary/SharedView.jsx,
+ * no photos). Used identically by Reports/Index.jsx and Diary/SharedView.jsx,
  * the same way MetricsView.jsx is shared across both - see FarmJob::
  * completedDuringPeriod()/openAsOf() for how the data is built.
  */

@@ -117,9 +117,8 @@ Route::middleware(['auth', 'property.role:admin'])->group(function () {
     Route::put('properties/{property}/billing', [PropertyController::class, 'updateBilling'])->name('properties.billing.update');
 });
 
-// Reports: admin/manager get the full ledger, approver gets a read-only
-// day-by-day diary (see ReportController::index) - both share the same
-// route/URL, just different views for different roles.
+// Reports: the full day-by-day diary for admin/manager/approver alike (see
+// ReportController::index). Sharing it is admin/manager only - see below.
 Route::middleware(['auth', 'property.role:admin,manager,approver'])->group(function () {
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
 });

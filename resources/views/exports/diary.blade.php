@@ -26,6 +26,7 @@
     .job-name { font-weight: bold; }
     .job-description { white-space: pre-line; margin-top: 4px; color: #4b5563; }
     .job-totals { color: #6b7280; font-size: 11px; margin-top: 6px; }
+    tr.subtotal td { font-weight: bold; background-color: #f9fafb; }
 </style>
 </head>
 <body>
@@ -125,6 +126,34 @@
                         <td class="amount">${{ format_number($job['total_expenses']) }}</td>
                     </tr>
                 @endforeach
+            </tbody>
+        </table>
+    @endif
+
+    @if (count($expensesByJob) > 0)
+        <h2 class="section">Expenses</h2>
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Expense</th><th class="amount">Amount</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($expensesByJob as $group)
+                    <tr class="subtotal">
+                        <td colspan="2">{{ $group['job']['name'] }}</td>
+                        <td class="amount">${{ format_number($group['totalAmount']) }}</td>
+                    </tr>
+                    @foreach ($group['expenses'] as $expense)
+                        <tr>
+                            <td>{{ \Carbon\Carbon::parse($expense['date'])->format('d/m/Y') }}</td>
+                            <td>{{ $expense['name'] }}</td>
+                            <td class="amount">{{ $expense['amount'] !== null ? '$' . format_number($expense['amount']) : 'Awaiting amount' }}</td>
+                        </tr>
+                    @endforeach
+                @endforeach
+                <tr class="subtotal">
+                    <td colspan="2">Total</td>
+                    <td class="amount">${{ format_number(collect($expensesByJob)->sum('totalAmount')) }}</td>
+                </tr>
             </tbody>
         </table>
     @endif

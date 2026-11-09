@@ -31,11 +31,11 @@ test('expenses in the date range are grouped by job with a subtotal', function (
     $response->assertInertia(fn ($page) => $page
         ->component('Reports/Index')
         ->has('expensesByJob', 2)
-        ->where('expensesByJob.0.farmJob.name', 'Fence the north paddock')
+        ->where('expensesByJob.0.job.name', 'Fence the north paddock')
         ->where('expensesByJob.0.totalAmount', 150)
-        ->where('expensesByJob.1.farmJob.name', 'Service the tractor')
-        ->where('expensesByJob.1.totalAmount', 30)
-        ->where('grandTotal.expenses', 180));
+        ->where('expensesByJob.0.expenses.0.name', 'Wire') // newest first
+        ->where('expensesByJob.1.job.name', 'Service the tractor')
+        ->where('expensesByJob.1.totalAmount', 30));
 });
 
 test('expenses outside the date range are excluded', function () {
@@ -51,8 +51,7 @@ test('expenses outside the date range are excluded', function () {
 
     $response->assertInertia(fn ($page) => $page
         ->has('expensesByJob', 1)
-        ->where('expensesByJob.0.totalAmount', 100)
-        ->where('grandTotal.expenses', 100));
+        ->where('expensesByJob.0.totalAmount', 100));
 });
 
 test('a needs_review expense with no amount is listed but excluded from totals', function () {
@@ -68,11 +67,10 @@ test('a needs_review expense with no amount is listed but excluded from totals',
 
     $response->assertInertia(fn ($page) => $page
         ->has('expensesByJob.0.expenses', 2)
-        ->where('expensesByJob.0.totalAmount', 100)
-        ->where('grandTotal.expenses', 100));
+        ->where('expensesByJob.0.totalAmount', 100));
 });
 
-test('an approver does not see expensesByJob at all - they get the read-only diary view instead', function () {
+test('an approver gets the same full diary, expenses included', function () {
     [$admin, $property] = createAdminWithProperty();
     $approver = User::factory()->create();
     Role::create(['user_id' => $approver->id, 'property_id' => $property->id, 'type' => Role::APPROVER]);
@@ -84,8 +82,10 @@ test('an approver does not see expensesByJob at all - they get the read-only dia
         ->get(route('reports.index', ['date_from' => '2026-06-01', 'date_to' => '2026-06-30']));
 
     $response->assertInertia(fn ($page) => $page
-        ->component('Reports/Diary')
-        ->missing('expensesByJob'));
+        ->component('Reports/Index')
+        ->has('days')
+        ->has('expensesByJob', 1)
+        ->where('expensesByJob.0.totalAmount', 100));
 });
 
 test('an expense from another property never appears, even with a matching date', function () {
@@ -99,6 +99,21 @@ test('an expense from another property never appears, even with a matching date'
         ->get(route('reports.index', ['date_from' => '2026-06-01', 'date_to' => '2026-06-30']));
 
     $response->assertInertia(fn ($page) => $page
-        ->has('expensesByJob', 0)
-        ->where('grandTotal.expenses', 0));
+        ->has('expensesByJob', 0));
+});
+
+test('the public share link and its PDF include the expenses section', function () {
+    [$admin, $property] = createAdminWithProperty();
+    $job = FarmJob::create(['name' => 'Fence the north paddock', 'property_id' => $property->id, 'user_id' => $admin->id]);
+    Expense::create(['farm_job_id' => $job->id, 'name' => 'Posts', 'date' => '2026-06-10', 'amount' => 100, 'gst_inclusive' => true, 'status' => Expense::COMPLETE]);
+    $share = \App\Models\DiaryShare::create(['property_id' => $property->id, 'created_by' => $admin->id, 'date_from' => '2026-06-01', 'date_to' => '2026-06-30']);
+
+    $this->get(route('diary.share', $share->token))
+        ->assertInertia(fn ($page) => $page
+            ->component('Diary/SharedView')
+            ->where('expensesByJob.0.job.name', 'Fence the north paddock')
+            ->missing('expensesByJob.0.job.budget')
+            ->where('expensesByJob.0.totalAmount', 100));
+
+    $this->get(route('diary.share.pdf', $share->token))->assertOk();
 });

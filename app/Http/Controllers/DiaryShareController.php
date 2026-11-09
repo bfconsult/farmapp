@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DiaryShare;
+use App\Models\Expense;
 use App\Models\FarmJob;
 use App\Models\Metric;
 use App\Models\WorkSession;
@@ -34,6 +35,7 @@ class DiaryShareController extends Controller
             'metrics' => Metric::forDiaryPeriod($share->property_id, $dateFrom, $dateTo),
             'completedJobs' => FarmJob::completedDuringPeriod($share->property_id, $dateFrom, $dateTo),
             'openJobs' => FarmJob::openAsOf($share->property_id, $dateTo),
+            'expensesByJob' => Expense::forDiaryPeriod($share->property_id, $dateFrom, $dateTo),
             // Not a plain "/favicon.svg" path - Vapor only serves favicon.ico
             // and robots.txt directly from the app root; everything else in
             // public/ needs asset(), which redirects to the CDN-backed URL.
@@ -61,6 +63,7 @@ class DiaryShareController extends Controller
             'metrics' => Metric::forDiaryPeriodExport($share->property_id, $dateFrom, $dateTo),
             'completedJobs' => FarmJob::completedDuringPeriodExport($share->property_id, $dateFrom, $dateTo),
             'openJobs' => FarmJob::openAsOfExport($share->property_id, $dateTo),
+            'expensesByJob' => Expense::forDiaryPeriod($share->property_id, $dateFrom, $dateTo),
         ])->download("diary_{$share->date_from->toDateString()}_{$share->date_to->toDateString()}.pdf");
     }
 }

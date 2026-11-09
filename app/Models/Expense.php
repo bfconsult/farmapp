@@ -91,4 +91,35 @@ class Expense extends Model
             ? $disk->temporaryUrl($this->invoice_file, now()->addHour())
             : $disk->url($this->invoice_file);
     }
+
+    /**
+     * Expenses dated within a Diary report period, grouped by job (jobs
+     * alphabetical, newest expense first within each) - plain arrays, so
+     * the same output feeds the Inertia diary views and the diary PDF
+     * alike. Deliberately just id/name for the job: the public share link
+     * renders this too. A needs_review expense (no amount yet - see
+     * SupplierExpenseController) is still listed, but left out of its
+     * job's totalAmount, same convention as FarmJob::annotateTotals().
+     */
+    public static function forDiaryPeriod(int $propertyId, $dateFrom, $dateTo): array
+    {
+        return static::whereHas('farmJob', fn ($query) => $query->where('property_id', $propertyId))
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->with('farmJob')
+            ->get()
+            ->groupBy('farm_job_id')
+            ->map(fn ($jobExpenses) => [
+                'job' => $jobExpenses->first()->farmJob->only(['id', 'name']),
+                'totalAmount' => round($jobExpenses->whereNotNull('amount')->sum('amount'), 2),
+                'expenses' => $jobExpenses->sortByDesc('date')->map(fn (self $expense) => [
+                    'id' => $expense->id,
+                    'name' => $expense->name,
+                    'date' => $expense->date->toDateString(),
+                    'amount' => $expense->amount !== null ? (float) $expense->amount : null,
+                ])->values()->all(),
+            ])
+            ->sortBy(fn ($group) => $group['job']['name'], SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+    }
 }

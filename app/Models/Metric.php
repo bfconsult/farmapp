@@ -57,7 +57,7 @@ class Metric extends Model
     /**
      * Metrics for a property with latestMeasurement replaced by whichever
      * measurement's period overlaps the given range - used by Diary views
-     * (Reports/Diary, Diary/SharedView) so they show the value that was
+     * (Reports/Index, Diary/SharedView) so they show the value that was
      * current *during* that range, not whatever is current *now* (mirrors
      * WorkSession::diaryDays' pattern of building exactly what these Diary
      * pages need in one place).

@@ -25,83 +25,6 @@ class ReportController extends Controller
             ? \Carbon\Carbon::parse($request->date_to)->endOfDay()
             : now()->endOfMonth();
 
-        // Approvers see the same day-by-day diary they'd get via a shared
-        // link (see DiaryShareController), just in-app with a date filter -
-        // not the admin/manager ledger view, which also carries billing
-        // figures an approver-only role shouldn't see.
-        $userRole = Auth::user()->roleOn(Property::find($currentPropertyId));
-        if ($userRole === 'approver') {
-            return Inertia::render('Reports/Diary', [
-                'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo),
-                'currentDateFrom' => $dateFrom->toDateString(),
-                'currentDateTo' => $dateTo->toDateString(),
-                'metrics' => Metric::forDiaryPeriod($currentPropertyId, $dateFrom, $dateTo),
-                'completedJobs' => FarmJob::completedDuringPeriod($currentPropertyId, $dateFrom, $dateTo),
-                'openJobs' => FarmJob::openAsOf($currentPropertyId, $dateTo),
-            ]);
-        }
-
-        $sessions = WorkSession::where('property_id', $currentPropertyId)
-            ->whereIn('status', [WorkSession::FINALISED, WorkSession::APPROVED])
-            ->whereBetween('started_at', [$dateFrom, $dateTo])
-            ->with(['farmJob', 'user'])
-            ->latest('started_at')
-            ->get();
-
-        $workers = $sessions
-            ->groupBy('user_id')
-            ->map(function ($userSessions) {
-                return [
-                    'user' => $userSessions->first()->user,
-                    'totalHours' => round($userSessions->sum('duration_in_hours'), 2),
-                    'totalBilling' => round($userSessions->sum('billing_amount'), 2),
-                    'sessions' => $userSessions->map(fn ($session) => [
-                        'id' => $session->id,
-                        'farm_job' => $session->farmJob,
-                        'started_at' => $session->started_at,
-                        'ended_at' => $session->ended_at,
-                        'duration_in_hours' => $session->duration_in_hours,
-                        'billing_amount' => $session->billing_amount,
-                        'status' => $session->status,
-                        'source' => $session->source,
-                        'reviewed_at' => $session->reviewed_at,
-                    ])->values(),
-                ];
-            })
-            ->sortBy(fn ($worker) => $worker['user']->name)
-            ->values();
-
-        // Grouped by job rather than by worker, same in-memory Collection
-        // approach as $workers above. A needs_review expense (no amount
-        // yet - see SupplierExpenseController) still shows in its job's
-        // list, but is excluded from both the per-job and grand totals,
-        // same as FarmJobController::index()'s total_expenses figure -
-        // otherwise the total would silently understate what's owed.
-        $expenses = Expense::whereHas('farmJob', fn ($query) => $query->where('property_id', $currentPropertyId))
-            ->whereBetween('date', [$dateFrom, $dateTo])
-            ->with('farmJob')
-            ->get();
-
-        $expensesByJob = $expenses
-            ->groupBy('farm_job_id')
-            ->map(function ($jobExpenses) {
-                return [
-                    'farmJob' => $jobExpenses->first()->farmJob,
-                    'totalAmount' => round($jobExpenses->whereNotNull('amount')->sum('amount'), 2),
-                    'expenses' => $jobExpenses->sortByDesc('date')->map(fn ($expense) => [
-                        'id' => $expense->id,
-                        'name' => $expense->name,
-                        'date' => $expense->date,
-                        'description' => $expense->description,
-                        'amount' => $expense->amount !== null ? (float) $expense->amount : null,
-                        'gst_inclusive' => $expense->gst_inclusive,
-                        'status' => $expense->status,
-                    ])->values(),
-                ];
-            })
-            ->sortBy(fn ($job) => $job['farmJob']->name)
-            ->values();
-
         // Surfaced once, right after generating a link via storeDiaryShare -
         // not persisted/re-shown on a plain page reload.
         $justSharedUrl = null;
@@ -112,14 +35,15 @@ class ReportController extends Controller
             $justSharedUrl = $share ? route('diary.share', $share->token) : null;
         }
 
+        // Every role gets the full diary here - the same content as the
+        // shared link (see DiaryShareController), just in-app with a date
+        // filter. Sharing it stays admin/manager only (see routes/web.php).
         return Inertia::render('Reports/Index', [
-            'workers' => $workers,
-            'expensesByJob' => $expensesByJob,
-            'grandTotal' => [
-                'hours' => round($sessions->sum('duration_in_hours'), 2),
-                'billing' => round($sessions->sum('billing_amount'), 2),
-                'expenses' => round($expenses->whereNotNull('amount')->sum('amount'), 2),
-            ],
+            'days' => WorkSession::diaryDays($currentPropertyId, $dateFrom, $dateTo),
+            'metrics' => Metric::forDiaryPeriod($currentPropertyId, $dateFrom, $dateTo),
+            'completedJobs' => FarmJob::completedDuringPeriod($currentPropertyId, $dateFrom, $dateTo),
+            'openJobs' => FarmJob::openAsOf($currentPropertyId, $dateTo),
+            'expensesByJob' => Expense::forDiaryPeriod($currentPropertyId, $dateFrom, $dateTo),
             'currentDateFrom' => $dateFrom->toDateString(),
             'currentDateTo' => $dateTo->toDateString(),
             'justSharedUrl' => $justSharedUrl,
@@ -154,6 +78,7 @@ class ReportController extends Controller
             'metrics' => Metric::forDiaryPeriod($currentPropertyId, $dateFrom, $dateTo),
             'completedJobs' => FarmJob::completedDuringPeriod($currentPropertyId, $dateFrom, $dateTo),
             'openJobs' => FarmJob::openAsOf($currentPropertyId, $dateTo),
+            'expensesByJob' => Expense::forDiaryPeriod($currentPropertyId, $dateFrom, $dateTo),
             'logoUrl' => asset('favicon.svg'),
             'backUrl' => route('reports.index', [
                 'date_from' => $dateFrom->toDateString(),
@@ -191,6 +116,7 @@ class ReportController extends Controller
             'metrics' => Metric::forDiaryPeriodExport($currentPropertyId, $dateFrom, $dateTo),
             'completedJobs' => FarmJob::completedDuringPeriodExport($currentPropertyId, $dateFrom, $dateTo),
             'openJobs' => FarmJob::openAsOfExport($currentPropertyId, $dateTo),
+            'expensesByJob' => Expense::forDiaryPeriod($currentPropertyId, $dateFrom, $dateTo),
         ])->download("diary_{$dateFrom->toDateString()}_{$dateTo->toDateString()}.pdf");
     }
 

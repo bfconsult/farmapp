@@ -13,7 +13,7 @@ function formatTime(datetime) {
 /**
  * Day-by-day, blog-style rendering of WorkSession::diaryDays() output -
  * shared between the public diary share (Diary/SharedView) and the in-app
- * approver diary (Reports/Diary), so the two stay visually consistent.
+ * in-app diary (Reports/Index), so the two stay visually consistent.
  */
 export default function DiaryDays({ days }) {
     if (days.length === 0) {

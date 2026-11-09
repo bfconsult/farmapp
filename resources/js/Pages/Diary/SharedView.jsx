@@ -2,6 +2,7 @@ import { Head } from '@inertiajs/react';
 import DiaryDays from '@/Components/DiaryDays';
 import MetricsView from '@/Components/MetricsView';
 import JobsView from '@/Components/JobsView';
+import ExpensesView from '@/Components/ExpensesView';
 import BackLink from '@/Components/BackLink';
 import { formatDate } from '@/dateInput';
 
@@ -9,7 +10,7 @@ function formatRangeHeading(dateStr) {
     return formatDate(dateStr, { year: 'numeric' });
 }
 
-export default function SharedView({ property, dateFrom, dateTo, days, metrics, completedJobs, openJobs, logoUrl, backUrl, pdfUrl }) {
+export default function SharedView({ property, dateFrom, dateTo, days, metrics, completedJobs, openJobs, expensesByJob, logoUrl, backUrl, pdfUrl }) {
     return (
         <>
             <Head title={`${property.name} — Activity Diary`} />
@@ -59,6 +60,10 @@ export default function SharedView({ property, dateFrom, dateTo, days, metrics, 
 
                     <div className="mt-6">
                         <JobsView completedJobs={completedJobs} openJobs={openJobs} />
+                    </div>
+
+                    <div className="mt-6">
+                        <ExpensesView expensesByJob={expensesByJob} />
                     </div>
 
                     <p className="text-center text-xs text-gray-400 pt-2 pb-8">

@@ -1,19 +1,21 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import DateRangeCalendar from '@/Components/DateRangeCalendar';
-import { Head, Link, router } from '@inertiajs/react';
+import DiaryDays from '@/Components/DiaryDays';
+import MetricsView from '@/Components/MetricsView';
+import JobsView from '@/Components/JobsView';
+import ExpensesView from '@/Components/ExpensesView';
+import { Head, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate, currentMonthRange, previousMonthRange } from '@/dateInput';
-import { formatNumber } from '@/numberFormat';
 
-function sessionLabel(session) {
-    if (session.farm_job) return session.farm_job.name;
-    // Only flagged as "Auto-tracked" until it's been reviewed once (see
-    // WorkSessionController::update()) - after that it's treated as a
-    // normal entry everywhere, same as Edit.jsx's isAutoTracked.
-    return session.source === 'auto_tracked' && !session.reviewed_at ? 'Auto-tracked visit' : 'Ad-hoc work';
-}
-
-export default function Index({ workers, expensesByJob, grandTotal, currentDateFrom, currentDateTo, justSharedUrl }) {
+/**
+ * The full activity diary for every role - the same sections as the shared
+ * link (Diary/SharedView), plus a date filter. Only admin/manager can
+ * share it (see routes/web.php), so the Share button is hidden otherwise.
+ */
+export default function Index({ days, metrics, completedJobs, openJobs, expensesByJob, currentDateFrom, currentDateTo, justSharedUrl }) {
+    const { currentUserRole } = usePage().props;
+    const canShare = currentUserRole === 'admin' || currentUserRole === 'manager';
     const [showFilters, setShowFilters] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -67,35 +69,11 @@ export default function Index({ workers, expensesByJob, grandTotal, currentDateF
         return currentDateFrom === from && currentDateTo === to;
     })();
 
-    const formatTime = (datetime) => {
-        if (!datetime) return '—';
-        return new Date(datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
-
-    const formatSessionDate = (datetime) => {
-        if (!datetime) return '—';
-        return formatDate(datetime);
-    };
-
     return (
         <AuthenticatedLayout title="Reports">
             <Head title="Reports" />
 
             <div className="max-w-lg mx-auto pb-6">
-                {/* Grand total */}
-                <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg shadow mb-3">
-                    <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">All Workers</p>
-                    <p className="text-base font-semibold text-gray-900">
-                        {formatNumber(grandTotal.hours)}h
-                        {grandTotal.billing > 0 && (
-                            <span className="text-green-700"> · ${formatNumber(grandTotal.billing)}</span>
-                        )}
-                        {grandTotal.expenses > 0 && (
-                            <span className="text-gray-500"> · ${formatNumber(grandTotal.expenses)} expenses</span>
-                        )}
-                    </p>
-                </div>
-
                 {/* Filters toggle */}
                 <div className="flex items-center justify-between mb-3 gap-2">
                     <button
@@ -108,12 +86,14 @@ export default function Index({ workers, expensesByJob, grandTotal, currentDateF
                         </span>
                         <span className="text-gray-400">{showFilters ? '▲' : '▼'}</span>
                     </button>
-                    <button
-                        onClick={() => setConfirmingShare((v) => !v)}
-                        className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600 flex-shrink-0"
-                    >
-                        Share diary
-                    </button>
+                    {canShare && (
+                        <button
+                            onClick={() => setConfirmingShare((v) => !v)}
+                            className="px-3 py-2 bg-white rounded-lg shadow text-sm font-medium text-green-600 flex-shrink-0"
+                        >
+                            Share diary
+                        </button>
+                    )}
                 </div>
 
                 {confirmingShare && (
@@ -199,90 +179,24 @@ export default function Index({ workers, expensesByJob, grandTotal, currentDateF
                     </div>
                 )}
 
-                {/* Per-worker breakdown */}
-                {workers.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-                        No finalised work sessions in this date range.
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {workers.map((worker) => (
-                            <div key={worker.user.id} className="bg-white rounded-lg shadow overflow-hidden">
-                                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-                                    <p className="font-medium text-gray-900">{worker.user.name}</p>
-                                    <div className="text-right">
-                                        <p className="text-xs text-gray-500 uppercase tracking-wide">Subtotal</p>
-                                        <p className="text-sm font-medium text-gray-900">
-                                            {formatNumber(worker.totalHours)}h
-                                            {worker.totalBilling > 0 && (
-                                                <span className="text-green-700"> · ${formatNumber(worker.totalBilling)}</span>
-                                            )}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="divide-y divide-gray-100">
-                                    {worker.sessions.map((session) => (
-                                        <div key={session.id} className="flex items-start justify-between gap-2 px-4 py-3">
-                                            <div className="min-w-0">
-                                                <p className="text-sm text-gray-900 truncate">
-                                                    {sessionLabel(session)}
-                                                </p>
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    {formatSessionDate(session.started_at)} · {formatTime(session.started_at)} — {formatTime(session.ended_at)}
-                                                </p>
-                                            </div>
-                                            <div className="text-right flex-shrink-0">
-                                                <p className="text-sm text-gray-900">{formatNumber(session.duration_in_hours)}h</p>
-                                                {session.billing_amount && (
-                                                    <p className="text-xs text-green-700">${formatNumber(session.billing_amount)}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+                <DiaryDays days={days} />
+
+                {metrics && metrics.length > 0 && (
+                    <>
+                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide mt-6 mb-3">
+                            Metrics
+                        </h2>
+                        <MetricsView metrics={metrics} showStatusBadge={false} showHistoryLinks={false} showPhotos />
+                    </>
                 )}
 
-                {/* Expenses grouped by job */}
-                {expensesByJob.length > 0 && (
-                    <div className="space-y-4 mt-4">
-                        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide px-1">Expenses by Job</h2>
-                        {expensesByJob.map((jobGroup) => (
-                            <div key={jobGroup.farmJob.id} className="bg-white rounded-lg shadow overflow-hidden">
-                                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-                                    <Link href={route('jobs.show', jobGroup.farmJob.id)} className="font-medium text-gray-900 truncate">
-                                        {jobGroup.farmJob.name}
-                                    </Link>
-                                    <div className="text-right flex-shrink-0">
-                                        <p className="text-xs text-gray-500 uppercase tracking-wide">Subtotal</p>
-                                        <p className="text-sm font-medium text-green-700">${formatNumber(jobGroup.totalAmount)}</p>
-                                    </div>
-                                </div>
-                                <div className="divide-y divide-gray-100">
-                                    {jobGroup.expenses.map((expense) => (
-                                        <div key={expense.id} className="flex items-start justify-between gap-2 px-4 py-3">
-                                            <div className="min-w-0">
-                                                <p className="text-sm text-gray-900 truncate">{expense.name}</p>
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    {formatSessionDate(expense.date.slice(0, 10))}
-                                                </p>
-                                            </div>
-                                            <div className="text-right flex-shrink-0">
-                                                <p className="text-sm text-gray-900">
-                                                    {expense.amount != null
-                                                        ? `$${formatNumber(expense.amount)}`
-                                                        : 'Awaiting amount'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                <div className="mt-6">
+                    <JobsView completedJobs={completedJobs} openJobs={openJobs} />
+                </div>
+
+                <div className="mt-6">
+                    <ExpensesView expensesByJob={expensesByJob} />
+                </div>
             </div>
         </AuthenticatedLayout>
     );
