@@ -59,6 +59,8 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
 
     // Defaults to a plain working day (6am - 3pm today) rather than opening
     // a blank form - Edit is where the details actually get filled in.
+    // fit_to_existing has the server shrink it into the gap around any
+    // sessions already logged today (see WorkSessionController::store()).
     const logPastSession = () => {
         const today = new Date();
         const pad = (n) => String(n).padStart(2, '0');
@@ -68,6 +70,7 @@ export default function Index({ sessions, activeSession, currentDateFrom, curren
         router.post(route('work-sessions.store'), {
             started_at: fromLocalInputValue(`${dateStr}T06:00`),
             ended_at: fromLocalInputValue(`${dateStr}T15:00`),
+            fit_to_existing: true,
         }, {
             onFinish: () => setLoggingPast(false),
         });

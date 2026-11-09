@@ -9,6 +9,7 @@ use App\Models\JobStatus;
 use App\Models\Property;
 use App\Models\RecurringJob;
 use App\Models\Role;
+use App\Models\User;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -110,7 +111,20 @@ class WorkSessionController extends Controller
             'ended_at' => 'nullable|date|after:started_at',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
+            'fit_to_existing' => 'boolean',
         ]);
+
+        // "Log a past session" sends a placeholder 6am-3pm and asks for it
+        // to be nudged into the gap around this user's existing sessions,
+        // so saving it untouched doesn't immediately hit an overlap.
+        if (($validated['fit_to_existing'] ?? false) && !empty($validated['started_at']) && !empty($validated['ended_at'])) {
+            [$validated['started_at'], $validated['ended_at']] = $this->fitAroundExistingSessions(
+                Auth::user(),
+                \Illuminate\Support\Carbon::parse($validated['started_at']),
+                \Illuminate\Support\Carbon::parse($validated['ended_at']),
+            );
+        }
+        unset($validated['fit_to_existing']);
 
         // A session logged with an end time already set (e.g. forgotten past work being
         // added after the fact) isn't "active", so it doesn't conflict with one that is.
@@ -137,11 +151,55 @@ class WorkSessionController extends Controller
         // stop for filling in the job/description, not the live Show view.
         // The newPastSession flash flags it as not "really" existing yet -
         // Edit.jsx uses it to delete instead of merely navigating away if
-        // the user backs out without saving, so the placeholder 6am-3pm
-        // entry they never asked to keep doesn't linger in their history.
+        // the user backs out without saving, so the placeholder entry
+        // (6am-3pm, fitted around existing sessions) they never asked to keep doesn't linger in their history.
         return $session->ended_at
             ? redirect()->route('work-sessions.edit', $session)->with('newPastSession', true)
             : redirect()->route('work-sessions.show', $session);
+    }
+
+    /**
+     * Shrinks a placeholder start/end to fit around the user's existing
+     * sessions: the start moves to the end of any session already running
+     * at that time (chaining through back-to-back ones), and the end moves
+     * back to the start of the next session after it, whichever comes
+     * first. Rounded inward to the user's billing block (in their own
+     * timezone - offsets like Adelaide's +10:30 aren't whole hours) so the
+     * Edit form's block-stepped time pickers can show both values. Falls
+     * back to the original times if there's no gap left at all - it'll
+     * overlap, but there's nothing better to offer.
+     */
+    private function fitAroundExistingSessions(User $user, \Illuminate\Support\Carbon $start, \Illuminate\Support\Carbon $end): array
+    {
+        $sessions = WorkSession::where('user_id', $user->id)
+            ->where('started_at', '<', $end)
+            ->where(fn ($query) => $query->where('ended_at', '>', $start)->orWhereNull('ended_at'))
+            ->orderBy('started_at')
+            ->get();
+
+        $fitStart = $start->clone();
+        foreach ($sessions as $session) {
+            // A still-active session counts as running until now.
+            $sessionEnd = $session->ended_at ?? now();
+            if ($session->started_at->lte($fitStart) && $sessionEnd->gt($fitStart)) {
+                $fitStart = $sessionEnd->clone();
+            }
+        }
+
+        $next = $sessions->first(fn ($session) => $session->started_at->gt($fitStart));
+        $fitEnd = $next && $next->started_at->lt($end) ? $next->started_at->clone() : $end->clone();
+
+        if ($block = $user->billing_block_minutes) {
+            $timezone = $user->displayTimezone();
+            $roundedStart = $user->floorToBillingBlock($fitStart->clone()->setTimezone($timezone));
+            if ($roundedStart->lt($fitStart)) {
+                $roundedStart->addMinutes($block);
+            }
+            $fitStart = $roundedStart->setTimezone('UTC');
+            $fitEnd = $user->floorToBillingBlock($fitEnd->clone()->setTimezone($timezone))->setTimezone('UTC');
+        }
+
+        return $fitStart->lt($fitEnd) ? [$fitStart, $fitEnd] : [$start, $end];
     }
 
     public function show(Request $request, WorkSession $workSession)
