@@ -71,7 +71,15 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
     };
 
     const [locationStatus, setLocationStatus] = useState('getting');
-    const [showOptional, setShowOptional] = useState(false);
+    // Starts open when arriving from an asset's page, so its pre-selected
+    // "Asset being maintained" isn't hidden - and reopens if a field inside
+    // it fails validation, so the error is actually visible.
+    const [showOptional, setShowOptional] = useState(Boolean(selectedAssetId));
+    const optionalFieldHasError = ['description', 'zone_ids', 'asset_id', 'scheduled_date', 'priority_id', 'job_type_id', 'job_status_id', 'estimated_hours', 'budget', 'hourly_rate', 'checklist_template_ids']
+        .some((field) => Object.keys(errors).some((key) => key === field || key.startsWith(`${field}.`)));
+    useEffect(() => {
+        if (optionalFieldHasError) setShowOptional(true);
+    }, [optionalFieldHasError]);
     const [showLocationModal, setShowLocationModal] = useState(false);
     const [pendingLocation, setPendingLocation] = useState(null);
 
@@ -151,48 +159,6 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                     <h1 className="text-xl font-semibold text-gray-900">Add Job</h1>
                 </div>
 
-                {currentProperty.zones && currentProperty.zones.length > 0 && (
-                    <div className="mb-4">
-                        <label className="block text-xs text-gray-500 mb-1">
-                            Zones <span className="text-gray-400">optional</span>
-                        </label>
-                        <div className="space-y-1 border border-gray-200 rounded-lg divide-y divide-gray-100">
-                            {currentProperty.zones.map((zone) => (
-                                <label key={zone.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={data.zone_ids.includes(zone.id)}
-                                        onChange={() => toggleZone(zone.id)}
-                                        className="rounded text-green-600 focus:ring-green-500"
-                                    />
-                                    <span className="text-sm text-gray-900">{zone.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                        {errors.zone_ids && <p className="mt-1 text-sm text-red-600">{errors.zone_ids}</p>}
-                    </div>
-                )}
-
-                {assets.length > 0 && (
-                    <div className="mb-4">
-                        <label className="block text-xs text-gray-500 mb-1">
-                            Asset being maintained <span className="text-gray-400">optional</span>
-                        </label>
-                        <select
-                            value={data.asset_id}
-                            onChange={(e) => setData('asset_id', e.target.value)}
-                            className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
-                        >
-                            <option value="">Not maintaining an asset</option>
-                            {assets.map((asset) => (
-                                <option key={asset.id} value={asset.id}>{asset.name}</option>
-                            ))}
-                        </select>
-                        <p className="mt-1 text-xs text-gray-500">For servicing or repairing an asset. Equipment used to do the work is recorded on each work session.</p>
-                        {errors.asset_id && <p className="mt-1 text-sm text-red-600">{errors.asset_id}</p>}
-                    </div>
-                )}
-
                 <form onSubmit={submit} className="space-y-4">
                     <div>
                         <input
@@ -250,6 +216,48 @@ export default function Create({ priorities, jobTypes, jobStatuses, currentPrope
                                 rows={3}
                                 className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
                             />
+
+                            {currentProperty.zones && currentProperty.zones.length > 0 && (
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">
+                                        Zones <span className="text-gray-400">optional</span>
+                                    </label>
+                                    <div className="space-y-1 border border-gray-200 rounded-lg divide-y divide-gray-100">
+                                        {currentProperty.zones.map((zone) => (
+                                            <label key={zone.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={data.zone_ids.includes(zone.id)}
+                                                    onChange={() => toggleZone(zone.id)}
+                                                    className="rounded text-green-600 focus:ring-green-500"
+                                                />
+                                                <span className="text-sm text-gray-900">{zone.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    {errors.zone_ids && <p className="mt-1 text-sm text-red-600">{errors.zone_ids}</p>}
+                                </div>
+                            )}
+
+                            {assets.length > 0 && (
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">
+                                        Asset being maintained <span className="text-gray-400">optional</span>
+                                    </label>
+                                    <select
+                                        value={data.asset_id}
+                                        onChange={(e) => setData('asset_id', e.target.value)}
+                                        className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-green-500 focus:border-green-500 p-3"
+                                    >
+                                        <option value="">Not maintaining an asset</option>
+                                        {assets.map((asset) => (
+                                            <option key={asset.id} value={asset.id}>{asset.name}</option>
+                                        ))}
+                                    </select>
+                                    <p className="mt-1 text-xs text-gray-500">For servicing or repairing an asset. Equipment used to do the work is recorded on each work session.</p>
+                                    {errors.asset_id && <p className="mt-1 text-sm text-red-600">{errors.asset_id}</p>}
+                                </div>
+                            )}
 
                             {!data.repeats && (
                                 <div>
