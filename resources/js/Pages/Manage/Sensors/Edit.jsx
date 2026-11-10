@@ -13,7 +13,7 @@ function boundaryCenter(coordinates) {
     return { lat, lng };
 }
 
-export default function Edit({ device, models, kinds, prefill, propertyBoundary }) {
+export default function Edit({ device, models, kinds, prefill, propertyBoundary, zones = [] }) {
     const isNew = !device;
 
     const kindsFor = (model) => kinds.filter((kind) => kind.models.includes(model));
@@ -33,6 +33,9 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary 
     const [pendingLocation, setPendingLocation] = useState(null);
     const [locating, setLocating] = useState(false);
     const [locateError, setLocateError] = useState(null);
+    // Zones show the fences, which is what a gate sits on.
+    const [showZones, setShowZones] = useState(true);
+    const shownZones = showZones ? zones : [];
 
     const openLocationModal = () => {
         setPendingLocation(hasPin ? { lat: data.latitude, lng: data.longitude } : boundaryCenter(propertyBoundary));
@@ -168,14 +171,28 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary 
                             </div>
 
                             <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-sm font-medium text-gray-700">Location</label>
+                                    {zones.length > 0 && (
+                                    <label className="flex items-center gap-1.5 text-xs text-gray-600">
+                                        <input
+                                            type="checkbox"
+                                            checked={showZones}
+                                            onChange={(e) => setShowZones(e.target.checked)}
+                                            className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                        />
+                                        Show zones
+                                    </label>
+                                )}
+                                </div>
                                 <div className="rounded-lg border border-gray-200 overflow-hidden">
-                                    {hasPin || propertyBoundary ? (
+                                    {hasPin || propertyBoundary || shownZones.length > 0 ? (
                                         <LocationMap
-                                            key={`${data.latitude}-${data.longitude}`}
+                                            key={`${data.latitude}-${data.longitude}-${showZones}`}
                                             latitude={data.latitude}
                                             longitude={data.longitude}
                                             propertyBoundary={propertyBoundary}
+                                            zones={shownZones}
                                             interactive={false}
                                             height="160px"
                                         />
@@ -240,9 +257,11 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary 
                     {showLocationModal && (
                         pendingLocation ? (
                             <LocationMap
+                                key={showZones}
                                 latitude={pendingLocation.lat}
                                 longitude={pendingLocation.lng}
                                 propertyBoundary={propertyBoundary}
+                                zones={shownZones}
                                 editable
                                 onDragEnd={(lat, lng) => setPendingLocation({ lat, lng })}
                             />
@@ -253,7 +272,20 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary 
                         )
                     )}
                     {pendingLocation && (
-                        <p className="text-xs text-gray-400 mt-2">Tap the map or drag the pin to where the sensor is.</p>
+                        <div className="flex items-center justify-between gap-3 mt-2">
+                            <p className="text-xs text-gray-400">Tap the map or drag the pin to where the sensor is.</p>
+                            {zones.length > 0 && (
+                                <label className="flex items-center gap-1.5 text-xs text-gray-600">
+                                    <input
+                                        type="checkbox"
+                                        checked={showZones}
+                                        onChange={(e) => setShowZones(e.target.checked)}
+                                        className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                    />
+                                    Show zones
+                                </label>
+                            )}
+                        </div>
                     )}
                 </div>
             </Modal>

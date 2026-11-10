@@ -7,6 +7,7 @@ use App\Models\Gateway;
 use App\Models\LorawanEvent;
 use App\Models\Property;
 use App\Models\SensorReading;
+use App\Models\Zone;
 use App\Services\Lorawan\DeviceModels;
 use App\Services\Lorawan\DoorActivity;
 use App\Services\Lorawan\SensorKinds;
@@ -55,6 +56,7 @@ class SensorController extends Controller
             'models' => DeviceModels::options(),
             'kinds' => SensorKinds::options(),
             'propertyBoundary' => Property::find(session('current_property_id'))?->shape?->coordinates,
+            'zones' => Zone::where('property_id', session('current_property_id'))->orderBy('name')->get(['id', 'name', 'coordinates']),
             'prefill' => [
                 'dev_eui' => $request->query('dev_eui', ''),
                 'name' => $request->query('name', ''),
@@ -170,6 +172,7 @@ class SensorController extends Controller
             'models' => DeviceModels::options(),
             'kinds' => SensorKinds::options(),
             'propertyBoundary' => Property::find(session('current_property_id'))?->shape?->coordinates,
+            'zones' => Zone::where('property_id', session('current_property_id'))->orderBy('name')->get(['id', 'name', 'coordinates']),
             'prefill' => null,
         ]);
     }

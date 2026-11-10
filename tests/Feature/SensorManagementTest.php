@@ -206,3 +206,14 @@ test('placed sensors show on the map in their current state', function () {
     asAdmin($this)->get(route('manage.sensors.index'))
         ->assertInertia(fn ($page) => $page->where('devices.0.state.key', 'open'));
 });
+
+test('the sensor form gets the property\'s zones to place it against', function () {
+    App\Models\Zone::create(['property_id' => $this->property->id, 'name' => 'House paddock', 'coordinates' => [[-34.9, 138.6], [-34.9, 138.61], [-34.91, 138.61]]]);
+    App\Models\Zone::create(['property_id' => Property::create(['name' => 'Other Farm', 'address' => '2 Test Rd'])->id, 'name' => 'Theirs', 'coordinates' => [[-35, 139], [-35, 139.1], [-35.1, 139.1]]]);
+    $device = Device::create(['property_id' => $this->property->id, 'name' => 'Main gate', 'model' => 'dragino_lds02', 'kind' => 'gate', 'dev_eui' => 'a84041210862a0ce']);
+
+    asAdmin($this)->get(route('manage.sensors.edit', $device))
+        ->assertInertia(fn ($page) => $page->has('zones', 1)->where('zones.0.name', 'House paddock'));
+    asAdmin($this)->get(route('manage.sensors.create'))
+        ->assertInertia(fn ($page) => $page->has('zones', 1));
+});
