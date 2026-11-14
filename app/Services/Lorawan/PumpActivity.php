@@ -73,6 +73,7 @@ class PumpActivity
             'runs' => $runs->values()->all(),
             'firstDate' => $first ? Carbon::parse($first, 'UTC')->setTimezone($this->timezone)->toDateString() : null,
             'threshold' => $this->threshold,
+            'warnAfterMinutes' => (float) SensorKinds::setting($this->device, 'warn_after_minutes'),
         ];
     }
 

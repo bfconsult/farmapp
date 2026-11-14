@@ -52,6 +52,14 @@ class SensorKinds
                     'max' => 1000,
                     'help' => 'The pump counts as running while it draws more current than this.',
                 ],
+                'warn_after_minutes' => [
+                    'label' => 'Warn if running longer than',
+                    'unit' => 'min',
+                    'default' => 30,
+                    'min' => 0,
+                    'max' => 1440,
+                    'help' => 'Admins and managers are emailed once per run. 0 turns it off.',
+                ],
             ],
         ],
     ];

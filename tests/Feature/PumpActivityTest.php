@@ -179,3 +179,65 @@ test('a low battery shows on the pump page while the sensor keeps reporting it',
     Carbon::setTestNow(Carbon::parse('2026-11-20 12:30', 'Australia/Adelaide')->utc());
     pumpPage($this)->assertInertia(fn ($page) => $page->where('device.low_battery', null));
 });
+
+// A CT101 uplink reporting this current, received now, processed as the
+// gateway's would be.
+function pumpUplink($test, float $amps, int $minutesAgo = 0): void
+{
+    $raw = (int) round($amps * 100);
+    $event = LorawanEvent::create([
+        'property_id' => $test->property->id,
+        'event' => 'uplink',
+        'dev_eui' => '24e124000000c101',
+        'body' => [
+            'data' => '0498'.sprintf('%02X%02X', $raw & 0xFF, $raw >> 8),
+            'fCnt' => ++$test->fCnt,
+            'fPort' => 85,
+            'devEUI' => '24e124000000c101',
+            'rxInfo' => [['rssi' => -64, 'loRaSNR' => 12]],
+            'timestamp' => Carbon::now()->subMinutes($minutesAgo)->getTimestamp(),
+            'data_encode' => 'hexstring',
+        ],
+    ]);
+    app(UplinkProcessor::class)->process($event);
+}
+
+test('admins and managers are emailed once when a run goes past its limit', function () {
+    Illuminate\Support\Facades\Mail::fake();
+    $manager = User::factory()->create(['claimed_at' => now()]);
+    Role::create(['user_id' => $manager->id, 'property_id' => $this->property->id, 'type' => Role::MANAGER]);
+    $worker = User::factory()->create(['claimed_at' => now()]);
+    Role::create(['user_id' => $worker->id, 'property_id' => $this->property->id, 'type' => Role::WORKER]);
+    $this->user->forceFill(['claimed_at' => now()])->save();
+
+    pumpUplink($this, 0, 40);
+    pumpUplink($this, 2.9, 33);
+    pumpUplink($this, 2.9, 4);
+    Illuminate\Support\Facades\Mail::assertNothingSent();
+
+    pumpUplink($this, 2.9, 2);
+    Illuminate\Support\Facades\Mail::assertSent(App\Mail\PumpRunningLong::class, 2);
+    Illuminate\Support\Facades\Mail::assertSent(App\Mail\PumpRunningLong::class, fn ($mail) => $mail->hasTo($manager->email) && $mail->minutes === 31);
+    Illuminate\Support\Facades\Mail::assertNotSent(App\Mail\PumpRunningLong::class, fn ($mail) => $mail->hasTo($worker->email));
+
+    // Still the same run.
+    pumpUplink($this, 2.9, 0);
+    Illuminate\Support\Facades\Mail::assertSent(App\Mail\PumpRunningLong::class, 2);
+
+    pumpPage($this)->assertInertia(fn ($page) => $page->where('warnAfterMinutes', 30));
+});
+
+test('no warning when it is turned off, or for a long run decoded late', function () {
+    Illuminate\Support\Facades\Mail::fake();
+    $this->user->forceFill(['claimed_at' => now()])->save();
+
+    // An old backlog: ran for an hour, three hours ago.
+    pumpUplink($this, 0, 250);
+    pumpUplink($this, 2.9, 240);
+    pumpUplink($this, 2.9, 180);
+    Illuminate\Support\Facades\Mail::assertNothingSent();
+
+    $this->device->update(['config' => ['settings' => ['warn_after_minutes' => 0]]]);
+    pumpUplink($this, 2.9, 0);
+    Illuminate\Support\Facades\Mail::assertNothingSent();
+});

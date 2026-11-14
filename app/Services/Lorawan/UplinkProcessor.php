@@ -79,6 +79,8 @@ class UplinkProcessor
 
             $event->update(['processed_at' => now(), 'error' => null]);
         });
+
+        app(SensorAlerts::class)->check($device);
     }
 
     /**

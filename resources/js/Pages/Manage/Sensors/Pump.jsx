@@ -47,8 +47,12 @@ function Run({ run, day }) {
     );
 }
 
-export default function Pump({ device, status, month, today, days, runs, firstDate, threshold }) {
+export default function Pump({ device, status, month, today, days, runs, firstDate, threshold, warnAfterMinutes }) {
     const [selected, setSelected] = useState(initialDay(month, today, days));
+
+    // Running past its warning limit (0 = no limit).
+    const runningMinutes = status?.running && status.since ? (Date.now() - new Date(status.since).getTime()) / 60000 : 0;
+    const runningLong = warnAfterMinutes > 0 && runningMinutes > warnAfterMinutes;
 
     const total = Object.values(days).reduce((sum, seconds) => sum + seconds, 0);
     const dayRuns = runs.filter((run) => run.dates.includes(selected)).reverse();
@@ -63,7 +67,7 @@ export default function Pump({ device, status, month, today, days, runs, firstDa
                 <SensorStatusCard
                     device={device}
                     state={status && (status.running
-                        ? { key: 'running', label: 'Running', tone: 'active' }
+                        ? { key: 'running', label: runningLong ? `Running ${formatDuration(runningMinutes * 60)}` : 'Running', tone: runningLong ? 'attention' : 'active' }
                         : { key: 'stopped', label: 'Stopped' })}
                     since={status?.since}
                     today={today}
@@ -103,8 +107,9 @@ export default function Pump({ device, status, month, today, days, runs, firstDa
                 )}
 
                 <p className="text-xs text-gray-400">
-                    Running means drawing more than {threshold} A - change it under Edit. Start and stop times are as
-                    accurate as the sensor's reporting interval.
+                    Running means drawing more than {threshold} A
+                    {warnAfterMinutes > 0 && `, with a warning after ${warnAfterMinutes} min`} - change these under Edit.
+                    Start and stop times are as accurate as the sensor's reporting interval.
                 </p>
             </div>
         </AuthenticatedLayout>
