@@ -4,6 +4,8 @@
 
 const COLORS = {
     attention: '#d97706',
+    active: '#2563eb',
+    idle: '#4b5563',
     normal: '#16a34a',
     unknown: '#9ca3af',
 };
@@ -14,12 +16,17 @@ const GLYPHS = {
     'gate-closed': '<path d="M3 5v15M21 5v15M3 8h18M3 12h18M3 16h18M3 16L21 8"/>',
     // Swung back on its hinge post, the far post standing alone.
     'gate-open': '<path d="M3 5v15M21 5v15M3 8l8-3M3 12l8-2M3 16l8-1M11 5v10"/>',
+    // A pump's impeller in its housing, with the outlet pipe.
+    pump: '<circle cx="11" cy="12" r="7"/><path d="M11 12V7M11 12l4.3 2.5M11 12l-4.3 2.5M18 9h4"/>',
 };
 
 const STYLES = {
     'gate-closed': { glyph: 'gate-closed', color: COLORS.normal },
     'gate-open': { glyph: 'gate-open', color: COLORS.attention },
     'gate-unknown': { glyph: 'gate-closed', color: COLORS.unknown },
+    'pump-running': { glyph: 'pump', color: COLORS.active },
+    'pump-stopped': { glyph: 'pump', color: COLORS.idle },
+    'pump-unknown': { glyph: 'pump', color: COLORS.unknown },
 };
 
 export function sensorIconSvg(kind, stateKey, size = 34) {

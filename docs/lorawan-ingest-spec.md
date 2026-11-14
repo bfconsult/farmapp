@@ -160,3 +160,27 @@ Decoded with the LDS02 fPort 10 layout (10 bytes; confirm against Dragino's publ
 | 9, bit 0 | Alarm | 0 | 0 |
 
 That fits an open followed by a close 12 seconds later (under a minute, so the duration rounds to 0).
+
+### Current sensor (Milesight CT101-915), 2026-11-14
+The first uplink pasted from the farm's CT101 ("HousePump", not yet clamped on the pump). Same gateway and JSON format as the door sensor, on fPort 85:
+
+```json
+{
+  "data": "039700000000049800000967FFFF",
+  "fCnt": 5,
+  "fPort": 85,
+  "devEUI": "24e12475106fb7c6",
+  "rxInfo": [{ "rssi": -65, "loRaSNR": 14, "gatewayID": "ac1f09fffe291787" }],
+  "timestamp": 1794625498,
+  "deviceName": "HousePump",
+  "data_encode": "hexstring"
+}
+```
+
+Decoded with Milesight's channel layout (`MilesightCt101Decoder`, ported from github.com/Milesight-IoT/SensorDecoders ct-series/ct101-v2):
+
+| Bytes | Channel | Value |
+|---|---|---|
+| `03 97 00000000` | Total current, uint32 LE / 100 Ah | 0 Ah |
+| `04 98 0000` | Current, uint16 LE / 100 A | 0 A |
+| `09 67 FFFF` | Temperature, int16 LE / 10 °C | FFFF = sensor read failed, not stored |

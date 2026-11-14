@@ -9,7 +9,6 @@ use App\Models\Property;
 use App\Models\SensorReading;
 use App\Models\Zone;
 use App\Services\Lorawan\DeviceModels;
-use App\Services\Lorawan\DoorActivity;
 use App\Services\Lorawan\SensorKinds;
 use App\Services\Lorawan\UplinkProcessor;
 use Carbon\Carbon;
@@ -76,6 +75,8 @@ class SensorController extends Controller
             'kind' => ['nullable', Rule::in(SensorKinds::forModel((string) $request->input('model')))],
             'dev_eui' => ['required', 'regex:/^[0-9a-fA-F]{16}$/'],
             ...self::LOCATION_RULES,
+            'settings' => 'nullable|array',
+            ...SensorKinds::settingRules($request->input('kind')),
         ], [
             'kind.in' => 'This sensor can\'t be used as that type.',
             'dev_eui.regex' => 'The DevEUI is 16 hex characters (0-9, A-F), printed on the sensor\'s label.',
@@ -89,7 +90,7 @@ class SensorController extends Controller
         ]);
 
         $device = Device::create([
-            ...$validated,
+            ...$this->withSettings($validated, null),
             'property_id' => session('current_property_id'),
         ]);
 
@@ -106,17 +107,16 @@ class SensorController extends Controller
     {
         $this->authorizeDevice($device);
 
-        if ($device->kind !== 'gate') {
+        $timezone = $request->user()->displayTimezone();
+        $activity = SensorKinds::activity($device, $timezone);
+        if (! $activity) {
             return redirect()->route('manage.sensors.trace', $device);
         }
 
-        $timezone = $request->user()->displayTimezone();
         $month = $request->validate(['month' => ['nullable', 'date_format:Y-m']])['month'] ?? null;
         $monthStart = $month
             ? Carbon::createFromFormat('Y-m-d', $month.'-01', $timezone)->startOfDay()
             : Carbon::now($timezone)->startOfMonth();
-
-        $activity = new DoorActivity($device, $timezone);
 
         return Inertia::render('Manage/Sensors/'.SensorKinds::page($device->kind), [
             'device' => $this->summary($device),
@@ -185,13 +185,17 @@ class SensorController extends Controller
     {
         $this->authorizeDevice($device);
 
-        $device->update($request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'kind' => ['nullable', Rule::in(SensorKinds::forModel($device->model))],
             ...self::LOCATION_RULES,
+            'settings' => 'nullable|array',
+            ...SensorKinds::settingRules($request->input('kind')),
         ], [
             'kind.in' => 'This sensor can\'t be used as that type.',
-        ]));
+        ]);
+
+        $device->update($this->withSettings($validated, $device->config));
 
         return redirect()->route('manage.sensors.show', $device)->with('success', 'Sensor updated.');
     }
@@ -229,6 +233,21 @@ class SensorController extends Controller
         abort_unless($device->property_id === (int) session('current_property_id'), 404);
     }
 
+    /**
+     * The kind's settings go in config, replacing any from a previous kind.
+     */
+    private function withSettings(array $validated, ?array $config): array
+    {
+        $settings = collect($validated['settings'] ?? [])
+            ->only(array_keys(SensorKinds::KINDS[$validated['kind'] ?? '']['settings'] ?? []))
+            ->reject(fn ($value) => $value === null)
+            ->map(fn ($value) => (float) $value)
+            ->all();
+        unset($validated['settings']);
+
+        return [...$validated, 'config' => [...($config ?? []), 'settings' => $settings]];
+    }
+
     private function summary(Device $device): array
     {
         return [
@@ -246,6 +265,8 @@ class SensorController extends Controller
             'last_rssi' => $device->last_rssi,
             'last_snr' => $device->last_snr !== null ? (float) $device->last_snr : null,
             'shown_metrics' => $device->shownMetrics(),
+            'settings' => collect(SensorKinds::KINDS[$device->kind]['settings'] ?? [])
+                ->mapWithKeys(fn ($setting, $name) => [$name => SensorKinds::setting($device, $name)]),
         ];
     }
 

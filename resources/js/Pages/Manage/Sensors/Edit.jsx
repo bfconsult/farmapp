@@ -26,7 +26,11 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary,
         dev_eui: device?.dev_eui ?? prefill?.dev_eui ?? '',
         latitude: device?.latitude ?? null,
         longitude: device?.longitude ?? null,
+        settings: device?.settings ?? {},
     });
+
+    // The chosen kind's settings, e.g. a pump's running threshold.
+    const kindSettings = Object.entries(kinds.find((kind) => kind.value === data.kind)?.settings ?? {});
 
     const hasPin = data.latitude !== null && data.longitude !== null;
     const [showLocationModal, setShowLocationModal] = useState(false);
@@ -169,6 +173,27 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary,
                                 </select>
                                 {errors.kind && <p className="mt-1 text-sm text-red-600">{errors.kind}</p>}
                             </div>
+
+                            {kindSettings.map(([name, setting]) => (
+                                <div key={name} className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{setting.label}</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="number"
+                                            inputMode="decimal"
+                                            step="any"
+                                            min={setting.min}
+                                            max={setting.max}
+                                            value={data.settings[name] ?? setting.default}
+                                            onChange={(e) => setData('settings', { ...data.settings, [name]: e.target.value })}
+                                            className="w-32 border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                        />
+                                        {setting.unit && <span className="text-sm text-gray-500">{setting.unit}</span>}
+                                    </div>
+                                    {setting.help && <p className="mt-1 text-xs text-gray-500">{setting.help}</p>}
+                                    {errors[`settings.${name}`] && <p className="mt-1 text-sm text-red-600">{errors[`settings.${name}`]}</p>}
+                                </div>
+                            ))}
 
                             <div className="mb-6">
                                 <div className="flex items-center justify-between mb-1">

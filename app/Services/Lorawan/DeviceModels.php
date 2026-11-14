@@ -3,6 +3,7 @@
 namespace App\Services\Lorawan;
 
 use App\Services\Lorawan\Decoders\DraginoLds02Decoder;
+use App\Services\Lorawan\Decoders\MilesightCt101Decoder;
 use App\Services\Lorawan\Decoders\SensorDecoder;
 
 /**
@@ -29,6 +30,21 @@ class DeviceModels
                 'water_leak' => ['label' => 'Water leak', 'unit' => null, 'states' => ['Dry', 'Leak'], 'default' => false],
                 'leak_count' => ['label' => 'Leak count', 'unit' => null, 'default' => false],
                 'last_leak_minutes' => ['label' => 'Last leak for', 'unit' => 'min', 'default' => false],
+            ],
+        ],
+        'milesight_ct101' => [
+            'label' => 'Milesight CT101 current sensor',
+            'decoder' => MilesightCt101Decoder::class,
+            'metrics' => [
+                'current' => ['label' => 'Current', 'unit' => 'A', 'default' => true],
+                'temperature' => ['label' => 'Temperature', 'unit' => '°C', 'default' => false],
+                'total_current' => ['label' => 'Total current', 'unit' => 'Ah', 'default' => false],
+                'energy' => ['label' => 'Energy', 'unit' => 'kWh', 'default' => false],
+                'current_alarm' => ['label' => 'Current alarm', 'unit' => null, 'states' => [1 => 'Threshold alarm', 2 => 'Threshold released', 4 => 'Over range', 8 => 'Over range released'], 'default' => false],
+                'current_max' => ['label' => 'Max current (alarm)', 'unit' => 'A', 'default' => false],
+                'current_min' => ['label' => 'Min current (alarm)', 'unit' => 'A', 'default' => false],
+                'temperature_alarm' => ['label' => 'Temperature alarm', 'unit' => null, 'states' => ['Released', 'Alarm'], 'default' => false],
+                'low_battery' => ['label' => 'Low battery', 'unit' => null, 'states' => ['No', 'Yes'], 'default' => false],
             ],
         ],
     ];
