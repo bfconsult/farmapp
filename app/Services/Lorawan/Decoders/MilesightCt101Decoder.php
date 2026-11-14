@@ -16,7 +16,7 @@ namespace App\Services\Lorawan\Decoders;
  *   13 75  1  low battery alarm - firmware v2
  *   84 98  7  current alarm: max, min, current (uint16 / 100 each) + alarm bits
  *   89 67  3  temperature alarm: temperature (int16 / 10) + 0/1 alarm
- *   FF 0B  1  device status - sent when it powers on, e.g. after a new battery
+ *   FF 0B  1  device status - sent when it powers on
  *   FF xx     other device information (versions, serial number, ...) - skipped
  */
 class MilesightCt101Decoder implements SensorDecoder

@@ -163,15 +163,19 @@ test('a CT101 uplink is stored and puts the pump on the map running', function (
         );
 });
 
-test('a low battery alarm shows on the pump page until the sensor restarts', function () {
-    pumpPage($this)->assertInertia(fn ($page) => $page->where('device.low_battery_since', null));
+test('a low battery shows on the pump page while the sensor keeps reporting it', function () {
+    pumpPage($this)->assertInertia(fn ($page) => $page->where('device.low_battery', null));
 
-    SensorReading::create(['device_id' => $this->device->id, 'recorded_at' => Carbon::parse('2026-11-14 10:00', 'Australia/Adelaide')->utc(), 'metric' => 'low_battery', 'value' => 1, 'f_cnt' => ++$this->fCnt]);
+    // "Now" is 12:00; it repeats the alarm every couple of minutes.
+    SensorReading::create(['device_id' => $this->device->id, 'recorded_at' => Carbon::parse('2026-11-20 11:20', 'Australia/Adelaide')->utc(), 'metric' => 'low_battery', 'value' => 1, 'f_cnt' => ++$this->fCnt]);
+    SensorReading::create(['device_id' => $this->device->id, 'recorded_at' => Carbon::parse('2026-11-20 11:22', 'Australia/Adelaide')->utc(), 'metric' => 'low_battery', 'value' => 1, 'f_cnt' => ++$this->fCnt]);
 
-    pumpPage($this)->assertInertia(fn ($page) => $page->where('device.low_battery_since', adelaideIso('2026-11-14 10:00')));
+    pumpPage($this)->assertInertia(fn ($page) => $page
+        ->where('device.low_battery.reported_at', adelaideIso('2026-11-20 11:22'))
+        ->where('device.low_battery.advice', fn ($advice) => str_contains($advice, 'charges itself'))
+    );
 
-    // A new battery restarts it.
-    SensorReading::create(['device_id' => $this->device->id, 'recorded_at' => Carbon::parse('2026-11-15 09:00', 'Australia/Adelaide')->utc(), 'metric' => 'powered_on', 'value' => 1, 'f_cnt' => ++$this->fCnt]);
-
-    pumpPage($this)->assertInertia(fn ($page) => $page->where('device.low_battery_since', null));
+    // An hour with no alarm: it has charged.
+    Carbon::setTestNow(Carbon::parse('2026-11-20 12:30', 'Australia/Adelaide')->utc());
+    pumpPage($this)->assertInertia(fn ($page) => $page->where('device.low_battery', null));
 });

@@ -47,9 +47,14 @@ class DeviceModels
                 'low_battery' => ['label' => 'Low battery', 'unit' => null, 'states' => ['No', 'Yes'], 'default' => false],
                 'powered_on' => ['label' => 'Powered on', 'unit' => null, 'states' => [1 => 'Yes'], 'default' => false],
             ],
-            // It sends an alarm when its battery runs low but never an
-            // all-clear; it restarts, and says so, when the battery is changed.
-            'low_battery_alarm' => ['metric' => 'low_battery', 'cleared_by' => 'powered_on'],
+            // It repeats this alarm every couple of minutes while its battery
+            // is low and sends no all-clear, so the alarm stopping is the
+            // all-clear. The battery is built in and charges from the cable.
+            'low_battery_alarm' => [
+                'metric' => 'low_battery',
+                'repeats_within_minutes' => 60,
+                'advice' => 'It charges itself from the current it measures, so this clears once the pump has run for a while.',
+            ],
         ],
     ];
 

@@ -61,27 +61,27 @@ class Device extends Model
     }
 
     /**
-     * When it reported a low battery, if it hasn't been cleared since - for
-     * models that send a low-battery alarm (DeviceModels 'low_battery_alarm').
+     * Its latest low-battery alarm as {reported_at, advice}, while the
+     * alarm is still repeating - for models that send one (DeviceModels
+     * 'low_battery_alarm').
      */
-    public function lowBatterySince(): ?Carbon
+    public function lowBattery(): ?array
     {
         $alarm = DeviceModels::MODELS[$this->model]['low_battery_alarm'] ?? null;
         if (! $alarm) {
             return null;
         }
 
-        $reportedAt = $this->readings()->where('metric', $alarm['metric'])->where('value', 1)->max('recorded_at');
-        if (! $reportedAt) {
-            return null;
-        }
+        $reportedAt = $this->readings()
+            ->where('metric', $alarm['metric'])
+            ->where('value', 1)
+            ->where('recorded_at', '>=', now()->subMinutes($alarm['repeats_within_minutes']))
+            ->max('recorded_at');
 
-        $cleared = $this->readings()
-            ->where('metric', $alarm['cleared_by'])
-            ->where('recorded_at', '>', $reportedAt)
-            ->exists();
-
-        return $cleared ? null : Carbon::parse($reportedAt, 'UTC');
+        return $reportedAt ? [
+            'reported_at' => Carbon::parse($reportedAt, 'UTC')->toIso8601String(),
+            'advice' => $alarm['advice'],
+        ] : null;
     }
 
     /**

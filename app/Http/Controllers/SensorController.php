@@ -262,7 +262,7 @@ class SensorController extends Controller
             'dev_eui' => $device->dev_eui,
             'last_seen_at' => $device->last_seen_at,
             'battery' => $device->battery !== null ? (float) $device->battery : null,
-            'low_battery_since' => $device->lowBatterySince()?->toIso8601String(),
+            'low_battery' => $device->lowBattery(),
             'last_rssi' => $device->last_rssi,
             'last_snr' => $device->last_snr !== null ? (float) $device->last_snr : null,
             'shown_metrics' => $device->shownMetrics(),
