@@ -31,9 +31,9 @@ test('decodes a current alarm', function () {
     ]);
 });
 
-test('skips device information to reach the readings after it', function () {
+test('notes a power-on and skips other device information to reach the readings after it', function () {
     expect(ct101('FF0BFF'.'FF0101'.'FF166746D38802580000'.'FF090100'.'FF0A0101'.'FF0F00'.'04983200'))
-        ->toBe(['current' => 0.5]);
+        ->toBe(['powered_on' => 1, 'current' => 0.5]);
 });
 
 test('decodes several readings in one uplink, including below-zero temperatures', function () {
@@ -54,4 +54,9 @@ test('a truncated channel is rejected', function () {
 // the pump (docs/lorawan-ingest-spec.md, "Captured samples").
 test('decodes a real uplink, leaving out the failed temperature reading', function () {
     expect(ct101('039700000000049800000967FFFF'))->toBe(['total_current' => 0, 'current' => 0]);
+});
+
+test('decodes real uplinks from the pump running and the low battery alarm', function () {
+    expect(ct101('03970A00000004981F010967FFFF'))->toBe(['total_current' => 0.1, 'current' => 2.87])
+        ->and(ct101('137501'))->toBe(['low_battery' => 1]);
 });

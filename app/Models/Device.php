@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Lorawan\DeviceModels;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -57,6 +58,30 @@ class Device extends Model
     public function shownMetrics(): array
     {
         return $this->config['shown_metrics'] ?? DeviceModels::defaultMetrics($this->model);
+    }
+
+    /**
+     * When it reported a low battery, if it hasn't been cleared since - for
+     * models that send a low-battery alarm (DeviceModels 'low_battery_alarm').
+     */
+    public function lowBatterySince(): ?Carbon
+    {
+        $alarm = DeviceModels::MODELS[$this->model]['low_battery_alarm'] ?? null;
+        if (! $alarm) {
+            return null;
+        }
+
+        $reportedAt = $this->readings()->where('metric', $alarm['metric'])->where('value', 1)->max('recorded_at');
+        if (! $reportedAt) {
+            return null;
+        }
+
+        $cleared = $this->readings()
+            ->where('metric', $alarm['cleared_by'])
+            ->where('recorded_at', '>', $reportedAt)
+            ->exists();
+
+        return $cleared ? null : Carbon::parse($reportedAt, 'UTC');
     }
 
     /**

@@ -162,3 +162,16 @@ test('a CT101 uplink is stored and puts the pump on the map running', function (
             ->where('sensors.0.state', ['key' => 'running', 'label' => 'Running'])
         );
 });
+
+test('a low battery alarm shows on the pump page until the sensor restarts', function () {
+    pumpPage($this)->assertInertia(fn ($page) => $page->where('device.low_battery_since', null));
+
+    SensorReading::create(['device_id' => $this->device->id, 'recorded_at' => Carbon::parse('2026-11-14 10:00', 'Australia/Adelaide')->utc(), 'metric' => 'low_battery', 'value' => 1, 'f_cnt' => ++$this->fCnt]);
+
+    pumpPage($this)->assertInertia(fn ($page) => $page->where('device.low_battery_since', adelaideIso('2026-11-14 10:00')));
+
+    // A new battery restarts it.
+    SensorReading::create(['device_id' => $this->device->id, 'recorded_at' => Carbon::parse('2026-11-15 09:00', 'Australia/Adelaide')->utc(), 'metric' => 'powered_on', 'value' => 1, 'f_cnt' => ++$this->fCnt]);
+
+    pumpPage($this)->assertInertia(fn ($page) => $page->where('device.low_battery_since', null));
+});

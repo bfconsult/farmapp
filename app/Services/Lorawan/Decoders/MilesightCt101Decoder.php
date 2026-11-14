@@ -16,7 +16,8 @@ namespace App\Services\Lorawan\Decoders;
  *   13 75  1  low battery alarm - firmware v2
  *   84 98  7  current alarm: max, min, current (uint16 / 100 each) + alarm bits
  *   89 67  3  temperature alarm: temperature (int16 / 10) + 0/1 alarm
- *   FF xx     device information (versions, serial number, ...) - skipped
+ *   FF 0B  1  device status - sent when it powers on, e.g. after a new battery
+ *   FF xx     other device information (versions, serial number, ...) - skipped
  */
 class MilesightCt101Decoder implements SensorDecoder
 {
@@ -29,7 +30,6 @@ class MilesightCt101Decoder implements SensorDecoder
         0x16 => 8, // serial number
         0x0F => 1, // LoRaWAN class
         0xFE => 1, // reset event
-        0x0B => 1, // device status
     ];
 
     public function decode(string $bytes, int $fPort): array
@@ -93,6 +93,12 @@ class MilesightCt101Decoder implements SensorDecoder
                     $values['temperature'] = $this->int16($b, $i) / 10;
                     $values['temperature_alarm'] = $b[$i + 2] === 1 ? 1 : 0;
                     $i += 3;
+                    break;
+
+                case $id === 0xFF && $type === 0x0B:
+                    $this->expectBytes($b, $i, 1);
+                    $values['powered_on'] = 1;
+                    $i += 1;
                     break;
 
                 case $id === 0xFF && isset(self::INFO_LENGTHS[$type]):

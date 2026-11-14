@@ -106,6 +106,15 @@ export function SensorStatusCard({ device, state, since, today, middle }) {
 
     return (
         <div className="bg-white rounded-lg shadow p-4">
+            {device.low_battery_since && (
+                <div className="mb-3 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+                    <p className="font-medium">Low battery</p>
+                    <p className="text-xs">
+                        Reported {formatSince(device.low_battery_since, today)}. Replace the battery soon - this
+                        clears when the sensor restarts.
+                    </p>
+                </div>
+            )}
             {state ? (
                 <div className="flex items-center gap-3">
                     <SensorStateIcon kind={device.kind} state={state} size={36} />

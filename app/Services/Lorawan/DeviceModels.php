@@ -45,7 +45,11 @@ class DeviceModels
                 'current_min' => ['label' => 'Min current (alarm)', 'unit' => 'A', 'default' => false],
                 'temperature_alarm' => ['label' => 'Temperature alarm', 'unit' => null, 'states' => ['Released', 'Alarm'], 'default' => false],
                 'low_battery' => ['label' => 'Low battery', 'unit' => null, 'states' => ['No', 'Yes'], 'default' => false],
+                'powered_on' => ['label' => 'Powered on', 'unit' => null, 'states' => [1 => 'Yes'], 'default' => false],
             ],
+            // It sends an alarm when its battery runs low but never an
+            // all-clear; it restarts, and says so, when the battery is changed.
+            'low_battery_alarm' => ['metric' => 'low_battery', 'cleared_by' => 'powered_on'],
         ],
     ];
 
