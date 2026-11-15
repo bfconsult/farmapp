@@ -115,6 +115,54 @@ test('the open count starting again after the sensor rejoins counts as new openi
     gatePage($this)->assertInertia(fn ($page) => $page->where('days.2026-11-06', 1));
 });
 
+test('a gate bouncing shut counts as one opening', function () {
+    // As the farm's gate sent it on 2026-11-14: open, close, and open
+    // and close again 6 seconds later.
+    gateUplink($this, '2026-11-14 15:00', 0, 124);
+    gateUplink($this, '2026-11-14 15:32:14', 1, 125);
+    gateUplink($this, '2026-11-14 15:32:17', 0, 125);
+    gateUplink($this, '2026-11-14 15:32:23', 1, 126);
+    gateUplink($this, '2026-11-14 15:32:25', 0, 126);
+    // Another bounce known only from the count, 3 seconds after the close.
+    gateUplink($this, '2026-11-14 15:32:28', 0, 127);
+
+    gatePage($this)->assertInertia(fn ($page) => $page
+        ->where('days.2026-11-14', 1)
+        ->has('openings', 1)
+        ->where('openings.0.opened_at', Carbon::parse('2026-11-14 15:32:14', 'Australia/Adelaide')->utc()->toIso8601String())
+        ->where('openings.0.closed_at', Carbon::parse('2026-11-14 15:32:28', 'Australia/Adelaide')->utc()->toIso8601String())
+        ->where('openings.0.seconds', 14)
+        ->where('openings.0.missed', 0)
+        ->missing('openings.0.at')
+    );
+});
+
+test('a re-open more than 15 seconds after the close is a new opening', function () {
+    gateUplink($this, '2026-11-14 15:00', 0, 124);
+    gateUplink($this, '2026-11-14 15:32:00', 1, 125);
+    gateUplink($this, '2026-11-14 15:32:10', 0, 125);
+    gateUplink($this, '2026-11-14 15:32:26', 1, 126);
+    gateUplink($this, '2026-11-14 15:32:30', 0, 126);
+
+    gatePage($this)->assertInertia(fn ($page) => $page
+        ->where('days.2026-11-14', 2)
+        ->has('openings', 2)
+    );
+});
+
+test('a bounce that ends with the gate left open stays open', function () {
+    gateUplink($this, '2026-11-14 15:00', 0, 124);
+    gateUplink($this, '2026-11-14 15:32:14', 1, 125);
+    gateUplink($this, '2026-11-14 15:32:17', 0, 125);
+    gateUplink($this, '2026-11-14 15:32:20', 1, 126);
+
+    gatePage($this)->assertInertia(fn ($page) => $page
+        ->has('openings', 1)
+        ->where('openings.0.closed_at', null)
+        ->where('openings.0.seconds', null)
+    );
+});
+
 test('a bad month is rejected', function () {
     gatePage($this, ['month' => 'november'])->assertSessionHasErrors('month');
 });

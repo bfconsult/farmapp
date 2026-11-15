@@ -17,6 +17,13 @@ class DoorActivity
 {
     private const METRICS = ['door_open', 'open_count', 'last_open_minutes'];
 
+    /**
+     * A gate swinging shut bounces the magnet past the reed switch, so one
+     * use often arrives as open/close/open/close a few seconds apart. A
+     * re-open within this long of the close is the same opening.
+     */
+    public const DEBOUNCE_SECONDS = 15;
+
     public function __construct(private Device $device, private string $timezone) {}
 
     /**
@@ -64,14 +71,22 @@ class DoorActivity
                         'closed_at' => null,
                         'seconds' => null,
                         'missed' => $opened,
+                        // When it was seen, for debouncing - not sent.
+                        'at' => $uplink['at'],
                     ];
                 }
             }
 
             if ($inMonth) {
-                $days[$this->date($uplink['at'])] = ($days[$this->date($uplink['at'])] ?? 0) + $opened;
+                // Days it reported on show 0, not "no data".
+                $days[$this->date($uplink['at'])] ??= 0;
             }
             $previous = $uplink;
+        }
+
+        $openings = $this->debounce($openings);
+        foreach ($openings as $opening) {
+            $days[$opening['date']] += ($opening['opened_at'] ? 1 : 0) + $opening['missed'];
         }
 
         $first = $this->device->readings()->where('metric', 'door_open')->min('recorded_at');
@@ -79,12 +94,45 @@ class DoorActivity
         return [
             'days' => $days,
             'openings' => array_map(fn ($opening) => [
-                ...$opening,
+                ...collect($opening)->except('at')->all(),
                 'opened_at' => $opening['opened_at']?->toIso8601String(),
                 'closed_at' => $opening['closed_at']?->toIso8601String(),
             ], $openings),
             'firstDate' => $first ? $this->date(Carbon::parse($first, 'UTC')) : null,
         ];
+    }
+
+    /**
+     * Folds each opening that starts within DEBOUNCE_SECONDS of the one
+     * before closing into that one, which now closes when it does. Openings
+     * counted from the total in the same window are bounces too, so their
+     * count is dropped.
+     */
+    private function debounce(array $openings): array
+    {
+        $kept = [];
+        foreach ($openings as $opening) {
+            $last = array_key_last($kept);
+            $startedAt = $opening['opened_at'] ?? $opening['at'] ?? null;
+
+            $gap = $last !== null && $kept[$last]['closed_at'] && $startedAt
+                ? $kept[$last]['closed_at']->diffInSeconds($startedAt)
+                : null;
+
+            if ($gap !== null && $gap >= 0 && $gap <= self::DEBOUNCE_SECONDS) {
+                // A count-only one was open and closed again by the uplink
+                // that reported it.
+                $closedAt = $opening['opened_at'] ? $opening['closed_at'] : $opening['at'];
+                $kept[$last]['closed_at'] = $closedAt;
+                $kept[$last]['seconds'] = $closedAt ? (int) $kept[$last]['opened_at']->diffInSeconds($closedAt) : null;
+
+                continue;
+            }
+
+            $kept[] = $opening;
+        }
+
+        return $kept;
     }
 
     /**
