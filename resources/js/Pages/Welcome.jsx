@@ -58,6 +58,27 @@ const featureCards = [
     },
 ];
 
+// LoRaWAN support (App\Services\Lorawan). Only claim what's built: the
+// supported models are App\Services\Lorawan\DeviceModels.
+const sensorCards = [
+    {
+        title: 'Gates',
+        description: 'See whether a gate is open or closed, and how many times it opened each day - including openings the gateway didn’t hear.',
+    },
+    {
+        title: 'Pumps',
+        description: 'A clamp-on current sensor shows when a pump runs and for how long, and emails you if it runs longer than it should.',
+    },
+    {
+        title: 'On the map',
+        description: 'Every sensor sits on the property map in its current state, right alongside your jobs and paddocks.',
+    },
+    {
+        title: 'Your own gateway',
+        description: 'Register your LoRaWAN gateway with its own key. Battery and signal are shown for every sensor, so you know it’s still working.',
+    },
+];
+
 // Placeholder testimonials pending real customer quotes - see "Assets
 // Needed" in the design handoff README.
 const testimonials = [
@@ -109,6 +130,9 @@ export default function Welcome({ auth }) {
                             </a>
                             <a href="#features" className="hidden text-sm font-medium text-[#5b5b4d] hover:text-[#22271f] sm:inline">
                                 Features
+                            </a>
+                            <a href="#sensors" className="hidden text-sm font-medium text-[#5b5b4d] hover:text-[#22271f] sm:inline">
+                                Sensors
                             </a>
                             {!auth.user && (
                                 <Link href={route('login')} className="text-sm font-medium text-[#5b5b4d] hover:text-[#22271f]">
@@ -228,6 +252,40 @@ export default function Welcome({ auth }) {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    </section>
+
+                    {/* Sensors */}
+                    <section id="sensors" className="bg-white py-24">
+                        <div className="mx-auto max-w-6xl px-6">
+                            <p className="font-display text-sm font-bold uppercase tracking-widest text-[#c1622d]">
+                                LoRaWAN sensors
+                            </p>
+                            <h2 className="mt-3 max-w-3xl font-display text-3xl font-extrabold text-[#22271f] sm:text-4xl">
+                                Know what’s happening on the property without driving out to check
+                            </h2>
+                            <p className="mt-4 max-w-2xl text-lg text-[#5b5b4d]">
+                                LoRaWAN sensors run for years on a battery and reach kilometres back to a
+                                gateway. Connect yours to FieldWerkz and their readings turn into something
+                                you can read at a glance - on the map, on a calendar, and in your inbox when
+                                something needs attention.
+                            </p>
+                            <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                                {sensorCards.map((card) => (
+                                    <div key={card.title} className="rounded-2xl border border-[#e4dbc8] bg-[#f6f1e7] p-8">
+                                        <h3 className="font-display text-xl font-bold text-[#22271f]">{card.title}</h3>
+                                        <p className="mt-3 text-[#5b5b4d]">{card.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="mt-10 text-sm text-[#5b5b4d]">
+                                Works today with the Dragino LDS02 door/gate sensor and the Milesight CT101
+                                current sensor, with more on the way.{' '}
+                                <Link href={route('contact')} className="font-semibold text-[#1a5c38] hover:underline">
+                                    Tell us which sensor you need
+                                </Link>
+                                .
+                            </p>
                         </div>
                     </section>
 
