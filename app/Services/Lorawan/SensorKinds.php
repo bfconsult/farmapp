@@ -39,6 +39,9 @@ class SensorKinds
             // ...or, with a threshold, whether it's above that setting. A
             // stopped pump's circuit doesn't always read zero.
             'state_threshold' => 'running_above',
+            // Its state is only shown while this fresh; after that it's
+            // "Not reporting" rather than whatever it last said.
+            'stale_after_minutes' => PumpActivity::STALE_AFTER_MINUTES,
             'states' => [
                 0 => ['key' => 'stopped', 'label' => 'Stopped'],
                 1 => ['key' => 'running', 'label' => 'Running'],
@@ -163,6 +166,13 @@ class SensorKinds
             ->latest('id')
             ->first();
 
-        return $reading ? ($kind['states'][self::stateIndex($device, $reading->value)] ?? null) : null;
+        if (! $reading) {
+            return null;
+        }
+        if (isset($kind['stale_after_minutes']) && $reading->recorded_at->lt(now()->subMinutes($kind['stale_after_minutes']))) {
+            return ['key' => 'not_reporting', 'label' => 'Not reporting'];
+        }
+
+        return $kind['states'][self::stateIndex($device, $reading->value)] ?? null;
     }
 }

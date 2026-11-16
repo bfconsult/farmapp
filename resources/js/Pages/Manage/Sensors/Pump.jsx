@@ -51,7 +51,7 @@ export default function Pump({ device, status, month, today, days, runs, firstDa
     const [selected, setSelected] = useState(initialDay(month, today, days));
 
     // Running past its warning limit (0 = no limit).
-    const runningMinutes = status?.running && status.since ? (Date.now() - new Date(status.since).getTime()) / 60000 : 0;
+    const runningMinutes = status?.reporting && status.running && status.since ? (Date.now() - new Date(status.since).getTime()) / 60000 : 0;
     const runningLong = warnAfterMinutes > 0 && runningMinutes > warnAfterMinutes;
 
     const total = Object.values(days).reduce((sum, seconds) => sum + seconds, 0);
@@ -66,12 +66,15 @@ export default function Pump({ device, status, month, today, days, runs, firstDa
 
                 <SensorStatusCard
                     device={device}
-                    state={status && (status.running
-                        ? { key: 'running', label: runningLong ? `Running ${formatDuration(runningMinutes * 60)}` : 'Running', tone: runningLong ? 'attention' : 'active' }
-                        : { key: 'stopped', label: 'Stopped' })}
-                    since={status?.since}
+                    state={status && (!status.reporting
+                        // Quiet too long to say whether it's still running.
+                        ? { key: 'not_reporting', label: 'Not reporting' }
+                        : status.running
+                            ? { key: 'running', label: runningLong ? `Running ${formatDuration(runningMinutes * 60)}` : 'Running', tone: runningLong ? 'attention' : 'active' }
+                            : { key: 'stopped', label: 'Stopped' })}
+                    since={status?.reporting ? status.since : status?.last_reading_at}
                     today={today}
-                    middle={{ label: 'Current', value: status ? `${status.current} A` : '—' }}
+                    middle={{ label: status && !status.reporting ? 'Last current' : 'Current', value: status ? `${status.current} A` : '—' }}
                 />
 
                 <SensorMonthCalendar

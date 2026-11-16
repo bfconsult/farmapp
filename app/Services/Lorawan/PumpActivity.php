@@ -18,6 +18,11 @@ class PumpActivity
     // last one, rather than running through a gap of lost uplinks.
     private const MAX_GAP_SECONDS = 2 * 60 * 60;
 
+    // With no current reading for this long, it's not known whether it's
+    // still running: the status shows "Not reporting" and a run in progress
+    // ends at its last reading. The CT101 reports every 2 minutes.
+    public const STALE_AFTER_MINUTES = 15;
+
     private float $threshold;
 
     public function __construct(private Device $device, private string $timezone)
@@ -102,6 +107,8 @@ class PumpActivity
             // Unknown when this state is all it has ever reported.
             'since' => $since ? Carbon::parse($since, 'UTC')->toIso8601String() : null,
             'current' => $latest->value,
+            'reporting' => $latest->recorded_at->gte(Carbon::now()->subMinutes(self::STALE_AFTER_MINUTES)),
+            'last_reading_at' => $latest->recorded_at->toIso8601String(),
         ];
     }
 
@@ -151,8 +158,8 @@ class PumpActivity
         }
 
         if ($run) {
-            // Still running, unless it has gone quiet for too long.
-            $stale = $run['last_at']->diffInSeconds(Carbon::now()) > self::MAX_GAP_SECONDS;
+            // Still running, unless it has gone quiet.
+            $stale = $run['last_at']->diffInSeconds(Carbon::now()) > self::STALE_AFTER_MINUTES * 60;
             $runs->push([
                 ...$run,
                 'ended_at' => $stale ? $run['last_at'] : null,

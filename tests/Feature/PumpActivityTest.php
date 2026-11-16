@@ -109,6 +109,37 @@ test('a run that goes quiet for hours ends at its last reading', function () {
     );
 });
 
+test('a pump that stops reporting while running shows as not reporting, not running', function () {
+    // As the farm's CT101 did on 2026-11-16: running, then silent.
+    $this->device->update(['latitude' => -34.9, 'longitude' => 138.6]);
+    pumpReading($this, '2026-11-20 10:00', 0.0);
+    pumpReading($this, '2026-11-20 11:07', 2.67);
+
+    pumpPage($this)->assertInertia(fn ($page) => $page
+        ->where('status.reporting', false)
+        ->where('status.last_reading_at', adelaideIso('2026-11-20 11:07'))
+        ->where('status.current', 2.67)
+        ->where('runs.0.ended_at', adelaideIso('2026-11-20 11:07'))
+        ->where('days.2026-11-20', 0)
+    );
+
+    $this->actingAs($this->user)->withSession(['current_property_id' => $this->property->id])
+        ->get(route('map'))
+        ->assertInertia(fn ($page) => $page
+            ->where('sensors.0.state', ['key' => 'not_reporting', 'label' => 'Not reporting'])
+        );
+});
+
+test('a pump that reported in the last 15 minutes is still reporting', function () {
+    pumpReading($this, '2026-11-20 11:46', 2.67);
+
+    pumpPage($this)->assertInertia(fn ($page) => $page
+        ->where('status.reporting', true)
+        ->where('status.running', true)
+        ->where('runs.0.ended_at', null)
+    );
+});
+
 test('the running threshold is set per sensor', function () {
     pumpReading($this, '2026-11-07 08:00', 0.8);
     pumpReading($this, '2026-11-07 09:00', 0.0);
