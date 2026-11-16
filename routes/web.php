@@ -108,6 +108,9 @@ Route::middleware('auth')->group(function () {
 // everything else - gated on the app_admin flag, not a per-property role.
 Route::middleware(['auth', 'app.admin'])->group(function () {
     Route::get('app-admin/report', [AppAdminController::class, 'index'])->name('app-admin.report');
+    Route::get('app-admin/users/{user}/delete-preview', [AppAdminController::class, 'deletePreview'])->name('app-admin.users.delete-preview');
+    Route::post('app-admin/users/{user}/deactivate', [AppAdminController::class, 'deactivate'])->name('app-admin.users.deactivate');
+    Route::delete('app-admin/users/{user}', [AppAdminController::class, 'destroy'])->name('app-admin.users.destroy');
 });
 
 // Admin only routes
