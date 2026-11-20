@@ -18,6 +18,8 @@ const GLYPHS = {
     'gate-open': '<path d="M3 5v15M21 5v15M3 8l8-3M3 12l8-2M3 16l8-1M11 5v10"/>',
     // A pump's impeller in its housing, with the outlet pipe.
     pump: '<circle cx="11" cy="12" r="7"/><path d="M11 12V7M11 12l4.3 2.5M11 12l-4.3 2.5M18 9h4"/>',
+    // An upright round tank, with the water line across it.
+    tank: '<path d="M5 6c0-1.7 14-1.7 14 0v13c0 1.7-14 1.7-14 0z"/><path d="M5 13c2.3 1 4.7-1 7 0s4.7 1 7 0"/>',
 };
 
 const STYLES = {
@@ -27,6 +29,9 @@ const STYLES = {
     'pump-running': { glyph: 'pump', color: COLORS.active },
     'pump-stopped': { glyph: 'pump', color: COLORS.idle },
     'pump-unknown': { glyph: 'pump', color: COLORS.unknown },
+    'tank-ok': { glyph: 'tank', color: COLORS.active },
+    'tank-low': { glyph: 'tank', color: COLORS.attention },
+    'tank-unknown': { glyph: 'tank', color: COLORS.unknown },
 };
 
 export function sensorIconSvg(kind, stateKey, size = 34) {

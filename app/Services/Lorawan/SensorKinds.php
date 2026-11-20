@@ -65,6 +65,52 @@ class SensorKinds
                 ],
             ],
         ],
+        'tank' => [
+            'label' => 'Water tank',
+            'page' => 'Tank',
+            'activity' => TankActivity::class,
+            'requires' => ['distance'],
+            'state_metric' => 'distance',
+            // ...or worked out by a resolver from the reading, here the
+            // level from the tank's size (ok / low / unknown until it's set).
+            'state' => [TankActivity::class, 'state'],
+            'stale_after_minutes' => TankActivity::STALE_AFTER_MINUTES,
+            'states' => [],
+            'settings' => [
+                'empty_distance' => [
+                    'label' => 'Distance when empty',
+                    'unit' => 'mm',
+                    'default' => null,
+                    'min' => 0,
+                    'max' => 20000,
+                    'help' => 'From the sensor down to the tank floor, or to the outlet if water below it can\'t be used.',
+                ],
+                'full_distance' => [
+                    'label' => 'Distance when full',
+                    'unit' => 'mm',
+                    'default' => null,
+                    'min' => 0,
+                    'max' => 20000,
+                    'help' => 'From the sensor down to the water when the tank is full (the overflow). The sensor can\'t measure closer than 280 mm.',
+                ],
+                'capacity' => [
+                    'label' => 'Capacity',
+                    'unit' => 'L',
+                    'default' => null,
+                    'min' => 0,
+                    'max' => 10000000,
+                    'help' => 'Litres when full. Leave it empty to show the level as a percentage only.',
+                ],
+                'warn_below_percent' => [
+                    'label' => 'Warn when below',
+                    'unit' => '%',
+                    'default' => 20,
+                    'min' => 0,
+                    'max' => 100,
+                    'help' => 'Admins and managers are emailed once when it drops below this, and again only after it has refilled. 0 turns it off.',
+                ],
+            ],
+        ],
     ];
 
     public static function label(?string $kind): ?string
@@ -171,6 +217,10 @@ class SensorKinds
         }
         if (isset($kind['stale_after_minutes']) && $reading->recorded_at->lt(now()->subMinutes($kind['stale_after_minutes']))) {
             return ['key' => 'not_reporting', 'label' => 'Not reporting'];
+        }
+
+        if (isset($kind['state'])) {
+            return call_user_func($kind['state'], $device, $reading);
         }
 
         return $kind['states'][self::stateIndex($device, $reading->value)] ?? null;

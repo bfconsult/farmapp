@@ -3,6 +3,7 @@
 namespace App\Services\Lorawan;
 
 use App\Mail\PumpRunningLong;
+use App\Mail\TankLow;
 use App\Models\Device;
 use App\Models\Role;
 use App\Models\User;
@@ -29,6 +30,9 @@ class SensorAlerts
         try {
             if ($device->kind === 'pump') {
                 $this->pumpRunningLong($device);
+            }
+            if ($device->kind === 'tank') {
+                $this->tankLow($device);
             }
         } catch (\Throwable $e) {
             // A warning that can't be sent mustn't lose the reading.
@@ -60,6 +64,39 @@ class SensorAlerts
 
         foreach ($this->recipients($device) as $user) {
             Mail::to($user->email)->send(new PumpRunningLong($device, $since, $minutes));
+        }
+    }
+
+    /**
+     * Once when a tank drops below its 'warn_below_percent' setting (0 turns
+     * it off), then not again until it has refilled a little above it.
+     */
+    private function tankLow(Device $device): void
+    {
+        $reading = $device->readings()->where('metric', 'distance')->latest('recorded_at')->latest('id')->first();
+        $level = $reading ? TankActivity::level($device, $reading->value) : null;
+        if (! $level) {
+            return;
+        }
+
+        $warnBelow = (float) SensorKinds::setting($device, 'warn_below_percent');
+        $alerted = $device->config['alerted']['tank_low'] ?? null;
+        $config = $device->config ?? [];
+
+        if ($alerted && $level['percent'] >= $warnBelow + TankActivity::REARM_ABOVE_PERCENT) {
+            unset($config['alerted']['tank_low']);
+            $device->update(['config' => $config]);
+
+            return;
+        }
+        if ($alerted || ! TankActivity::isLow($device, $level)) {
+            return;
+        }
+
+        $device->update(['config' => [...$config, 'alerted' => [...($config['alerted'] ?? []), 'tank_low' => $reading->recorded_at->toIso8601String()]]]);
+
+        foreach ($this->recipients($device) as $user) {
+            Mail::to($user->email)->send(new TankLow($device, $level));
         }
     }
 
