@@ -76,6 +76,13 @@ class SensorKinds
             'state' => [TankActivity::class, 'state'],
             'stale_after_minutes' => TankActivity::STALE_AFTER_MINUTES,
             'states' => [],
+            // What it can record for a Metric linked to it (MetricsFromSensors):
+            // the value its state metric's reading means, or null if it can't
+            // be worked out (here, until the tank's capacity is set).
+            'metric' => [
+                'label' => 'litres in the tank',
+                'value' => [TankActivity::class, 'litres'],
+            ],
             'settings' => [
                 'empty_distance' => [
                     'label' => 'Distance when empty',

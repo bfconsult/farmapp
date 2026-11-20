@@ -46,6 +46,15 @@ class TankActivity
         ];
     }
 
+    /**
+     * The litres a distance reading means, or null until the tank's size
+     * and capacity are set - what a Metric linked to it records.
+     */
+    public static function litres(Device $device, float $distance): ?float
+    {
+        return self::level($device, $distance)['litres'] ?? null;
+    }
+
     public static function isLow(Device $device, ?array $level): bool
     {
         $warnBelow = (float) SensorKinds::setting($device, 'warn_below_percent');

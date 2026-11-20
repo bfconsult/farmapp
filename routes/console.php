@@ -10,6 +10,8 @@ Artisan::command('inspire', function () {
 
 Schedule::command('jobs:generate-recurring')->daily();
 Schedule::command('metrics:generate-measurements')->daily();
+// Hourly, so a period is filled soon after it ends wherever the property is.
+Schedule::command('metrics:fill-from-sensors')->hourly();
 Schedule::command('maintenance:generate-jobs')->daily();
 Schedule::command('reminders:send')->daily();
 Schedule::command('reports:send-weekly-summary')->weeklyOn(1, '07:00');

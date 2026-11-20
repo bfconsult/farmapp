@@ -31,6 +31,7 @@ export default function Show({ measurement }) {
             : measurement.value_text ?? ''
     );
 
+    const sensor = measurement.metric?.device;
     const valueField = measurement.answer_type === 'number' ? 'value_number' : 'value_text';
 
     const addMeasurement = () => {
@@ -132,6 +133,17 @@ export default function Show({ measurement }) {
                     <label className="block text-sm font-medium text-gray-700">
                         {measurement.answer_type === 'number' ? 'Value' : 'Notes'}
                     </label>
+                    {sensor && measurement.source === 'sensor' && measurement.status === 'complete' && (
+                        <p className="text-xs text-blue-700">
+                            From the {sensor.name} sensor's reading at {new Date(measurement.completed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.
+                            Re-measure to change it by hand.
+                        </p>
+                    )}
+                    {sensor && !measurement.source && measurement.status === 'incomplete' && (
+                        <p className="text-xs text-blue-700">
+                            This is filled in from the {sensor.name} sensor when the period ends, or you can enter it now.
+                        </p>
+                    )}
                     {measurement.status === 'incomplete' ? (
                         <>
                             {measurement.answer_type === 'number' ? (

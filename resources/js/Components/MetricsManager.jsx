@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatMeasurementValue } from '@/Components/MetricsView';
+import { formatDate } from '@/dateInput';
 
 const REPORTING_PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
@@ -27,7 +28,9 @@ const STATUS_COLORS = {
     complete: 'bg-green-100 text-green-700',
 };
 
-function MetricFields({ values, setValues }) {
+function MetricFields({ values, setValues, sensors }) {
+    const canLink = values.answer_type === 'number' && sensors.length > 0;
+
     return (
         <div className="space-y-3">
             <input
@@ -64,6 +67,27 @@ function MetricFields({ values, setValues }) {
                     ))}
                 </select>
             </div>
+            {canLink && (
+                <div>
+                    <select
+                        value={values.device_id ?? ''}
+                        onChange={(e) => setValues({ ...values, device_id: e.target.value === '' ? null : Number(e.target.value) })}
+                        className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                    >
+                        <option value="">Measured by hand</option>
+                        {sensors.map((sensor) => (
+                            <option key={sensor.id} value={sensor.id}>From {sensor.name} ({sensor.records})</option>
+                        ))}
+                    </select>
+                    {values.device_id && (
+                        <p className="text-xs text-gray-500 mt-1">
+                            When each period ends, it's filled in with the sensor's last reading in it, so the period
+                            above is how often it's sampled. Daily gives a value for the end of any report's dates. It
+                            can still be changed by hand.
+                        </p>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
@@ -75,17 +99,18 @@ function MetricFields({ values, setValues }) {
  * whoever can log one, and inline edit/pause/delete for admin/manager.
  * History stays available to every role, same as the old View tab default.
  */
-function MetricRow({ metric, canMeasure, canManage }) {
+function MetricRow({ metric, canMeasure, canManage, sensors }) {
     const [editing, setEditing] = useState(false);
     const [values, setValues] = useState({
         name: metric.name,
         description: metric.description ?? '',
         reporting_period: metric.reporting_period,
         answer_type: metric.answer_type,
+        device_id: metric.device_id,
     });
 
     const save = () => {
-        router.patch(route('metrics.update', metric.id), values, {
+        router.patch(route('metrics.update', metric.id), withoutSensorForText(values), {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => setEditing(false),
@@ -108,7 +133,7 @@ function MetricRow({ metric, canMeasure, canManage }) {
     if (editing) {
         return (
             <div className="p-4 bg-green-50 space-y-3">
-                <MetricFields values={values} setValues={setValues} />
+                <MetricFields values={values} setValues={setValues} sensors={sensors} />
                 <div className="flex gap-2">
                     <button onClick={save} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Save</button>
                     <button onClick={() => setEditing(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
@@ -117,7 +142,12 @@ function MetricRow({ metric, canMeasure, canManage }) {
         );
     }
 
-    const measurement = metric.latest_measurement;
+    // A sensor fills a period in only once it's over, so show the latest
+    // one it (or someone) has filled rather than the open current one.
+    const measurement = metric.device
+        ? metric.latest_complete_measurement ?? metric.latest_measurement
+        : metric.latest_measurement;
+    const fromSensor = measurement?.source === 'sensor';
 
     return (
         <div className="px-4 py-3">
@@ -125,7 +155,13 @@ function MetricRow({ metric, canMeasure, canManage }) {
                 <div className="min-w-0">
                     <p className="text-sm text-gray-900">{metric.name}</p>
                     {measurement && (
-                        <p className="text-xs text-gray-500 mt-1">{formatMeasurementValue(measurement)}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                            {formatMeasurementValue(measurement)}
+                            {metric.device && measurement.status === 'complete' && ` · ${formatDate(measurement.period_end.slice(0, 10))}`}
+                        </p>
+                    )}
+                    {metric.device && (
+                        <p className="text-xs text-blue-600 mt-1">From the {metric.device.name} sensor</p>
                     )}
                     {!metric.is_active && (
                         <span className="inline-block text-xs px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500 mt-1">
@@ -134,14 +170,14 @@ function MetricRow({ metric, canMeasure, canManage }) {
                     )}
                 </div>
                 {measurement && (
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[measurement.status]}`}>
-                        {STATUS_LABELS[measurement.status]}
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${fromSensor ? 'bg-blue-100 text-blue-700' : STATUS_COLORS[measurement.status]}`}>
+                        {fromSensor ? 'Sensor' : STATUS_LABELS[measurement.status]}
                     </span>
                 )}
             </div>
             <div className="flex flex-wrap gap-3 mt-2 text-xs">
-                {canMeasure && measurement && (
-                    <Link href={route('metric-measurements.show', measurement.id)} className="text-green-600 font-medium">
+                {canMeasure && metric.latest_measurement && (
+                    <Link href={route('metric-measurements.show', metric.latest_measurement.id)} className="text-green-600 font-medium">
                         Measure
                     </Link>
                 )}
@@ -158,7 +194,10 @@ function MetricRow({ metric, canMeasure, canManage }) {
     );
 }
 
-export default function MetricsManager({ metrics }) {
+// Only a number can come from a sensor.
+const withoutSensorForText = (values) => (values.answer_type === 'number' ? values : { ...values, device_id: null });
+
+export default function MetricsManager({ metrics, sensors = [] }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canMeasure = canManage || currentUserRole === 'worker';
@@ -169,15 +208,16 @@ export default function MetricsManager({ metrics }) {
         description: '',
         reporting_period: 'monthly',
         answer_type: 'number',
+        device_id: null,
     });
 
     const create = () => {
-        router.post(route('metrics.store'), values, {
+        router.post(route('metrics.store'), withoutSensorForText(values), {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
                 setAdding(false);
-                setValues({ name: '', description: '', reporting_period: 'monthly', answer_type: 'number' });
+                setValues({ name: '', description: '', reporting_period: 'monthly', answer_type: 'number', device_id: null });
             },
         });
     };
@@ -213,7 +253,7 @@ export default function MetricsManager({ metrics }) {
                 canManage && (
                     adding ? (
                         <div className="bg-white rounded-lg shadow p-4 space-y-3">
-                            <MetricFields values={values} setValues={setValues} />
+                            <MetricFields values={values} setValues={setValues} sensors={sensors} />
                             <div className="flex gap-2">
                                 <button onClick={create} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Add Metric</button>
                                 <button onClick={() => setAdding(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
@@ -239,7 +279,7 @@ export default function MetricsManager({ metrics }) {
                     </div>
                     <div className="divide-y divide-gray-100">
                         {group.metrics.map((metric) => (
-                            <MetricRow key={metric.id} metric={metric} canMeasure={canMeasure} canManage={canManage} />
+                            <MetricRow key={metric.id} metric={metric} canMeasure={canMeasure} canManage={canManage} sensors={sensors} />
                         ))}
                     </div>
                 </div>

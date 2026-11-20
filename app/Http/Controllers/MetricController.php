@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Metric;
+use App\Services\Lorawan\MetricsFromSensors;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class MetricController extends Controller
@@ -13,12 +15,13 @@ class MetricController extends Controller
         $currentPropertyId = session('current_property_id');
 
         $metrics = Metric::where('property_id', $currentPropertyId)
-            ->with('latestMeasurement')
+            ->with(['latestMeasurement', 'latestCompleteMeasurement', 'device:id,name'])
             ->orderBy('name')
             ->get();
 
         return Inertia::render('Metrics/Index', [
             'metrics' => $metrics,
+            'sensors' => MetricsFromSensors::linkable($currentPropertyId),
         ]);
     }
 
@@ -106,6 +109,13 @@ class MetricController extends Controller
             'description' => 'nullable|string',
             'reporting_period' => 'required|in:' . implode(',', Metric::REPORTING_PERIODS),
             'answer_type' => 'required|in:' . implode(',', Metric::ANSWER_TYPES),
+            // A sensor records a number, and only one of this property's
+            // that can record a metric.
+            'device_id' => [
+                'nullable',
+                'prohibited_unless:answer_type,' . Metric::NUMBER,
+                Rule::in(MetricsFromSensors::linkable(session('current_property_id'))->pluck('id')),
+            ],
         ]);
     }
 }

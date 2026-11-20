@@ -10,7 +10,7 @@ class MetricMeasurementController extends Controller
 {
     public function show(MetricMeasurement $metricMeasurement)
     {
-        $metricMeasurement->load('photos');
+        $metricMeasurement->load(['photos', 'metric.device:id,name']);
 
         return Inertia::render('MetricMeasurements/Show', [
             'measurement' => $metricMeasurement,
@@ -32,6 +32,10 @@ class MetricMeasurementController extends Controller
             $validated['completed_by'] = null;
             $validated['completed_at'] = null;
         }
+
+        // A person's change to a sensor-linked metric's measurement is theirs
+        // from now on - it's never filled from the sensor over the top.
+        $validated['source'] = $metricMeasurement->metric?->device_id ? MetricMeasurement::MANUAL : null;
 
         $metricMeasurement->update($validated);
 

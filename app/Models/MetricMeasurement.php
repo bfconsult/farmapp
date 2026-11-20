@@ -11,6 +11,10 @@ class MetricMeasurement extends Model
 
     const STATUSES = [self::INCOMPLETE, self::COMPLETE];
 
+    // Where a linked metric's value came from (see the source column).
+    const SENSOR = 'sensor';
+    const MANUAL = 'manual';
+
     protected $fillable = [
         'metric_id',
         'name',
@@ -18,6 +22,7 @@ class MetricMeasurement extends Model
         'period_start',
         'period_end',
         'status',
+        'source',
         'value_number',
         'value_text',
         'completed_by',

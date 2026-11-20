@@ -3,7 +3,7 @@ import MetricsManager from '@/Components/MetricsManager';
 import BackLink from '@/Components/BackLink';
 import { Head } from '@inertiajs/react';
 
-export default function Index({ metrics }) {
+export default function Index({ metrics, sensors }) {
     return (
         <AuthenticatedLayout title="Metrics">
             <Head title="Metrics" />
@@ -15,7 +15,7 @@ export default function Index({ metrics }) {
 
                 <h1 className="text-lg font-semibold text-gray-900">Metrics</h1>
 
-                <MetricsManager metrics={metrics} />
+                <MetricsManager metrics={metrics} sensors={sensors} />
             </div>
         </AuthenticatedLayout>
     );

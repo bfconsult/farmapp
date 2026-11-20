@@ -27,6 +27,7 @@ class Metric extends Model
         'description',
         'reporting_period',
         'answer_type',
+        'device_id',
         'is_active',
     ];
 
@@ -44,6 +45,14 @@ class Metric extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * The sensor that fills in its measurements, if any (MetricsFromSensors).
+     */
+    public function device()
+    {
+        return $this->belongsTo(Device::class);
+    }
+
     public function measurements()
     {
         return $this->hasMany(MetricMeasurement::class);
@@ -52,6 +61,18 @@ class Metric extends Model
     public function latestMeasurement()
     {
         return $this->hasOne(MetricMeasurement::class)->latestOfMany('period_start');
+    }
+
+    /**
+     * Its latest measurement that has a value - for a sensor-linked metric,
+     * whose current one stays open until its period ends.
+     */
+    public function latestCompleteMeasurement()
+    {
+        return $this->hasOne(MetricMeasurement::class)->ofMany(
+            ['period_start' => 'max'],
+            fn ($query) => $query->where('status', MetricMeasurement::COMPLETE),
+        );
     }
 
     /**
@@ -74,7 +95,12 @@ class Metric extends Model
             ->orderBy('name')
             ->get()
             ->each(function (self $metric) {
-                $metric->setRelation('latestMeasurement', $metric->measurements->first());
+                // A sensor-linked metric's current period isn't filled until
+                // it ends, so its latest filled one in the range stands in.
+                $latest = $metric->device_id
+                    ? $metric->measurements->firstWhere('status', MetricMeasurement::COMPLETE) ?? $metric->measurements->first()
+                    : $metric->measurements->first();
+                $metric->setRelation('latestMeasurement', $latest);
                 $metric->unsetRelation('measurements');
             });
     }
