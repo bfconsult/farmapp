@@ -184,3 +184,20 @@ Decoded with Milesight's channel layout (`MilesightCt101Decoder`, ported from gi
 | `03 97 00000000` | Total current, uint32 LE / 100 Ah | 0 Ah |
 | `04 98 0000` | Current, uint16 LE / 100 A | 0 A |
 | `09 67 FFFF` | Temperature, int16 LE / 10 °C | FFFF = sensor read failed, not stored |
+
+### Ultrasonic distance sensor (Dragino DDS75-LS), 2026-11-20
+The first uplinks from the farm's DDS75-LS (solar) on the house water tank, from the same gateway in the same JSON format. On joining it sent fPort 4 `00` (not in Dragino's decoder, ignored), then its first reading on fPort 2:
+
+`data` `0EC40279000CCC01`, `fCnt` 1, `fPort` 2, rssi -51.
+
+Decoded with the DDS75-LB layout from Dragino's user manual (wiki.dragino.com, DDS75-LB "Uplink Payload": 8 bytes; it also covers the solar DDS75-LS) and the official decoder (`DraginoDds75Decoder`):
+
+| Bytes | Field | Value |
+|---|---|---|
+| `0EC4` | Battery, mV (bits 13-0) | 3.780 V |
+| `0279` | Distance to the surface, mm (0 = no sensor; reliable range 280-7500) | 633 mm |
+| `00` | Interrupt flag | periodic uplink |
+| `0CCC` | DS18B20 probe, °C x 10 signed | 327.6 = no probe fitted, not stored |
+| `01` | Sensor flag | ultrasonic sensor detected |
+
+Dragino's current decoder divides the probe temperature by 100 in this branch, but the manual's examples use /10 (0x0105 = 26.1 °C), so /10 is used. It also treats bit 4 of byte 0 as a longer multi-reading payload, which a solar battery at 4096 mV or more would trip, so only the payload length is checked instead.

@@ -2,6 +2,7 @@
 
 namespace App\Services\Lorawan;
 
+use App\Services\Lorawan\Decoders\DraginoDds75Decoder;
 use App\Services\Lorawan\Decoders\DraginoLds02Decoder;
 use App\Services\Lorawan\Decoders\MilesightCt101Decoder;
 use App\Services\Lorawan\Decoders\SensorDecoder;
@@ -54,6 +55,17 @@ class DeviceModels
                 'metric' => 'low_battery',
                 'repeats_within_minutes' => 60,
                 'advice' => 'It charges itself from the current it measures, so this clears once the pump has run for a while.',
+            ],
+        ],
+        'dragino_dds75' => [
+            'label' => 'Dragino DDS75 ultrasonic distance sensor',
+            'decoder' => DraginoDds75Decoder::class,
+            'metrics' => [
+                'distance' => ['label' => 'Distance', 'unit' => 'mm', 'default' => true],
+                'battery' => ['label' => 'Battery', 'unit' => 'V', 'default' => true],
+                'temperature' => ['label' => 'Temperature (probe)', 'unit' => '°C', 'default' => false],
+                'interrupt' => ['label' => 'Sent by', 'unit' => null, 'states' => ['Schedule', 'Interrupt pin'], 'default' => false],
+                'sensor_detected' => ['label' => 'Ultrasonic sensor', 'unit' => null, 'states' => ['Not detected', 'Detected'], 'default' => false],
             ],
         ],
     ];
