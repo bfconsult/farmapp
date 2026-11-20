@@ -10,6 +10,7 @@ use App\Models\SensorReading;
 use App\Models\Zone;
 use App\Services\Lorawan\DeviceModels;
 use App\Services\Lorawan\SensorKinds;
+use App\Services\Lorawan\TankActivity;
 use App\Services\Lorawan\UplinkProcessor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -285,9 +286,32 @@ class SensorController extends Controller
                 'metric' => $metric,
                 'value' => $latest[$metric]->value,
                 ...array_intersect_key($definitions[$metric] ?? [], array_flip(['label', 'unit', 'states'])),
+                ...$this->displayOverride($device, $metric, $latest[$metric]->value),
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * A tank's distance reading is shown as the water it means once the
+     * tank's size is set: "5,000 L (50%)", or just "50%" with no capacity.
+     */
+    private function displayOverride(Device $device, string $metric, float $value): array
+    {
+        if ($device->kind !== 'tank' || $metric !== 'distance') {
+            return [];
+        }
+        $level = TankActivity::level($device, $value);
+        if (! $level) {
+            return [];
+        }
+
+        $percent = round($level['percent']).'%';
+
+        return [
+            'label' => 'Level',
+            'display' => $level['litres'] !== null ? number_format($level['litres']).' L ('.$percent.')' : $percent,
+        ];
     }
 
     /**

@@ -92,7 +92,7 @@ export default function Index({ devices, gateways, unrecognised }) {
                                         </p>
                                         <p className="text-xs text-gray-500 truncate">
                                             {device.latest.length > 0
-                                                ? device.latest.map((reading) => (reading.states || reading.unit ? '' : `${reading.label} `) + formatReading(reading.value, reading)).join(' · ')
+                                                ? device.latest.map((reading) => reading.display ?? (reading.states || reading.unit ? '' : `${reading.label} `) + formatReading(reading.value, reading)).join(' · ')
                                                 : 'No readings yet'}
                                         </p>
                                     </div>

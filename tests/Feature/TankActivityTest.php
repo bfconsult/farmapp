@@ -128,6 +128,25 @@ test('the map shows its level, flagged when low or not reporting', function () {
     $mapState()->assertInertia(fn ($page) => $page->where('sensors.0.state.key', 'not_reporting'));
 });
 
+test('the sensors list shows the water in the tank rather than the distance', function () {
+    $list = fn () => $this->actingAs($this->user)->withSession(['current_property_id' => $this->property->id])->get(route('manage.sensors.index'));
+    tankUplink($this, '2026-11-20 11:50', 880);
+
+    $list()->assertInertia(fn ($page) => $page
+        ->where('devices.0.latest.0.label', 'Level')
+        ->where('devices.0.latest.0.display', '7,000 L (70%)'));
+
+    // No capacity: just the percentage.
+    $this->device->update(['config' => ['settings' => ['empty_distance' => 2000, 'full_distance' => 400]]]);
+    $list()->assertInertia(fn ($page) => $page->where('devices.0.latest.0.display', '70%'));
+
+    // No size: the raw distance.
+    $this->device->update(['config' => []]);
+    $list()->assertInertia(fn ($page) => $page
+        ->where('devices.0.latest.0.value', 880)
+        ->missing('devices.0.latest.0.display'));
+});
+
 test('admins and managers are emailed once when it drops below its warning level, and again after a refill', function () {
     Mail::fake();
     $worker = User::factory()->create(['claimed_at' => now()]);
