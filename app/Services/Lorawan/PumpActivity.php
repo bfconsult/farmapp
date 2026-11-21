@@ -102,6 +102,11 @@ class PumpActivity
             ? $readings()->where($running ? $isRunning : $isStopped)->where('recorded_at', '>', $lastOther)->min('recorded_at')
             : null;
 
+        // Nor across a gap in its readings: after it has been offline, the
+        // state started (as far as is known) when it came back - as with
+        // runs(), which ends a run at such a gap.
+        $since = $this->afterLastGap($latest->recorded_at, $since ? Carbon::parse($since, 'UTC') : null) ?? $since;
+
         return [
             'running' => $running,
             // Unknown when this state is all it has ever reported.
@@ -110,6 +115,39 @@ class PumpActivity
             'reporting' => $latest->recorded_at->gte(Carbon::now()->subMinutes(self::STALE_AFTER_MINUTES)),
             'last_reading_at' => $latest->recorded_at->toIso8601String(),
         ];
+    }
+
+    /**
+     * The first reading after the latest gap of more than MAX_GAP_SECONDS
+     * between $from (or its first reading) and $latest, or null if there's
+     * no such gap.
+     */
+    private function afterLastGap(Carbon $latest, ?Carbon $from): ?string
+    {
+        $after = $latest;
+
+        // Back from the latest reading, a page at a time.
+        while (true) {
+            $times = $this->device->readings()
+                ->where('metric', 'current')
+                ->where('recorded_at', '<', $after)
+                ->when($from, fn ($query) => $query->where('recorded_at', '>=', $from))
+                ->orderByDesc('recorded_at')
+                ->limit(500)
+                ->pluck('recorded_at');
+
+            foreach ($times as $time) {
+                $time = Carbon::parse($time, 'UTC');
+                if ($time->diffInSeconds($after) > self::MAX_GAP_SECONDS) {
+                    return $after->copy()->utc()->toDateTimeString();
+                }
+                $after = $time;
+            }
+
+            if ($times->count() < 500) {
+                return null;
+            }
+        }
     }
 
     /**

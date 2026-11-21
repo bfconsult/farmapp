@@ -130,6 +130,40 @@ test('a pump that stops reporting while running shows as not reporting, not runn
         );
 });
 
+test('back online and running, it has been running since it came back, not since before it went offline', function () {
+    // As the farm's CT101 did: running when it went silent on the 16th,
+    // running again when it came back on the 20th.
+    pumpReading($this, '2026-11-16 10:00', 0.0);
+    pumpReading($this, '2026-11-16 10:37', 2.67);
+    pumpReading($this, '2026-11-20 11:52', 2.3);
+    pumpReading($this, '2026-11-20 11:54', 2.3);
+
+    pumpPage($this)->assertInertia(fn ($page) => $page
+        ->where('status.running', true)
+        ->where('status.since', adelaideIso('2026-11-20 11:52'))
+    );
+
+    // And stopped since it came back after a gap while stopped.
+    pumpReading($this, '2026-11-20 11:56', 0.0);
+    Carbon::setTestNow(Carbon::parse('2026-11-20 16:00', 'Australia/Adelaide')->utc());
+    pumpReading($this, '2026-11-20 15:58', 0.0);
+    pumpPage($this)->assertInertia(fn ($page) => $page
+        ->where('status.running', false)
+        ->where('status.since', adelaideIso('2026-11-20 15:58'))
+    );
+});
+
+test('no running-long email for a run that only seems long because the sensor was offline', function () {
+    Illuminate\Support\Facades\Mail::fake();
+    pumpUplink($this, 0.0, 5 * 24 * 60 + 30);
+    pumpUplink($this, 2.67, 5 * 24 * 60);
+    pumpUplink($this, 2.3, 4);
+    pumpUplink($this, 2.3, 2);
+    pumpUplink($this, 2.3);
+
+    Illuminate\Support\Facades\Mail::assertNothingSent();
+});
+
 test('a pump that reported in the last 15 minutes is still reporting', function () {
     pumpReading($this, '2026-11-20 11:46', 2.67);
 
