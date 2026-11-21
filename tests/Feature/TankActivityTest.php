@@ -1,5 +1,6 @@
 <?php
 
+use App\Mail\TankDropping;
 use App\Mail\TankLow;
 use App\Models\Device;
 use App\Models\LorawanEvent;
@@ -179,6 +180,58 @@ test('no low-level email when it is turned off', function () {
 
     tankUplink($this, '2026-11-20 11:58', 1900);
     Mail::assertNothingSent();
+});
+
+test('each drop warning emails once when the level falls that much within its time, and again once it has steadied', function () {
+    Mail::fake();
+    $this->device->update(['config' => [...$this->device->config, 'drop_warnings' => [
+        ['percent' => 10, 'within_minutes' => 60],
+        ['percent' => 20, 'within_minutes' => 1440],
+    ]]]);
+
+    // Each reading arrives as it's sent: warnings only look at fresh ones.
+    $live = function (string $at, int $distance) {
+        Carbon::setTestNow(Carbon::parse($at, 'Australia/Adelaide')->utc());
+        tankUplink($this, $at, $distance);
+    };
+
+    tankUplink($this, '2026-11-19 14:00', 560);   // 90% yesterday afternoon
+    $live('2026-11-20 11:10', 880);   // 70%: 20% down within a day
+    Mail::assertSent(TankDropping::class, 1);
+    Mail::assertSent(TankDropping::class, fn ($mail) => $mail->warning['within_minutes'] === 1440
+        && $mail->drop['drop'] == 20 && $mail->drop['from_percent'] == 90 && $mail->drop['litres'] === 7000);
+
+    $live('2026-11-20 11:30', 960);   // 65%
+    Mail::assertSent(TankDropping::class, 1);
+    $live('2026-11-20 11:50', 1056);  // 59%: 11% down within an hour
+    Mail::assertSent(TankDropping::class, 2);
+    Mail::assertSent(TankDropping::class, fn ($mail) => $mail->warning['within_minutes'] === 60 && $mail->drop['drop'] == 11);
+
+    // Still falling: no repeats.
+    $live('2026-11-20 11:55', 1100);
+    Mail::assertSent(TankDropping::class, 2);
+
+    // Steady for an hour re-arms the hourly warning; falling again warns again.
+    $live('2026-11-20 13:00', 1100);
+    $live('2026-11-20 13:10', 1300);  // 43.75%, 12.5% down
+    Mail::assertSent(TankDropping::class, 3);
+});
+
+test('drop warnings are saved from the Edit form, and only for a tank', function () {
+    $save = fn (array $values) => $this->actingAs($this->user)->withSession(['current_property_id' => $this->property->id])
+        ->patch(route('manage.sensors.update', $this->device), ['name' => 'House tank', 'kind' => 'tank', ...$values]);
+
+    $save(['drop_warnings' => [['percent' => 0, 'within_minutes' => 60]]])->assertSessionHasErrors('drop_warnings.0.percent');
+    $save(['drop_warnings' => [['percent' => 10, 'within_minutes' => 5]]])->assertSessionHasErrors('drop_warnings.0.within_minutes');
+
+    $save(['drop_warnings' => [['percent' => 20, 'within_minutes' => 1440], ['percent' => '10', 'within_minutes' => '60']]])
+        ->assertSessionHasNoErrors();
+    expect($this->device->fresh()->config['drop_warnings'])->toEqual([
+        ['percent' => 10, 'within_minutes' => 60],
+        ['percent' => 20, 'within_minutes' => 1440],
+    ]);
+
+    tankPage($this)->assertInertia(fn ($page) => $page->has('device.drop_warnings', 2));
 });
 
 test('the tank\'s size is saved from the Edit form', function () {

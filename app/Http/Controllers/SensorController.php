@@ -24,6 +24,13 @@ use Inertia\Inertia;
  */
 class SensorController extends Controller
 {
+    // A tank's "dropped by this much within this time" warnings.
+    private const DROP_WARNING_RULES = [
+        'drop_warnings' => 'nullable|array|max:10',
+        'drop_warnings.*.percent' => 'required|numeric|min:1|max:100',
+        'drop_warnings.*.within_minutes' => 'required|integer|min:10|max:43200',
+    ];
+
     private const LOCATION_RULES = [
         'latitude' => 'nullable|numeric|between:-90,90|required_with:longitude',
         'longitude' => 'nullable|numeric|between:-180,180|required_with:latitude',
@@ -78,6 +85,7 @@ class SensorController extends Controller
             ...self::LOCATION_RULES,
             'settings' => 'nullable|array',
             ...SensorKinds::settingRules($request->input('kind')),
+            ...self::DROP_WARNING_RULES,
         ], [
             'kind.in' => 'This sensor can\'t be used as that type.',
             'dev_eui.regex' => 'The DevEUI is 16 hex characters (0-9, A-F), printed on the sensor\'s label.',
@@ -192,6 +200,7 @@ class SensorController extends Controller
             ...self::LOCATION_RULES,
             'settings' => 'nullable|array',
             ...SensorKinds::settingRules($request->input('kind')),
+            ...self::DROP_WARNING_RULES,
         ], [
             'kind.in' => 'This sensor can\'t be used as that type.',
         ]);
@@ -244,9 +253,18 @@ class SensorController extends Controller
             ->reject(fn ($value) => $value === null)
             ->map(fn ($value) => (float) $value)
             ->all();
-        unset($validated['settings']);
+        // Only a tank has drop warnings.
+        $dropWarnings = ($validated['kind'] ?? null) === 'tank'
+            ? collect($validated['drop_warnings'] ?? [])
+                ->map(fn ($warning) => ['percent' => (float) $warning['percent'], 'within_minutes' => (int) $warning['within_minutes']])
+                ->unique(fn ($warning) => "{$warning['percent']}/{$warning['within_minutes']}")
+                ->sortBy('within_minutes')
+                ->values()
+                ->all()
+            : [];
+        unset($validated['settings'], $validated['drop_warnings']);
 
-        return [...$validated, 'config' => [...($config ?? []), 'settings' => $settings]];
+        return [...$validated, 'config' => [...($config ?? []), 'settings' => $settings, 'drop_warnings' => $dropWarnings]];
     }
 
     private function summary(Device $device): array
@@ -267,6 +285,7 @@ class SensorController extends Controller
             'last_rssi' => $device->last_rssi,
             'last_snr' => $device->last_snr !== null ? (float) $device->last_snr : null,
             'shown_metrics' => $device->shownMetrics(),
+            'drop_warnings' => $device->config['drop_warnings'] ?? [],
             'settings' => collect(SensorKinds::KINDS[$device->kind]['settings'] ?? [])
                 ->mapWithKeys(fn ($setting, $name) => [$name => SensorKinds::setting($device, $name)]),
         ];

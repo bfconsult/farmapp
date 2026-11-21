@@ -3,6 +3,7 @@
 namespace App\Services\Lorawan;
 
 use App\Mail\PumpRunningLong;
+use App\Mail\TankDropping;
 use App\Mail\TankLow;
 use App\Models\Device;
 use App\Models\Role;
@@ -33,6 +34,7 @@ class SensorAlerts
             }
             if ($device->kind === 'tank') {
                 $this->tankLow($device);
+                $this->tankDropping($device->fresh());
             }
         } catch (\Throwable $e) {
             // A warning that can't be sent mustn't lose the reading.
@@ -97,6 +99,53 @@ class SensorAlerts
 
         foreach ($this->recipients($device) as $user) {
             Mail::to($user->email)->send(new TankLow($device, $level));
+        }
+    }
+
+    /**
+     * Once for each of its drop warnings when the level falls by that much
+     * within that time, then not again until the fall over that time is
+     * back under half as much - so a steady leak is one email, not one per
+     * reading.
+     */
+    private function tankDropping(Device $device): void
+    {
+        $warnings = TankActivity::dropWarnings($device);
+        $reading = $device->readings()->where('metric', 'distance')->latest('recorded_at')->latest('id')->first();
+        if ($warnings === [] || ! $reading) {
+            return;
+        }
+
+        $config = $device->config ?? [];
+        $alerted = $config['alerted']['tank_drop'] ?? [];
+        $send = [];
+
+        foreach ($warnings as $warning) {
+            $key = "{$warning['percent']}/{$warning['within_minutes']}";
+            $drop = TankActivity::dropWithin($device, $reading, (int) $warning['within_minutes']);
+            if (! $drop) {
+                continue;
+            }
+
+            if (isset($alerted[$key]) && $drop['drop'] < $warning['percent'] / 2) {
+                unset($alerted[$key]);
+            } elseif (! isset($alerted[$key]) && $drop['drop'] >= $warning['percent']) {
+                $alerted[$key] = $reading->recorded_at->toIso8601String();
+                $send[] = [$warning, $drop];
+            }
+        }
+
+        // Only the keys of warnings it still has.
+        $current = array_map(fn ($warning) => "{$warning['percent']}/{$warning['within_minutes']}", $warnings);
+        $alerted = array_intersect_key($alerted, array_flip($current));
+        if ($alerted !== ($config['alerted']['tank_drop'] ?? [])) {
+            $device->update(['config' => [...$config, 'alerted' => [...($config['alerted'] ?? []), 'tank_drop' => $alerted]]]);
+        }
+
+        foreach ($send as [$warning, $drop]) {
+            foreach ($this->recipients($device) as $user) {
+                Mail::to($user->email)->send(new TankDropping($device, $warning, $drop));
+            }
         }
     }
 

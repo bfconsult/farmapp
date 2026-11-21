@@ -12,6 +12,12 @@ import {
 
 const litres = (value) => `${Math.round(value).toLocaleString()} L`;
 
+// "20% within 1 day", as TankActivity::describeMinutes.
+function describeDrop({ percent, within_minutes: minutes }) {
+    const [count, unit] = minutes % 1440 === 0 ? [minutes / 1440, 'day'] : minutes % 60 === 0 ? [minutes / 60, 'hour'] : [minutes, 'minute'];
+    return `${percent}% within ${count} ${unit}${count === 1 ? '' : 's'}`;
+}
+
 // The tank drawn as a bar filled to its level.
 function LevelBar({ percent, low }) {
     return (
@@ -161,8 +167,9 @@ export default function Tank({ device, status, month, today, days, levels, first
                     <p className="text-xs text-gray-400">
                         The level is worked out from the distance down to the water: {settings.empty_distance} mm when empty,{' '}
                         {settings.full_distance} mm when full
-                        {settings.warn_below_percent > 0 && `, with a warning below ${settings.warn_below_percent}%`} - change
-                        these under Edit.
+                        {settings.warn_below_percent > 0 && `, with a warning below ${settings.warn_below_percent}%`}
+                        {(device.drop_warnings ?? []).length > 0 && ` and when it drops by ${device.drop_warnings.map(describeDrop).join(' or ')}`} -
+                        change these under Edit.
                     </p>
                 )}
             </div>

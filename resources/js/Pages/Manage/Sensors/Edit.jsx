@@ -5,6 +5,87 @@ import Modal from '@/Components/Modal';
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
+// A tank's drop warnings are stored in minutes and edited as a number of
+// minutes, hours or days.
+const TIME_UNITS = { minutes: 1, hours: 60, days: 1440 };
+
+function toWarningRow({ percent, within_minutes }) {
+    const unit = within_minutes % 1440 === 0 ? 'days' : within_minutes % 60 === 0 ? 'hours' : 'minutes';
+    return { percent, amount: within_minutes / TIME_UNITS[unit], unit };
+}
+
+function DropWarnings({ rows, setRows, errors }) {
+    const update = (index, field, value) => setRows(rows.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+    const rowError = (index) => errors[`drop_warnings.${index}.percent`] || errors[`drop_warnings.${index}.within_minutes`];
+
+    return (
+        <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Warn when it drops quickly</label>
+            {rows.length > 0 && (
+                <div className="space-y-2 mb-2">
+                    {rows.map((row, index) => (
+                        <div key={index}>
+                            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                                <span>Drops by</span>
+                                <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    step="any"
+                                    min="1"
+                                    max="100"
+                                    value={row.percent}
+                                    onChange={(e) => update(index, 'percent', e.target.value)}
+                                    aria-label="Drop, % of a full tank"
+                                    className="w-20 border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                />
+                                <span>% within</span>
+                                <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min="1"
+                                    value={row.amount}
+                                    onChange={(e) => update(index, 'amount', e.target.value)}
+                                    aria-label="Within"
+                                    className="w-20 border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                />
+                                <select
+                                    value={row.unit}
+                                    onChange={(e) => update(index, 'unit', e.target.value)}
+                                    aria-label="Time unit"
+                                    className="border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                >
+                                    {Object.keys(TIME_UNITS).map((unit) => (
+                                        <option key={unit} value={unit}>{unit}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setRows(rows.filter((_, i) => i !== index))}
+                                    className="text-red-500 text-sm"
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                            {rowError(index) && <p className="mt-1 text-sm text-red-600">{rowError(index)}</p>}
+                        </div>
+                    ))}
+                </div>
+            )}
+            <button
+                type="button"
+                onClick={() => setRows([...rows, { percent: 10, amount: 1, unit: 'hours' }])}
+                className="text-sm text-green-600"
+            >
+                + Add a warning
+            </button>
+            <p className="mt-1 text-xs text-gray-500">
+                Admins and managers are emailed when the level falls by this much of a full tank within this time - a
+                leak or a tap left on - and again only once it has steadied.
+            </p>
+        </div>
+    );
+}
+
 /** Rough centroid of the property boundary, as a starting pin. */
 function boundaryCenter(coordinates) {
     if (!coordinates || coordinates.length === 0) return null;
@@ -19,7 +100,7 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary,
     const kindsFor = (model) => kinds.filter((kind) => kind.models.includes(model));
     const initialModel = device?.model ?? models[0]?.value ?? '';
 
-    const { data, setData, post, put, processing, errors } = useForm({
+    const { data, setData, post, put, transform, processing, errors } = useForm({
         name: device?.name ?? prefill?.name ?? '',
         model: initialModel,
         kind: isNew ? (kindsFor(initialModel)[0]?.value ?? '') : (device.kind ?? ''),
@@ -27,7 +108,16 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary,
         latitude: device?.latitude ?? null,
         longitude: device?.longitude ?? null,
         settings: device?.settings ?? {},
+        drop_warnings: (device?.drop_warnings ?? []).map(toWarningRow),
     });
+
+    transform((values) => ({
+        ...values,
+        drop_warnings: values.drop_warnings.map((row) => ({
+            percent: row.percent,
+            within_minutes: Math.round(Number(row.amount) * TIME_UNITS[row.unit]),
+        })),
+    }));
 
     // The chosen kind's settings, e.g. a pump's running threshold.
     const kindSettings = Object.entries(kinds.find((kind) => kind.value === data.kind)?.settings ?? {});
@@ -194,6 +284,14 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary,
                                     {errors[`settings.${name}`] && <p className="mt-1 text-sm text-red-600">{errors[`settings.${name}`]}</p>}
                                 </div>
                             ))}
+
+                            {data.kind === 'tank' && (
+                                <DropWarnings
+                                    rows={data.drop_warnings}
+                                    setRows={(rows) => setData('drop_warnings', rows)}
+                                    errors={errors}
+                                />
+                            )}
 
                             <div className="mb-6">
                                 <div className="flex items-center justify-between mb-1">

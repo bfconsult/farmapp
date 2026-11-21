@@ -55,6 +55,59 @@ class TankActivity
         return self::level($device, $distance)['litres'] ?? null;
     }
 
+    /**
+     * Its "dropped by" warnings as [{percent, within_minutes}]: each warns
+     * when the level falls by that much of a full tank within that time.
+     */
+    public static function dropWarnings(Device $device): array
+    {
+        return $device->config['drop_warnings'] ?? [];
+    }
+
+    /**
+     * A warning's time in words: "1 hour", "2 days", "90 minutes".
+     */
+    public static function describeMinutes(int $minutes): string
+    {
+        [$count, $unit] = match (true) {
+            $minutes % 1440 === 0 => [$minutes / 1440, 'day'],
+            $minutes % 60 === 0 => [$minutes / 60, 'hour'],
+            default => [$minutes, 'minute'],
+        };
+
+        return $count.' '.$unit.($count === 1 ? '' : 's');
+    }
+
+    /**
+     * How far the level has fallen by $reading from its highest in the
+     * $minutes before it: {drop, from_percent, from_at, percent, litres},
+     * or null until the tank's size is set.
+     */
+    public static function dropWithin(Device $device, SensorReading $reading, int $minutes): ?array
+    {
+        $level = self::level($device, $reading->value);
+        // The highest level is the shortest distance down to the water.
+        $highest = $device->readings()
+            ->where('metric', 'distance')
+            ->whereBetween('recorded_at', [$reading->recorded_at->copy()->subMinutes($minutes), $reading->recorded_at])
+            ->orderBy('value')
+            ->orderBy('recorded_at')
+            ->first();
+        $from = $highest ? self::level($device, $highest->value) : null;
+        if (! $level || ! $from) {
+            return null;
+        }
+
+        return [
+            'drop' => round(max(0, $from['percent'] - $level['percent']), 1),
+            'from_percent' => $from['percent'],
+            'from_at' => $highest->recorded_at,
+            'percent' => $level['percent'],
+            'litres' => $level['litres'],
+            'from_litres' => $from['litres'],
+        ];
+    }
+
     public static function isLow(Device $device, ?array $level): bool
     {
         $warnBelow = (float) SensorKinds::setting($device, 'warn_below_percent');
