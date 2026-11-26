@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\FarmJobController;
+use App\Http\Controllers\FarmViewController;
 use App\Http\Controllers\GatewayController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\WorkSessionController;
@@ -111,6 +112,10 @@ Route::middleware(['auth', 'app.admin'])->group(function () {
     Route::get('app-admin/users/{user}/delete-preview', [AppAdminController::class, 'deletePreview'])->name('app-admin.users.delete-preview');
     Route::post('app-admin/users/{user}/deactivate', [AppAdminController::class, 'deactivate'])->name('app-admin.users.deactivate');
     Route::delete('app-admin/users/{user}', [AppAdminController::class, 'destroy'])->name('app-admin.users.destroy');
+    // A prototype, not yet for everyone.
+    Route::get('farm-view', [FarmViewController::class, 'index'])->name('farm-view');
+    Route::put('farm-view/rotation', [FarmViewController::class, 'updateRotation'])->name('farm-view.rotation');
+    Route::post('farm-view/terrain', [FarmViewController::class, 'fetchTerrain'])->name('farm-view.terrain');
 });
 
 // Admin only routes

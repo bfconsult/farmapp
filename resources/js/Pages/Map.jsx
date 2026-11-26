@@ -102,7 +102,7 @@ export default function Map({
     // meaningful until the pin is dragged, since a manually-placed point
     // has no accuracy figure of its own.
     const [draftNoteAccuracy, setDraftNoteAccuracy] = useState(null);
-    const { currentProperty, flash } = usePage().props;
+    const { auth, currentProperty, flash } = usePage().props;
     const isAdminOrManager = currentRole === 'admin' || currentRole === 'manager';
     const canCreateNote = isAdminOrManager || currentRole === 'worker';
     const jobsWithLocation = jobs.filter(j => j.latitude && j.longitude);
@@ -724,6 +724,15 @@ export default function Map({
                 )}
                 <div className="relative">
                     <div className="absolute right-4 top-4 z-[1000] flex items-start gap-2">
+                        {/* A prototype, for app admins only for now. */}
+                        {auth.user.app_admin && (
+                            <Link
+                                href={route('farm-view')}
+                                className="hidden md:flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-md text-sm font-medium text-gray-700"
+                            >
+                                Farm view
+                            </Link>
+                        )}
                         {currentProperty && shape && isAdminOrManager && (
                             <Link
                                 href={route('shape.edit', currentProperty.id)}
