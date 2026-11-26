@@ -180,6 +180,8 @@ class AssetController extends Controller
         return Inertia::render('Assets/Show', [
             'asset' => $asset,
             'otherLines' => $otherLines,
+            // For the edit form's type picker (e.g. to make a Fixed asset a fence).
+            'assetTypes' => AssetType::where('property_id', $asset->property_id)->orderBy('name')->get(['id', 'name', 'kind']),
             'recentJobs' => FarmJob::whereIn('id', $jobIds)->with('jobStatus')->latest()->take(5)->get(),
             'jobsCount' => $jobIds->count(),
             'usageHours' => $usageHours,

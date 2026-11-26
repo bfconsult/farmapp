@@ -372,7 +372,8 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
     );
 }
 
-function AssetFields({ values, setValues, isFence }) {
+function AssetFields({ values, setValues, assetTypes }) {
+    const isFence = isFenceType(assetTypes.find((type) => String(type.id) === String(values.asset_type_id)));
     return (
         <div className="space-y-3">
             <input
@@ -382,6 +383,16 @@ function AssetFields({ values, setValues, isFence }) {
                 className="w-full border-gray-300 rounded-lg p-2 text-sm"
                 placeholder="Name"
             />
+            <select
+                value={values.asset_type_id}
+                onChange={(e) => setValues({ ...values, asset_type_id: e.target.value })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+            >
+                <option value="">No type</option>
+                {assetTypes.map((type) => (
+                    <option key={type.id} value={type.id}>{type.name}</option>
+                ))}
+            </select>
             <textarea
                 value={values.description}
                 onChange={(e) => setValues({ ...values, description: e.target.value })}
@@ -642,7 +653,7 @@ function AddMaintenanceItemForm({ asset, onClose }) {
     );
 }
 
-export default function Show({ asset, otherLines, recentJobs, jobsCount, usageHours, maintenanceHours, workSessions }) {
+export default function Show({ asset, otherLines, assetTypes = [], recentJobs, jobsCount, usageHours, maintenanceHours, workSessions }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canConvert = canManage || currentUserRole === 'worker';
@@ -652,6 +663,7 @@ export default function Show({ asset, otherLines, recentJobs, jobsCount, usageHo
     const [values, setValues] = useState({
         name: asset.name,
         description: asset.description ?? '',
+        asset_type_id: asset.asset_type_id ?? '',
         value: asset.value ?? '',
         ...fenceValues(asset),
     });
@@ -707,7 +719,7 @@ export default function Show({ asset, otherLines, recentJobs, jobsCount, usageHo
                 <div className="bg-white rounded-lg shadow p-4">
                     {editing ? (
                         <div className="space-y-3">
-                            <AssetFields values={values} setValues={setValues} isFence={isFenceType(asset.asset_type)} />
+                            <AssetFields values={values} setValues={setValues} assetTypes={assetTypes} />
                             <div className="flex gap-2">
                                 <button onClick={save} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Save</button>
                                 <button onClick={() => setEditing(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>

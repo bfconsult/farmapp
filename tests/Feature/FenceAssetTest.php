@@ -86,6 +86,9 @@ test('a fence is drawn in the farm view where its line is', function () {
     // ...and the asset page has the other lines to draw up to.
     ($this->as)()->get(route('assets.show', $this->fence))->assertInertia(fn ($page) => $page
         ->where('otherLines.0.name', 'Pipe')
+        // ...and the types, so its edit form can make an asset a fence.
+        ->where('assetTypes.0.name', 'Fence')
+        ->where('assetTypes.0.kind', 'fence')
     );
 });
 
