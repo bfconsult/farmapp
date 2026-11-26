@@ -251,14 +251,20 @@ export default function Map({
             };
             map.on('zoomend', updateZoneLabels.current);
 
-            // Assets - point ones as markers, shape ones as polygons, same
+            // Assets - point ones as markers, shape ones as polygons, line
+            // ones (fences, pipes) as lines, same
             // built-up-front/toggle-visibility pattern as zones above. Assets
             // with neither set (location is optional) are left off entirely.
             assetLayerGroup.current = L.layerGroup(
                 (assets ?? [])
-                    .filter((asset) => asset.current_location?.shape || (asset.current_location?.latitude && asset.current_location?.longitude))
+                    .filter((asset) => asset.current_location?.line || asset.current_location?.shape || (asset.current_location?.latitude && asset.current_location?.longitude))
                     .map((asset) => {
                     const location = asset.current_location;
+                    if (location.line) {
+                        return L.polyline(location.line, { color: ASSET_COLOR, weight: 3 })
+                            .bindTooltip(asset.name, { permanent: true, direction: 'center' })
+                            .on('click', () => router.visit(route('assets.show', asset.id)));
+                    }
                     if (location.shape) {
                         return L.polygon(location.shape, {
                             color: ASSET_COLOR,

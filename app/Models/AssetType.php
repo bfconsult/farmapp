@@ -6,7 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 
 class AssetType extends Model
 {
-    protected $fillable = ['property_id', 'name'];
+    /**
+     * The kind of the type fences go in: assets of it are drawn as lines
+     * and shown in the farm view. Each property has one (see
+     * fenceTypeFor), whatever it chooses to call it.
+     */
+    public const FENCE = 'fence';
+
+    protected $fillable = ['property_id', 'name', 'kind'];
 
     public function property()
     {
@@ -28,5 +35,15 @@ class AssetType extends Model
         static::create(['property_id' => $propertyId, 'name' => 'Fixed']);
         static::create(['property_id' => $propertyId, 'name' => 'Plant']);
         static::create(['property_id' => $propertyId, 'name' => 'Stock']);
+        static::create(['property_id' => $propertyId, 'name' => 'Fence', 'kind' => self::FENCE]);
+    }
+
+    /** The property's fence type - made again if it's been deleted. */
+    public static function fenceTypeFor(int $propertyId): self
+    {
+        return static::firstOrCreate(
+            ['property_id' => $propertyId, 'kind' => self::FENCE],
+            ['name' => 'Fence'],
+        );
     }
 }

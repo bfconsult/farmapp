@@ -1,5 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackLink from '@/Components/BackLink';
+import FenceFields, { describeFence, fenceValues, isFenceType } from '@/Components/FenceFields';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
@@ -42,6 +43,9 @@ function AssetFields({ values, setValues, assetTypes }) {
                     placeholder="Value ($, optional)"
                 />
             </div>
+            {isFenceType(assetTypes.find((type) => String(type.id) === String(values.asset_type_id))) && (
+                <FenceFields values={values} setValues={setValues} />
+            )}
         </div>
     );
 }
@@ -62,6 +66,7 @@ function AssetRow({ asset, canManage, assetTypes }) {
         description: asset.description ?? '',
         asset_type_id: asset.asset_type_id ?? '',
         value: asset.value ?? '',
+        ...fenceValues(asset),
     });
 
     const save = () => {
@@ -98,6 +103,9 @@ function AssetRow({ asset, canManage, assetTypes }) {
             <Link href={route('assets.show', asset.id)} className="min-w-0 flex-1">
                 <p className="text-sm text-gray-900">{asset.name}</p>
                 <div className="flex items-center gap-2 mt-1">
+                    {isFenceType(asset.asset_type) && describeFence(asset.details) && (
+                        <span className="text-xs text-gray-500">{describeFence(asset.details)}</span>
+                    )}
                     {asset.value && <span className="text-xs text-gray-500">${formatNumber(asset.value)}</span>}
                     {asset.maintenance_job_open && (
                         <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
@@ -128,7 +136,8 @@ function AssetRow({ asset, canManage, assetTypes }) {
 
 export default function Assets({ assets, assetTypes, canManage }) {
     const [adding, setAdding] = useState(false);
-    const [values, setValues] = useState({ name: '', description: '', asset_type_id: '', value: '' });
+    const blank = { name: '', description: '', asset_type_id: '', value: '', ...fenceValues(null) };
+    const [values, setValues] = useState(blank);
 
     const create = () => {
         router.post(route('assets.store'), values, {
@@ -136,7 +145,7 @@ export default function Assets({ assets, assetTypes, canManage }) {
             preserveState: true,
             onSuccess: () => {
                 setAdding(false);
-                setValues({ name: '', description: '', asset_type_id: '', value: '' });
+                setValues(blank);
             },
         });
     };

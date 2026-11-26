@@ -6,6 +6,7 @@ import { formatDate } from '@/dateInput';
 
 const ZONE_COLOR = '#7c3aed';
 const NOTE_COLOR = 'blue';
+const FENCE_COLOR = '#b45309';
 
 const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
@@ -27,7 +28,7 @@ function pinIcon(L, color) {
     });
 }
 
-export default function Shape({ property, shape, zones, notes }) {
+export default function Shape({ property, shape, zones, notes, fences }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const leafletRef = useRef(null);
@@ -35,6 +36,7 @@ export default function Shape({ property, shape, zones, notes }) {
     const circleLayer = useRef(null);
     const zoneLayers = useRef({});
     const noteLayerGroup = useRef(null);
+    const fenceLayerGroup = useRef(null);
     const [hasShape, setHasShape] = useState(!!shape);
     const [hasZone, setHasZone] = useState(
         !!property.non_working_zone_center_lat,
@@ -51,6 +53,7 @@ export default function Shape({ property, shape, zones, notes }) {
     // the primary content of this page, so it shouldn't clutter the
     // boundary/zone view until asked for.
     const [showNotes, setShowNotes] = useState(false);
+    const [showFences, setShowFences] = useState(false);
 
     useEffect(() => {
         activeTabRef.current = activeTab;
@@ -233,6 +236,17 @@ export default function Shape({ property, shape, zones, notes }) {
                 }),
             );
 
+            // Fences (fence assets drawn as lines) - another read-only
+            // reference layer. Geoman leaves them alone (pmIgnore: not
+            // editable here) but still snaps to them (snapIgnore: false), so
+            // a zone's corner dropped near a fence lands exactly on it.
+            fenceLayerGroup.current = L.layerGroup(
+                (fences ?? []).map((fence) =>
+                    L.polyline(fence.line, { color: FENCE_COLOR, weight: 3, pmIgnore: true, snapIgnore: false })
+                        .bindTooltip(fence.name, { sticky: true }),
+                ),
+            );
+
             const existingBounds = [polygonLayer.current, circleLayer.current]
                 .filter(Boolean)
                 .map(
@@ -368,6 +382,14 @@ export default function Shape({ property, shape, zones, notes }) {
         if (showNotes) noteLayerGroup.current.addTo(map);
         else noteLayerGroup.current.remove();
     }, [showNotes]);
+
+    useEffect(() => {
+        const map = mapInstance.current;
+        if (!map || !fenceLayerGroup.current) return;
+
+        if (showFences) fenceLayerGroup.current.addTo(map);
+        else fenceLayerGroup.current.remove();
+    }, [showFences]);
 
     // Swap which geoman draw tools are offered per tab - circle only makes
     // sense for the non-working zone (Boundary tab); Zones only ever draws
@@ -603,6 +625,22 @@ export default function Shape({ property, shape, zones, notes }) {
                         <HelpTip messageKey="properties.shape" />
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        {fences && fences.length > 0 && (
+                            <div className="flex items-center gap-2" title="Show the fences - zone corners snap onto them">
+                                <span className="text-sm text-gray-700">Fences</span>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={showFences}
+                                    onClick={() => setShowFences((v) => !v)}
+                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                                        showFences ? 'bg-amber-700' : 'bg-gray-300'
+                                    }`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showFences ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+                        )}
                         {notes && notes.length > 0 && (
                             <div className="flex items-center gap-2">
                                 <span className="text-sm text-gray-700">Notes</span>

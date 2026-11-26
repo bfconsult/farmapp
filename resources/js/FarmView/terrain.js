@@ -161,11 +161,12 @@ export function contourLabelSpots(segments, interval, spacing) {
     return spots;
 }
 
-// Polygon edges split into short pieces, so fences follow the ground.
-export function densify(polygon, step) {
+// Polygon edges (or an open line's) split into short pieces, so fences
+// follow the ground.
+export function densify(polygon, step, closed = true) {
     if (!Number.isFinite(step)) return polygon;
     const out = [];
-    for (let i = 0; i < polygon.length; i++) {
+    for (let i = 0; i < (closed ? polygon.length : polygon.length - 1); i++) {
         const a = polygon[i];
         const b = polygon[(i + 1) % polygon.length];
         const pieces = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
@@ -173,5 +174,6 @@ export function densify(polygon, step) {
             out.push({ x: a.x + ((b.x - a.x) * s) / pieces, y: a.y + ((b.y - a.y) * s) / pieces });
         }
     }
+    if (!closed) out.push(polygon[polygon.length - 1]);
     return out;
 }

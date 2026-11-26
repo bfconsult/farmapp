@@ -5,8 +5,10 @@
 //   zoomed out:  paddocks, fence lines, a name tag for each mob and sensor
 //   zoomed in:   fence posts, grass, and each animal wandering its paddock
 //
-// Props (gates, tanks, pumps) are drawn bigger than life when zoomed out so
-// they stay visible, and at their real size once you're close enough.
+// In the cartoon style (the default), props (gates, tanks, pumps) and
+// fences are drawn bigger than life when zoomed out so they stay visible -
+// as in farm games - and at their real size once you're close enough.
+// "True to scale" draws them their real size whatever the zoom.
 //
 // The view can be turned around the property (this.angle): everything in
 // metres is rotated by it before going into the angled view (this.view).
@@ -25,6 +27,10 @@ const SHOW_ANIMALS_AT = 2.5;
 const SHOW_GRASS_AT = 2;
 // A prop is drawn at least this many pixels across.
 const MIN_PROP_PX = 34;
+// In the cartoon style, a fence is at least this tall on screen, and its
+// posts at least this far apart.
+const MIN_FENCE_PX = 12;
+const MIN_POST_GAP_PX = 16;
 // The most animals drawn for one mob; its tag still says how many.
 const MAX_ANIMALS = 80;
 const GATE_SNAP_METRES = 40;
@@ -33,6 +39,35 @@ const GRASS = [0x9ccc74, 0x8cc06a, 0xa8d17f, 0x95c56f, 0xa2c977, 0x91bd66];
 // The paddock picture's resolution, at most.
 const GROUND_PX_PER_METRE = 2;
 const GROUND_MAX_PX = 2048;
+
+// How each type of fence is drawn close up: its wires' (or rails')
+// heights in metres, their colour and width on screen, and post spacing.
+const FENCE_STYLES = {
+    plain: { wires: 4, color: 0x8a8f94, width: 1, posts: 4 },
+    barbed: { wires: 4, color: 0x7a7f84, width: 1, posts: 4 },
+    electric: { wires: 2, color: 0xf4f1e4, width: 1.8, posts: 8 },
+    netting: { wires: 1, color: 0x8a8f94, width: 1, posts: 4, mesh: true },
+    post_and_rail: { wires: 3, color: 0x9a7650, width: 3, posts: 2.5 },
+    other: { wires: 2, color: 0x8a8f94, width: 1, posts: 4 },
+};
+const LOWEST_WIRE = 0.3;
+const TOP_WIRE = 1.05;
+
+function wireHeights(run) {
+    const style = FENCE_STYLES[run.type] ?? FENCE_STYLES.plain;
+    const count = Math.max(1, Math.min(8, run.wires || style.wires));
+    if (count === 1) return [TOP_WIRE];
+    return Array.from({ length: count }, (_, i) => LOWEST_WIRE + ((TOP_WIRE - LOWEST_WIRE) * i) / (count - 1));
+}
+
+// A path's segments: an open fence's between its points, a closed
+// paddock edge's back round to the start too.
+function* segments(run) {
+    const { points, closed } = run;
+    for (let i = closed ? 0 : 1, j = closed ? points.length - 1 : 0; i < points.length; j = i++) {
+        yield [points[j], points[i]];
+    }
+}
 
 const css = (color) => `#${color.toString(16).padStart(6, '0')}`;
 
@@ -45,7 +80,8 @@ function sensorTone(sensor) {
 }
 
 export class FarmScene {
-    constructor(element, { onOpen, onRotate, angle = 0 }) {
+    constructor(element, { onOpen, onRotate, angle = 0, cartoon = true }) {
+        this.cartoon = cartoon;
         this.element = element;
         this.onOpen = onOpen;
         this.onRotate = onRotate;
@@ -145,6 +181,17 @@ export class FarmScene {
         return point;
     }
 
+    // Cartoon (props and fences big enough to see from afar) or true to scale.
+    setCartoon(on) {
+        this.cartoon = on;
+        if (this.app && this.project) this.updateCamera(true);
+    }
+
+    // How much bigger than life fences are drawn at this zoom.
+    get fenceScale() {
+        return this.cartoon ? Math.max(1, MIN_FENCE_PX / (this.zoom * TOP_WIRE)) : 1;
+    }
+
     setContours(on) {
         this.showContours = on;
         if (this.contours) {
@@ -196,7 +243,7 @@ export class FarmScene {
         // arrive, as they make it taller.
         const refit = !this.zones || (Boolean(data.terrain) && !this.hadTerrain);
         this.hadTerrain = Boolean(data.terrain);
-        const staticKey = JSON.stringify([data.boundary, data.zones, data.terrain?.heights?.length, data.terrain?.north]);
+        const staticKey = JSON.stringify([data.boundary, data.zones, data.fences, data.terrain?.heights?.length, data.terrain?.north]);
         if (staticKey !== this.staticKey) {
             this.staticKey = staticKey;
             this.buildLand(data);
@@ -211,7 +258,7 @@ export class FarmScene {
     }
 
     // The ground, paddocks, fences and paddock names.
-    buildLand({ boundary, zones, terrain }) {
+    buildLand({ boundary, zones, fences, terrain }) {
         const all = [...(boundary ?? []), ...(zones ?? []).flatMap((zone) => zone.coordinates ?? [])];
         if (all.length === 0) {
             this.project = null;
@@ -224,13 +271,27 @@ export class FarmScene {
         this.zones = (zones ?? [])
             .filter((zone) => zone.coordinates?.length > 2)
             .map((zone) => ({ ...zone, polygon: zone.coordinates.map(this.project) }));
+        // The boundary's and paddocks' edges.
         this.fenceLines = [...(this.boundary ? [this.boundary] : []), ...this.zones.map((zone) => zone.polygon)];
         this.land = this.boundary ? [this.boundary] : this.zones.map((zone) => zone.polygon);
 
-        this.terrain = makeTerrain(terrain, this.project, bounds(this.fenceLines.flat()));
+        // The fences: where fence assets have been drawn, those - with the
+        // paddock edges faint, as a paddock edge isn't always fenced. Until
+        // there are any, every paddock edge is drawn as a fence.
+        const drawn = (fences ?? [])
+            .filter((fence) => fence.line?.length > 1)
+            .map((fence) => ({ id: fence.id, type: fence.fence_type, wires: fence.wires, points: fence.line.map(this.project), closed: false }));
+        this.runs = drawn.length
+            ? drawn
+            : this.fenceLines.map((points) => ({ type: null, points, closed: true }));
+        this.edges = drawn.length ? this.fenceLines : [];
+
+        const everything = [...this.fenceLines.flat(), ...drawn.flatMap((run) => run.points)];
+        this.terrain = makeTerrain(terrain, this.project, bounds(everything));
         const step = this.terrain.hilly ? Math.min(Math.abs(this.terrain.dx), Math.abs(this.terrain.dy)) / 2 : Infinity;
         // Fences and the land's edge in short pieces, so they follow the ground.
-        this.fenceRuns = this.fenceLines.map((polygon) => densify(polygon, step));
+        this.fenceRuns = this.runs.map((run) => ({ ...run, points: densify(run.points, step, run.closed) }));
+        this.edgeLines = this.edges.map((polygon) => densify(polygon, step));
         this.edgeRuns = this.land.map((polygon) => densify(polygon, step));
 
         this.buildGround();
@@ -419,23 +480,6 @@ export class FarmScene {
             }
         }
 
-        // A post every 4 m along each fence.
-        this.posts.clear();
-        for (const polygon of this.fenceLines) {
-            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-                const a = polygon[j];
-                const b = polygon[i];
-                const steps = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / 4));
-                for (let s = 0; s < steps; s++) {
-                    const x = a.x + ((b.x - a.x) * s) / steps;
-                    const y = a.y + ((b.y - a.y) * s) / steps;
-                    const bottom = this.view(x, y, 0);
-                    const top = this.view(x, y, 1.15);
-                    this.posts.moveTo(bottom.x, bottom.y).lineTo(top.x, top.y).stroke({ width: 0.12, color: 0x6b4f35 });
-                }
-            }
-        }
-
         for (const label of this.zoneLabels) label.destroy();
         this.zoneLabels = this.zones.map((zone) => {
             const text = new Text({ text: zone.name, style: { fontFamily: 'Figtree, sans-serif', fontSize: 13, fontWeight: '600', fill: 0x3f5f2a } });
@@ -472,7 +516,7 @@ export class FarmScene {
 
                 if (sensor.kind === 'gate') {
                     // On the nearest fence, across it.
-                    const edge = nearestEdge(at, this.fenceLines);
+                    const edge = nearestEdge(at, this.runs);
                     const onFence = edge && edge.distance <= GATE_SNAP_METRES;
                     if (onFence) at = edge.point;
                     const direction = onFence ? edge.direction : { x: 1, y: 0 };
@@ -666,13 +710,13 @@ export class FarmScene {
     updateCamera(force = false) {
         this.world.scale.set(this.zoom);
 
-        this.posts.visible = this.zoom >= SHOW_POSTS_AT;
+        this.posts.visible = this.cartoon || this.zoom >= SHOW_POSTS_AT;
         this.grass.visible = this.zoom >= SHOW_GRASS_AT;
         for (const herd of this.herds.values()) {
             for (const animal of herd.animals) animal.sprite.visible = this.zoom >= SHOW_ANIMALS_AT;
         }
         for (const prop of this.props) {
-            prop.container.scale.set(Math.max(1, MIN_PROP_PX / (this.zoom * prop.size)));
+            prop.container.scale.set(this.cartoon ? Math.max(1, MIN_PROP_PX / (this.zoom * prop.size)) : 1);
         }
 
         // Fence wire and the diorama's edge, redrawn when the zoom changes
@@ -686,13 +730,76 @@ export class FarmScene {
         this.placeLabels();
     }
 
+    // Posts every few metres along each fence, and at its far end - fewer
+    // and taller when the cartoon style draws the fence bigger than life.
+    drawPosts() {
+        const scale = this.fenceScale;
+        const g = this.posts;
+        g.clear();
+        for (const run of this.runs ?? []) {
+            const spacing = Math.max((FENCE_STYLES[run.type] ?? FENCE_STYLES.plain).posts, this.cartoon ? MIN_POST_GAP_PX / this.zoom : 0);
+            for (const [a, b] of segments(run)) {
+                const steps = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / spacing));
+                for (let s = 0; s <= steps; s++) {
+                    if (s === steps && (run.closed || b !== run.points[run.points.length - 1])) continue;
+                    const x = a.x + ((b.x - a.x) * s) / steps;
+                    const y = a.y + ((b.y - a.y) * s) / steps;
+                    const bottom = this.view(x, y, 0);
+                    const top = this.view(x, y, (TOP_WIRE + 0.1) * scale);
+                    g.moveTo(bottom.x, bottom.y).lineTo(top.x, top.y);
+                }
+            }
+        }
+        g.stroke({ width: Math.max(0.12, 2 / this.zoom), color: 0x6b4f35 });
+    }
+
+    // Far off (true to scale), each fence is a line along the ground; close
+    // up, or in the cartoon style, its wires (or rails, or netting) by type.
+    // Paddock edges without a fence asset along them are faint.
     drawFences() {
-        const width = Math.max(0.05, 1.4 / this.zoom);
-        const wires = this.zoom >= SHOW_POSTS_AT ? [0.45, 1.0] : [0];
-        this.fences.clear();
-        for (const polygon of this.fenceRuns ?? []) {
-            for (const z of wires) {
-                this.fences.poly(this.viewPoints(polygon, z), true).stroke({ width, color: z ? 0x8a8f94 : 0x6b4f35, alpha: z ? 0.9 : 0.8 });
+        const px = 1 / this.zoom;
+        const close = this.cartoon || this.zoom >= SHOW_POSTS_AT;
+        const scale = this.fenceScale;
+        const g = this.fences;
+        g.clear();
+        this.drawPosts();
+
+        const path = (points, closed, z) => {
+            points.forEach((p, i) => {
+                const q = this.view(p.x, p.y, z);
+                if (i) g.lineTo(q.x, q.y);
+                else g.moveTo(q.x, q.y);
+            });
+            if (closed) g.closePath();
+        };
+
+        for (const polygon of this.edgeLines ?? []) {
+            path(polygon, true, 0);
+            // Pale, so it isn't taken for a contour line.
+            g.stroke({ width: Math.max(0.04, 1.2 * px), color: 0xf1ecd8, alpha: 0.6 });
+        }
+
+        for (const run of this.fenceRuns ?? []) {
+            const style = FENCE_STYLES[run.type] ?? FENCE_STYLES.plain;
+            if (!close) {
+                path(run.points, run.closed, 0);
+                g.stroke({ width: Math.max(0.05, 1.4 * px), color: run.type === 'electric' ? 0xc9a227 : 0x6b4f35, alpha: 0.85 });
+                continue;
+            }
+            if (style.mesh) {
+                // Netting: a see-through band up to the top wire.
+                for (const [a, b] of segments(run)) {
+                    const a0 = this.view(a.x, a.y, 0.05 * scale);
+                    const b0 = this.view(b.x, b.y, 0.05 * scale);
+                    const b1 = this.view(b.x, b.y, TOP_WIRE * scale);
+                    const a1 = this.view(a.x, a.y, TOP_WIRE * scale);
+                    g.poly([a0.x, a0.y, b0.x, b0.y, b1.x, b1.y, a1.x, a1.y]);
+                }
+                g.fill({ color: 0x9aa0a6, alpha: 0.35 });
+            }
+            for (const z of wireHeights(run)) {
+                path(run.points, run.closed, z * scale);
+                g.stroke({ width: Math.max(0.03, style.width * px), color: style.color, alpha: 0.95 });
             }
         }
     }
@@ -721,7 +828,7 @@ export class FarmScene {
 
     fit() {
         if (!this.app || !this.fenceLines?.length) return;
-        const points = this.fenceLines.flat().map((p) => this.view(p.x, p.y));
+        const points = [...this.fenceLines.flat(), ...this.runs.flatMap((run) => run.points)].map((p) => this.view(p.x, p.y));
         const b = bounds(points);
         const { width, height } = this.app.screen;
         this.zoom = Math.min(width / (b.maxX - b.minX || 1), height / (b.maxY - b.minY || 1)) * 0.82;

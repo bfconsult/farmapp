@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asset;
 use App\Models\Note;
 use App\Models\Property;
 use Illuminate\Http\Request;
@@ -24,6 +25,15 @@ class ShapeController extends Controller
                 ->whereNotNull('latitude')
                 ->with('createdBy')
                 ->get(),
+            // Fences drawn as lines, as a toggleable reference layer too -
+            // a zone's corners snap onto them, so paddocks and fences agree.
+            'fences' => Asset::where('property_id', $property->id)
+                ->fences()
+                ->with('currentLocation')
+                ->get()
+                ->filter(fn (Asset $fence) => count($fence->currentLocation?->line ?? []) > 1)
+                ->map(fn (Asset $fence) => ['id' => $fence->id, 'name' => $fence->name, 'line' => $fence->currentLocation->line])
+                ->values(),
         ]);
     }
 

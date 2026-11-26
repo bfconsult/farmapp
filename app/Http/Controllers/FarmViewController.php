@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asset;
 use App\Models\Device;
 use App\Models\Livestock;
 use App\Models\Mob;
@@ -36,6 +37,7 @@ class FarmViewController extends Controller
             ])->values() ?? [],
             'mobs' => $this->mobs($propertyId),
             'sensors' => $this->sensors($propertyId),
+            'fences' => $this->fences($propertyId),
             'rotation' => (int) ($property?->farm_view_rotation ?? 0),
             'terrain' => $terrain ? [
                 'north' => $terrain->north,
@@ -116,6 +118,28 @@ class FarmViewController extends Controller
                     'type' => $animals->first()?->type,
                 ];
             })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Fence assets drawn as lines: {id, name, fence_type, wires, line}.
+     */
+    private function fences(?int $propertyId): array
+    {
+        return Asset::where('property_id', $propertyId)
+            ->fences()
+            ->with('currentLocation')
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Asset $asset) => count($asset->currentLocation?->line ?? []) > 1)
+            ->map(fn (Asset $asset) => [
+                'id' => $asset->id,
+                'name' => $asset->name,
+                'fence_type' => $asset->details['fence_type'] ?? null,
+                'wires' => $asset->details['wires'] ?? null,
+                'line' => $asset->currentLocation->line,
+            ])
             ->values()
             ->all();
     }

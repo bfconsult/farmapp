@@ -3,6 +3,7 @@ import Modal from '@/Components/Modal';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
 import BackLink from '@/Components/BackLink';
+import FenceFields, { describeFence, fenceValues, isFenceType } from '@/Components/FenceFields';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
@@ -11,6 +12,24 @@ import { pillBadgeClass } from '@/Utils/pillColors';
 
 const ASSET_COLOR = '#2563eb';
 const PROPERTY_BOUNDARY_COLOR = '#9ca3af';
+const OTHER_LINE_COLOR = '#6b7280';
+
+/** A line's length in metres, along the ground. */
+function lineLength(line) {
+    let metres = 0;
+    for (let i = 1; i < (line?.length ?? 0); i++) {
+        const [lat1, lng1] = line[i - 1];
+        const [lat2, lng2] = line[i];
+        const dy = (lat2 - lat1) * 110540;
+        const dx = (lng2 - lng1) * 111320 * Math.cos((((lat1 + lat2) / 2) * Math.PI) / 180);
+        metres += Math.hypot(dx, dy);
+    }
+    return metres;
+}
+
+function formatLength(metres) {
+    return metres >= 1000 ? `${(metres / 1000).toFixed(2)} km` : `${Math.round(metres)} m`;
+}
 const ZONE_COLOR = '#7c3aed';
 
 /** Standard ray-casting point-in-polygon test - `coordinates` is a plain
@@ -88,7 +107,10 @@ function LocationThumbnail({ asset, propertyBoundary }) {
                 bounds.extend(boundary.getBounds());
             }
 
-            if (location.shape) {
+            if (location.line) {
+                const line = L.polyline(location.line, { color: ASSET_COLOR, weight: 3, interactive: false }).addTo(map);
+                bounds.extend(line.getBounds());
+            } else if (location.shape) {
                 const shape = L.polygon(location.shape, {
                     color: ASSET_COLOR,
                     fillColor: ASSET_COLOR,
@@ -123,7 +145,7 @@ function LocationThumbnail({ asset, propertyBoundary }) {
 }
 
 /** Full interactive map + Geoman drawing controls, shown inside the Location modal. */
-function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved }) {
+function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canManage, onSaved }) {
     const mapRef = useRef(null);
     const mapInstance = useRef(null);
     const originalLayer = useRef(null);
@@ -132,6 +154,17 @@ function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved 
     const [showZones, setShowZones] = useState(false);
     const [zonesReady, setZonesReady] = useState(false);
     const [pendingPayload, setPendingPayload] = useState(null);
+    const originalPoints = useRef(null);
+
+    // What to save for a drawn pin, line or shape.
+    const payloadFor = (layer) => {
+        if (layer.getLatLng) return { latitude: layer.getLatLng().lat, longitude: layer.getLatLng().lng };
+        const points = layer.getLatLngs();
+        // A polygon's points are nested a ring deep; a line's aren't.
+        return Array.isArray(points[0])
+            ? { shape: points[0].map((ll) => [ll.lat, ll.lng]) }
+            : { line: points.map((ll) => [ll.lat, ll.lng]) };
+    };
 
     useEffect(() => {
         Promise.all([
@@ -176,8 +209,19 @@ function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved 
                 boundaryBounds = boundary.getBounds();
             }
 
+            // The property's other fences and lines, to draw up to - a new
+            // line's points snap onto them, and onto paddock and boundary
+            // corners and edges.
+            (otherLines ?? []).forEach((other) => {
+                L.polyline(other.line, { color: OTHER_LINE_COLOR, weight: 2, dashArray: '4 4' })
+                    .bindTooltip(other.name, { sticky: true })
+                    .addTo(map);
+            });
+
             const location = asset.current_location;
-            if (location?.shape) {
+            if (location?.line) {
+                originalLayer.current = L.polyline(location.line, { color: ASSET_COLOR, weight: 4 }).addTo(map);
+            } else if (location?.shape) {
                 originalLayer.current = L.polygon(location.shape, {
                     color: ASSET_COLOR,
                     fillColor: ASSET_COLOR,
@@ -201,11 +245,13 @@ function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved 
             }
 
             if (canManage) {
+                map.pm.setGlobalOptions({ snappable: true, snapDistance: 20 });
                 map.pm.addControls({
                     position: 'topleft',
                     drawMarker: true,
                     drawCircleMarker: false,
-                    drawPolyline: false,
+                    // A line: a fence, pipe or track - no width to match up.
+                    drawPolyline: true,
                     drawRectangle: false,
                     drawCircle: false,
                     drawText: false,
@@ -226,11 +272,7 @@ function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved 
                     map.pm.disableDraw();
 
                     const updatePending = () => {
-                        setPendingPayload(
-                            e.shape === 'Marker'
-                                ? { latitude: e.layer.getLatLng().lat, longitude: e.layer.getLatLng().lng }
-                                : { shape: e.layer.getLatLngs()[0].map((ll) => [ll.lat, ll.lng]) }
-                        );
+                        setPendingPayload(payloadFor(e.layer));
                     };
 
                     if (e.shape === 'Marker') {
@@ -242,6 +284,16 @@ function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved 
 
                     updatePending();
                 });
+
+                // Editing the saved line or shape in place (edit mode) is a
+                // draft too, until "Done"; Cancel puts it back.
+                if (originalLayer.current?.getLatLngs) {
+                    const original = originalLayer.current;
+                    // A copy: editing moves the layer's own points.
+                    const copy = (points) => points.map((p) => (Array.isArray(p) ? copy(p) : { lat: p.lat, lng: p.lng }));
+                    originalPoints.current = copy(original.getLatLngs());
+                    original.on('pm:edit', () => setPendingPayload(payloadFor(original)));
+                }
             }
         });
 
@@ -271,7 +323,9 @@ function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved 
     const cancelDraft = () => {
         pendingLayer.current?.remove();
         pendingLayer.current = null;
+        if (originalPoints.current) originalLayer.current?.setLatLngs(originalPoints.current);
         originalLayer.current?.addTo(mapInstance.current);
+        mapInstance.current?.pm.disableGlobalEditMode();
         setPendingPayload(null);
     };
 
@@ -302,6 +356,11 @@ function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved 
                     </button>
                 </div>
             )}
+            {canManage && (
+                <p className="text-xs text-gray-500 mb-2">
+                    For a fence, pipe or track, draw a line: click along it and click the last point again to finish. Points snap to paddock corners and other fences.
+                </p>
+            )}
             <div ref={mapRef} style={{ height: '350px' }} />
             {pendingPayload && (
                 <div className="flex gap-2 mt-3">
@@ -313,7 +372,7 @@ function LocationEditorMap({ asset, propertyBoundary, zones, canManage, onSaved 
     );
 }
 
-function AssetFields({ values, setValues }) {
+function AssetFields({ values, setValues, isFence }) {
     return (
         <div className="space-y-3">
             <input
@@ -338,6 +397,7 @@ function AssetFields({ values, setValues }) {
                 className="w-full border-gray-300 rounded-lg p-2 text-sm"
                 placeholder="Value ($, optional)"
             />
+            {isFence && <FenceFields values={values} setValues={setValues} />}
         </div>
     );
 }
@@ -582,7 +642,7 @@ function AddMaintenanceItemForm({ asset, onClose }) {
     );
 }
 
-export default function Show({ asset, recentJobs, jobsCount, usageHours, maintenanceHours, workSessions }) {
+export default function Show({ asset, otherLines, recentJobs, jobsCount, usageHours, maintenanceHours, workSessions }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canConvert = canManage || currentUserRole === 'worker';
@@ -593,10 +653,12 @@ export default function Show({ asset, recentJobs, jobsCount, usageHours, mainten
         name: asset.name,
         description: asset.description ?? '',
         value: asset.value ?? '',
+        ...fenceValues(asset),
     });
 
     const [showLocationModal, setShowLocationModal] = useState(false);
     const hasLocation = Boolean(
+        asset.current_location?.line ||
         asset.current_location?.shape ||
         (asset.current_location?.latitude && asset.current_location?.longitude)
     );
@@ -608,6 +670,7 @@ export default function Show({ asset, recentJobs, jobsCount, usageHours, mainten
     const pastLocations = (asset.locations ?? []).slice(1); // [0] is current_location itself
 
     const describeLocation = (location) => {
+        if (location.line) return `Line (${formatLength(lineLength(location.line))})`;
         if (location.shape) return `Shape (${location.shape.length} points)`;
         if (location.latitude && location.longitude) {
             const lat = Number(location.latitude);
@@ -644,7 +707,7 @@ export default function Show({ asset, recentJobs, jobsCount, usageHours, mainten
                 <div className="bg-white rounded-lg shadow p-4">
                     {editing ? (
                         <div className="space-y-3">
-                            <AssetFields values={values} setValues={setValues} />
+                            <AssetFields values={values} setValues={setValues} isFence={isFenceType(asset.asset_type)} />
                             <div className="flex gap-2">
                                 <button onClick={save} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Save</button>
                                 <button onClick={() => setEditing(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
@@ -662,6 +725,13 @@ export default function Show({ asset, recentJobs, jobsCount, usageHours, mainten
                             </div>
                             {asset.description && (
                                 <p className="text-sm text-gray-500 mb-2">{asset.description}</p>
+                            )}
+                            {isFenceType(asset.asset_type) && (
+                                <p className="text-sm text-gray-700 mb-1">
+                                    {[describeFence(asset.details), asset.current_location?.line && formatLength(lineLength(asset.current_location.line))]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                </p>
                             )}
                             {asset.value && (
                                 <p className="text-sm text-gray-900">${formatNumber(asset.value)}</p>
@@ -734,6 +804,7 @@ export default function Show({ asset, recentJobs, jobsCount, usageHours, mainten
                                 asset={asset}
                                 propertyBoundary={asset.property?.shape?.coordinates}
                                 zones={asset.property?.zones}
+                                otherLines={otherLines}
                                 canManage={canManage}
                                 onSaved={() => setShowLocationModal(false)}
                             />

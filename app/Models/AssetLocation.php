@@ -12,10 +12,12 @@ class AssetLocation extends Model
         'latitude',
         'longitude',
         'shape',
+        'line',
     ];
 
     protected $casts = [
         'shape' => 'array',
+        'line' => 'array',
     ];
 
     public function asset()

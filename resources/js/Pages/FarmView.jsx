@@ -7,6 +7,17 @@ import { FarmScene } from '@/FarmView/scene';
 // Sensors and mobs are refreshed this often, so gates and tanks keep up.
 const REFRESH_MS = 60 * 1000;
 
+// Whether this viewer last chose "True to scale" - remembered in the
+// browser, as it's only a viewing preference.
+const TRUE_SCALE_KEY = 'farmView.trueToScale';
+function rememberedTrueScale() {
+    try {
+        return window.localStorage.getItem(TRUE_SCALE_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
 // Which way north points on screen at this view angle, in CSS degrees
 // (0 = up) - north (0, -1) turned and put through the angled view.
 function northOnScreen(degrees) {
@@ -27,11 +38,12 @@ function Compass({ degrees }) {
     );
 }
 
-export default function FarmView({ boundary, zones, mobs, sensors, rotation, terrain, terrainStale }) {
+export default function FarmView({ boundary, zones, fences, mobs, sensors, rotation, terrain, terrainStale }) {
     const [degrees, setDegrees] = useState(rotation);
     const [saving, setSaving] = useState(false);
     const [fetching, setFetching] = useState(false);
     const [contours, setContours] = useState(true);
+    const [trueScale, setTrueScale] = useState(rememberedTrueScale);
     const containerRef = useRef(null);
     const sceneRef = useRef(null);
     const hasLand = (boundary?.length ?? 0) > 2 || zones.some((zone) => (zone.coordinates?.length ?? 0) > 2);
@@ -42,6 +54,7 @@ export default function FarmView({ boundary, zones, mobs, sensors, rotation, ter
             onOpen: (url) => router.visit(url),
             onRotate: setDegrees,
             angle: rotation,
+            cartoon: !trueScale,
         });
         sceneRef.current = scene;
         scene.init();
@@ -52,12 +65,21 @@ export default function FarmView({ boundary, zones, mobs, sensors, rotation, ter
     }, [hasLand]);
 
     useEffect(() => {
-        sceneRef.current?.setData({ boundary, zones, mobs, sensors, terrain });
-    }, [boundary, zones, mobs, sensors, terrain, hasLand]);
+        sceneRef.current?.setData({ boundary, zones, fences, mobs, sensors, terrain });
+    }, [boundary, zones, fences, mobs, sensors, terrain, hasLand]);
 
     useEffect(() => {
         sceneRef.current?.setContours(contours);
     }, [contours]);
+
+    useEffect(() => {
+        sceneRef.current?.setCartoon(!trueScale);
+        try {
+            window.localStorage.setItem(TRUE_SCALE_KEY, trueScale ? '1' : '0');
+        } catch {
+            // Not remembered - fine.
+        }
+    }, [trueScale]);
 
     const fetchTerrain = () => router.post(route('farm-view.terrain'), {}, {
         preserveState: true,
@@ -116,6 +138,13 @@ export default function FarmView({ boundary, zones, mobs, sensors, rotation, ter
                                     {fetching ? 'Getting the hills…' : terrain ? 'Update the hills' : 'Add hills'}
                                 </button>
                             )}
+                            <label
+                                className="flex items-center gap-1.5 text-sm text-gray-700 mr-1"
+                                title="Off: fences, gates, tanks and pumps are drawn big enough to see from afar. On: their real size."
+                            >
+                                <input type="checkbox" className="rounded border-gray-300 text-green-600" checked={trueScale} onChange={(e) => setTrueScale(e.target.checked)} />
+                                True to scale
+                            </label>
                             {terrain && (
                                 <label className="flex items-center gap-1.5 text-sm text-gray-700 mr-1">
                                     <input type="checkbox" className="rounded border-gray-300 text-green-600" checked={contours} onChange={(e) => setContours(e.target.checked)} />

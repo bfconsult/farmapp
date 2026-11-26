@@ -6,9 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class Asset extends Model
 {
+    /** A fence's details.fence_type, with its label. */
+    public const FENCE_TYPES = [
+        'plain' => 'Plain wire',
+        'barbed' => 'Barbed wire',
+        'electric' => 'Electric',
+        'netting' => 'Netting',
+        'post_and_rail' => 'Post and rail',
+        'other' => 'Other',
+    ];
+
     protected $fillable = [
         'property_id',
         'asset_type_id',
+        'details',
         'created_by',
         'name',
         'description',
@@ -17,6 +28,7 @@ class Asset extends Model
 
     protected $casts = [
         'value' => 'decimal:2',
+        'details' => 'array',
     ];
 
     public function property()
@@ -27,6 +39,12 @@ class Asset extends Model
     public function assetType()
     {
         return $this->belongsTo(AssetType::class);
+    }
+
+    /** Fences: assets of the property's fence type, whatever it's called. */
+    public function scopeFences($query)
+    {
+        return $query->whereHas('assetType', fn ($type) => $type->where('kind', AssetType::FENCE));
     }
 
     public function createdBy()

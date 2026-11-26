@@ -9,6 +9,7 @@ use App\Models\Property;
 use App\Models\WorkSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class AssetController extends Controller
@@ -63,7 +64,7 @@ class AssetController extends Controller
 
     public function update(Request $request, Asset $asset)
     {
-        $asset->update($this->validated($request));
+        $asset->update($this->validated($request, $asset));
 
         return back()->with('success', 'Asset updated.');
     }
@@ -72,14 +73,27 @@ class AssetController extends Controller
      * Records a new current location for this asset - every call inserts a
      * fresh AssetLocation row (including "clear", which inserts an all-null
      * row) rather than overwriting one, so location history accumulates. An
-     * asset has at most one of a point location or a shape at a time within
-     * a single row - saving one clears the other, mirroring how
+     * asset has at most one of a point location, a shape or a line at a time
+     * within a single row - saving one clears the others, mirroring how
      * Properties/Shape.jsx saves a zone's polygon immediately on draw, no
      * separate Save step.
      */
     public function updateLocation(Request $request, Asset $asset)
     {
-        if ($request->has('shape')) {
+        if ($request->has('line')) {
+            // A fence, pipe or track: a run of [lat, lng] points.
+            $validated = $request->validate([
+                'line' => 'required|array|min:2',
+                'line.*' => 'array|size:2',
+                'line.*.0' => 'numeric|between:-90,90',
+                'line.*.1' => 'numeric|between:-180,180',
+            ]);
+
+            $asset->locations()->create([
+                'line' => array_map(fn ($point) => [(float) $point[0], (float) $point[1]], $validated['line']),
+                'created_by' => $request->user()->id,
+            ]);
+        } elseif ($request->has('shape')) {
             $validated = $request->validate([
                 'shape' => 'required|array|min:3',
             ]);
@@ -118,6 +132,16 @@ class AssetController extends Controller
     public function show(Asset $asset)
     {
         $asset->load(['assetType', 'maintenanceItems', 'property.shape', 'property.zones', 'notes.photos', 'notes.createdBy', 'notes.views', 'currentLocation', 'locations']);
+
+        // The property's other lines (fences, pipes...), so a new one can be
+        // drawn to meet them exactly.
+        $otherLines = Asset::where('property_id', $asset->property_id)
+            ->whereKeyNot($asset->id)
+            ->with('currentLocation')
+            ->get()
+            ->filter(fn (Asset $other) => $other->currentLocation?->line)
+            ->map(fn (Asset $other) => ['id' => $other->id, 'name' => $other->name, 'line' => $other->currentLocation->line])
+            ->values();
         $asset->notes->each(fn ($note) => $note->is_unread = $note->isUnreadBy(Auth::id()));
 
         $jobIds = $asset->jobs()->pluck('farm_jobs.id');
@@ -155,6 +179,7 @@ class AssetController extends Controller
 
         return Inertia::render('Assets/Show', [
             'asset' => $asset,
+            'otherLines' => $otherLines,
             'recentJobs' => FarmJob::whereIn('id', $jobIds)->with('jobStatus')->latest()->take(5)->get(),
             'jobsCount' => $jobIds->count(),
             'usageHours' => $usageHours,
@@ -174,13 +199,30 @@ class AssetController extends Controller
         ]);
     }
 
-    private function validated(Request $request): array
+    private function validated(Request $request, ?Asset $asset = null): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'asset_type_id' => 'nullable|exists:asset_types,id',
             'value' => 'nullable|numeric|min:0',
+            'details' => 'nullable|array',
+            'details.fence_type' => ['nullable', Rule::in(array_keys(Asset::FENCE_TYPES))],
+            'details.wires' => 'nullable|integer|min:1|max:20',
         ]);
+
+        // A fence's details are kept only while it's of the fence type.
+        $typeId = array_key_exists('asset_type_id', $validated) ? $validated['asset_type_id'] : $asset?->asset_type_id;
+        $isFence = $typeId && AssetType::whereKey($typeId)->where('kind', AssetType::FENCE)->exists();
+        if (! $isFence) {
+            $validated['details'] = null;
+        } elseif (array_key_exists('details', $validated)) {
+            $validated['details'] = array_filter([
+                'fence_type' => $validated['details']['fence_type'] ?? null,
+                'wires' => isset($validated['details']['wires']) ? (int) $validated['details']['wires'] : null,
+            ], fn ($value) => $value !== null) ?: null;
+        }
+
+        return $validated;
     }
 }

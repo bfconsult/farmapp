@@ -86,14 +86,14 @@ export function randomPointIn(polygon, random, around = null, radius = 0) {
     return around ?? centroid(polygon);
 }
 
-// The closest point on any of the polygons' edges, with that edge's
-// direction - where a gate sensor's fence is.
-export function nearestEdge(point, polygons) {
+// The closest point on any of the fences ({points, closed}), with that
+// stretch's direction - where a gate sensor's fence is.
+export function nearestEdge(point, runs) {
     let best = null;
-    for (const polygon of polygons) {
-        for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-            const a = polygon[j];
-            const b = polygon[i];
+    for (const { points, closed } of runs) {
+        for (let i = closed ? 0 : 1, j = closed ? points.length - 1 : 0; i < points.length; j = i++) {
+            const a = points[j];
+            const b = points[i];
             const dx = b.x - a.x;
             const dy = b.y - a.y;
             const length = Math.hypot(dx, dy);

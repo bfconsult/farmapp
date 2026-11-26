@@ -150,6 +150,12 @@ class SettingsController extends Controller
             abort(404);
         }
 
+        // Fences are drawn as lines and in the farm view because of this
+        // type, so it stays - it can be renamed.
+        if ($assetType->kind === AssetType::FENCE) {
+            return back()->with('error', "\"{$assetType->name}\" is where fences go, so it can't be deleted. You can rename it.");
+        }
+
         $assetType->delete();
         return back();
     }
