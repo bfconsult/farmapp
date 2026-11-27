@@ -101,9 +101,6 @@ function AssetRow({ asset, canManage, assetTypes }) {
             <Link href={route('assets.show', asset.id)} className="min-w-0 flex-1">
                 <p className="text-sm text-gray-900">{asset.name}</p>
                 <div className="flex items-center gap-2 mt-1">
-                    {asset.asset_type?.parent && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{asset.asset_type.name}</span>
-                    )}
                     {describeDetails(asset.asset_type?.kind, asset.details) && (
                         <span className="text-xs text-gray-500">{describeDetails(asset.asset_type?.kind, asset.details)}</span>
                     )}
@@ -151,15 +148,27 @@ export default function Assets({ assets, assetTypes, canManage }) {
         });
     };
 
-    // Grouped by category - a sub-type's assets under its category, with
-    // the sub-type on each row. Categories by name, untyped ones last.
+    // Grouped by category, categories by name and untyped ones last; within
+    // a category, by sub-type - the category's own assets first, as
+    // "General", then each sub-type by name.
     const grouped = Object.values(
         assets.reduce((groups, asset) => {
             const key = asset.asset_type?.parent?.name ?? asset.asset_type?.name ?? 'Other';
             (groups[key] ??= { label: key, assets: [] }).assets.push(asset);
             return groups;
         }, {})
-    ).sort((a, b) => (a.label === 'Other') - (b.label === 'Other') || a.label.localeCompare(b.label));
+    )
+        .sort((a, b) => (a.label === 'Other') - (b.label === 'Other') || a.label.localeCompare(b.label))
+        .map((group) => ({
+            ...group,
+            subGroups: Object.values(
+                group.assets.reduce((subGroups, asset) => {
+                    const label = asset.asset_type?.parent ? asset.asset_type.name : null;
+                    (subGroups[label ?? ''] ??= { label, assets: [] }).assets.push(asset);
+                    return subGroups;
+                }, {})
+            ).sort((a, b) => (a.label !== null) - (b.label !== null) || (a.label ?? '').localeCompare(b.label ?? '')),
+        }));
 
     return (
         <AuthenticatedLayout title="Assets">
@@ -226,11 +235,21 @@ export default function Assets({ assets, assetTypes, canManage }) {
                                         {group.label}
                                     </p>
                                 </div>
-                                <div className="divide-y divide-gray-100">
-                                    {group.assets.map((asset) => (
-                                        <AssetRow key={asset.id} asset={asset} canManage={canManage} assetTypes={assetTypes} />
-                                    ))}
-                                </div>
+                                {group.subGroups.map((subGroup) => (
+                                    <div key={subGroup.label ?? ''} className="border-t border-gray-100 first:border-t-0">
+                                        {/* Sub-headings only once the category has a sub-type in use. */}
+                                        {group.subGroups.some((other) => other.label !== null) && (
+                                            <p className="px-4 pt-3 pb-1 text-xs font-medium text-gray-400">
+                                                {subGroup.label ?? 'General'}
+                                            </p>
+                                        )}
+                                        <div className="divide-y divide-gray-100">
+                                            {subGroup.assets.map((asset) => (
+                                                <AssetRow key={asset.id} asset={asset} canManage={canManage} assetTypes={assetTypes} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ))}
                     </div>
