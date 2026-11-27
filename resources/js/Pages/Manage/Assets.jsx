@@ -87,6 +87,11 @@ function AssetRow({ asset, canManage, assetTypes }) {
                     <button onClick={save} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm">Save</button>
                     <button onClick={() => setEditing(false)} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
                 </div>
+                <div className="text-right">
+                    <Link href={`${route('assets.show', asset.id)}?edit=1`} className="text-xs text-green-600">
+                        Full edit →
+                    </Link>
+                </div>
             </div>
         );
     }
@@ -121,7 +126,7 @@ function AssetRow({ asset, canManage, assetTypes }) {
                 </div>
                 {canManage && (
                     <div className="flex gap-3 mt-1 text-xs">
-                        <button type="button" onClick={(e) => { e.preventDefault(); setEditing(true); }} className="text-green-600">Edit</button>
+                        <button type="button" onClick={(e) => { e.preventDefault(); setEditing(true); }} className="text-green-600">Quick edit</button>
                         <button type="button" onClick={(e) => { e.preventDefault(); destroy(); }} className="text-red-500">Delete</button>
                     </div>
                 )}

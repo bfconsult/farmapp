@@ -721,7 +721,9 @@ export default function Show({ asset, otherLines, assetTypes = [], sensors = [],
     const canConvert = canManage || currentUserRole === 'worker';
     const canCreateNote = canManage || currentUserRole === 'worker';
 
-    const [editing, setEditing] = useState(false);
+    // Opened with ?edit=1 (the asset list's "Full edit" link), it starts in
+    // its edit form.
+    const [editing, setEditing] = useState(() => canManage && new URLSearchParams(window.location.search).has('edit'));
     const [values, setValues] = useState({
         name: asset.name,
         description: asset.description ?? '',
