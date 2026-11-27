@@ -26,7 +26,7 @@ class AssetController extends Controller
         // Visible to every role - only the CRUD/location controls on top of
         // this are canManage-gated.
         $assets = Asset::where('property_id', $currentPropertyId)
-            ->with(['assetType', 'maintenanceItems'])
+            ->with(['assetType.parent', 'maintenanceItems'])
             ->orderBy('name')
             ->get();
 
@@ -47,7 +47,7 @@ class AssetController extends Controller
 
         return Inertia::render('Manage/Assets', [
             'assets' => $assets,
-            'assetTypes' => $canManage ? AssetType::where('property_id', $currentPropertyId)->orderBy('name')->get() : [],
+            'assetTypes' => $canManage ? AssetType::where('property_id', $currentPropertyId)->orderBy('name')->get(['id', 'parent_id', 'name', 'kind']) : [],
             'canManage' => $canManage,
         ]);
     }
@@ -134,7 +134,7 @@ class AssetController extends Controller
 
     public function show(Asset $asset)
     {
-        $asset->load(['assetType', 'maintenanceItems', 'property.shape', 'property.zones', 'notes.photos', 'notes.createdBy', 'notes.views', 'currentLocation', 'locations']);
+        $asset->load(['assetType.parent', 'maintenanceItems', 'property.shape', 'property.zones', 'notes.photos', 'notes.createdBy', 'notes.views', 'currentLocation', 'locations']);
 
         // The property's other lines (fences, pipes...), so a new one can be
         // drawn to meet them exactly.
@@ -184,7 +184,7 @@ class AssetController extends Controller
             'asset' => $asset,
             'otherLines' => $otherLines,
             // For the edit form's type picker (e.g. to make a Fixed asset a fence).
-            'assetTypes' => AssetType::where('property_id', $asset->property_id)->orderBy('name')->get(['id', 'name', 'kind']),
+            'assetTypes' => AssetType::where('property_id', $asset->property_id)->orderBy('name')->get(['id', 'parent_id', 'name', 'kind']),
             'sensors' => $this->fittedSensors($asset),
             'recentJobs' => FarmJob::whereIn('id', $jobIds)->with('jobStatus')->latest()->take(5)->get(),
             'jobsCount' => $jobIds->count(),

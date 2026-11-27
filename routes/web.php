@@ -334,7 +334,7 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             ->get();
 
         $assets = \App\Models\Asset::where('property_id', $currentPropertyId)
-            ->with(['assetType', 'currentLocation'])
+            ->with(['assetType.parent', 'currentLocation'])
             ->get();
 
         $notes = \App\Models\Note::where('property_id', $currentPropertyId)

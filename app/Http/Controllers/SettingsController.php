@@ -29,7 +29,7 @@ class SettingsController extends Controller
             'priorities' => Priority::where('property_id', $currentPropertyId)->orderBy('order')->get(),
             'jobTypes' => JobType::where('property_id', $currentPropertyId)->orderBy('name')->get(),
             'jobStatuses' => JobStatus::where('property_id', $currentPropertyId)->orderBy('order')->get(),
-            'assetTypes' => AssetType::where('property_id', $currentPropertyId)->orderBy('name')->get(),
+            'assetTypes' => AssetType::where('property_id', $currentPropertyId)->orderBy('name')->get(['id', 'parent_id', 'name', 'kind']),
             'livestockTypes' => LivestockType::where('property_id', $currentPropertyId)->orderBy('name')->get(),
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
             'billingBlockOptions' => User::BILLING_BLOCK_OPTIONS,
@@ -122,13 +122,27 @@ class SettingsController extends Controller
     }
 
     // Asset Types - scoped to the current property, same as Priorities.
+    // Two levels: a category (no parent_id) or a sub-type of one.
     public function storeAssetType(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'parent_id' => $this->assetCategoryRule(),
         ]);
         AssetType::create([...$validated, 'property_id' => session('current_property_id')]);
         return back();
+    }
+
+    /** A category on the current property (not a sub-type, and not this type itself). */
+    private function assetCategoryRule(?AssetType $type = null): array
+    {
+        return [
+            'nullable',
+            \Illuminate\Validation\Rule::exists('asset_types', 'id')
+                ->where('property_id', session('current_property_id'))
+                ->whereNull('parent_id'),
+            \Illuminate\Validation\Rule::notIn(array_filter([$type?->id])),
+        ];
     }
 
     public function updateAssetType(Request $request, AssetType $assetType)
@@ -139,7 +153,16 @@ class SettingsController extends Controller
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'parent_id' => $this->assetCategoryRule($assetType),
         ]);
+
+        // A category with sub-types can't become a sub-type itself.
+        if ($validated['parent_id'] ?? null) {
+            if ($assetType->children()->exists()) {
+                return back()->with('error', "\"{$assetType->name}\" has its own sub-types, so it has to stay a category.");
+            }
+        }
+
         $assetType->update($validated);
         return back();
     }
@@ -155,6 +178,15 @@ class SettingsController extends Controller
         // stays - it can be renamed.
         if ($assetType->kind) {
             return back()->with('error', "\"{$assetType->name}\" is one of the types the farm view and sensors rely on, so it can't be deleted. You can rename it.");
+        }
+
+        if ($assetType->children()->exists()) {
+            return back()->with('error', "\"{$assetType->name}\" has sub-types - move or delete them first.");
+        }
+
+        // Its assets move up to its category, rather than losing their type.
+        if ($assetType->parent_id) {
+            $assetType->assets()->update(['asset_type_id' => $assetType->parent_id]);
         }
 
         $assetType->delete();

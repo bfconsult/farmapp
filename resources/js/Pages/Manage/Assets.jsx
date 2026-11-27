@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackLink from '@/Components/BackLink';
-import AssetDetailsFields, { describeDetails, detailValues, kindOfType } from '@/Components/AssetDetailsFields';
+import AssetDetailsFields, { AssetTypeSelect, describeDetails, detailValues, kindOfType } from '@/Components/AssetDetailsFields';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
@@ -24,16 +24,11 @@ function AssetFields({ values, setValues, assetTypes }) {
                 rows={2}
             />
             <div className="grid grid-cols-2 gap-2">
-                <select
+                <AssetTypeSelect
+                    assetTypes={assetTypes}
                     value={values.asset_type_id}
-                    onChange={(e) => setValues({ ...values, asset_type_id: e.target.value })}
-                    className="w-full border-gray-300 rounded-lg p-2 text-sm"
-                >
-                    <option value="">No type</option>
-                    {assetTypes.map((type) => (
-                        <option key={type.id} value={type.id}>{type.name}</option>
-                    ))}
-                </select>
+                    onChange={(id) => setValues({ ...values, asset_type_id: id })}
+                />
                 <input
                     type="number"
                     step="0.01"
@@ -101,6 +96,9 @@ function AssetRow({ asset, canManage, assetTypes }) {
             <Link href={route('assets.show', asset.id)} className="min-w-0 flex-1">
                 <p className="text-sm text-gray-900">{asset.name}</p>
                 <div className="flex items-center gap-2 mt-1">
+                    {asset.asset_type?.parent && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{asset.asset_type.name}</span>
+                    )}
                     {describeDetails(asset.asset_type?.kind, asset.details) && (
                         <span className="text-xs text-gray-500">{describeDetails(asset.asset_type?.kind, asset.details)}</span>
                     )}
@@ -148,15 +146,15 @@ export default function Assets({ assets, assetTypes, canManage }) {
         });
     };
 
-    const grouped = [
-        ...Object.values(
-            assets.reduce((groups, asset) => {
-                const key = asset.asset_type?.name ?? 'Other';
-                (groups[key] ??= { label: key, assets: [] }).assets.push(asset);
-                return groups;
-            }, {})
-        ),
-    ];
+    // Grouped by category - a sub-type's assets under its category, with
+    // the sub-type on each row. Categories by name, untyped ones last.
+    const grouped = Object.values(
+        assets.reduce((groups, asset) => {
+            const key = asset.asset_type?.parent?.name ?? asset.asset_type?.name ?? 'Other';
+            (groups[key] ??= { label: key, assets: [] }).assets.push(asset);
+            return groups;
+        }, {})
+    ).sort((a, b) => (a.label === 'Other') - (b.label === 'Other') || a.label.localeCompare(b.label));
 
     return (
         <AuthenticatedLayout title="Assets">

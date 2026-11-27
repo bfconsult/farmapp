@@ -3,6 +3,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import ColorPicker from '@/Components/ColorPicker';
 import { pillBadgeClass } from '@/Utils/pillColors';
+import { typeGroups } from '@/Components/AssetDetailsFields';
 
 function LookupRow({ item, onSave, onDelete, extraFields }) {
     const [editing, setEditing] = useState(false);
@@ -62,6 +63,11 @@ function LookupRow({ item, onSave, onDelete, extraFields }) {
                 {item.is_recurring_closed_default && (
                     <span className="text-xs ml-2 px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">
                         repeating-closed default
+                    </span>
+                )}
+                {item.kind && (
+                    <span className="text-xs ml-2 px-1.5 py-0.5 rounded bg-sky-100 text-sky-700" title="The farm view and sensors use this type, so it can be renamed or moved but not deleted">
+                        farm view
                     </span>
                 )}
                 {item.is_finished_default && (
@@ -185,8 +191,28 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, l
     };
 
     // Asset Types
-    const addAssetType = (values) => router.post(route('settings.asset-types.store'), { name: values.name }, preserve);
-    const saveAssetType = (id, values) => router.patch(route('settings.asset-types.update', id), { name: values.name }, preserve);
+    const addAssetType = (values) => router.post(route('settings.asset-types.store'), { name: values.name, parent_id: values.parent_id || null }, preserve);
+    const saveAssetType = (id, values) => router.patch(route('settings.asset-types.update', id), { name: values.name, parent_id: values.parent_id || null }, preserve);
+    // Two levels: a category, or a sub-type of one. A category with
+    // sub-types of its own has to stay a category.
+    const assetTypeGroups = typeGroups(assetTypes);
+    const categoryField = (values, setValues) => {
+        if (values.id && assetTypes.some((type) => type.parent_id === values.id)) return null;
+        return (
+            <select
+                value={values.parent_id ?? ''}
+                onChange={(e) => setValues({ ...values, parent_id: e.target.value ? Number(e.target.value) : null })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+            >
+                <option value="">A category of its own</option>
+                {assetTypeGroups
+                    .filter(({ category }) => category.id !== values.id)
+                    .map(({ category }) => (
+                        <option key={category.id} value={category.id}>Sub-type of {category.name}</option>
+                    ))}
+            </select>
+        );
+    };
     const deleteAssetType = (id) => {
         if (confirm('Delete this asset type?')) router.delete(route('settings.asset-types.destroy', id), preserve);
     };
@@ -331,15 +357,22 @@ export default function Index({ priorities, jobTypes, jobStatuses, assetTypes, l
 
                     {activeTab === 'assetTypes' && (
                         <>
-                            {assetTypes.map((item) => (
-                                <LookupRow
-                                    key={item.id}
-                                    item={item}
-                                    onSave={saveAssetType}
-                                    onDelete={deleteAssetType}
-                                />
+                            <p className="text-xs text-gray-500 mb-2">
+                                Categories, each with its sub-types - e.g. Fence and Trough under Fixed. An asset can be in a category or one of its sub-types.
+                            </p>
+                            {assetTypeGroups.map(({ category, subTypes }) => (
+                                <div key={category.id}>
+                                    <LookupRow item={category} onSave={saveAssetType} onDelete={deleteAssetType} extraFields={categoryField} />
+                                    {subTypes.length > 0 && (
+                                        <div className="ml-6 border-l border-gray-100 pl-3">
+                                            {subTypes.map((item) => (
+                                                <LookupRow key={item.id} item={item} onSave={saveAssetType} onDelete={deleteAssetType} extraFields={categoryField} />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             ))}
-                            <AddRow onAdd={addAssetType} />
+                            <AddRow onAdd={addAssetType} extraFields={categoryField} />
                         </>
                     )}
 

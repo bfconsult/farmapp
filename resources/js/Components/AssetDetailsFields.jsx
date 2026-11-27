@@ -50,7 +50,45 @@ export function detailValues(asset) {
     };
 }
 
-export const formatLitres = (litres) => `${Math.round(Number(litres)).toLocaleString()} L`;
+// The property's asset types as categories, each with its sub-types, by
+// name. A sub-type whose category isn't in the list shows as a category.
+export function typeGroups(assetTypes) {
+    const ids = new Set(assetTypes.map((type) => type.id));
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    return assetTypes
+        .filter((type) => !type.parent_id || !ids.has(type.parent_id))
+        .sort(byName)
+        .map((category) => ({
+            category,
+            subTypes: assetTypes.filter((type) => type.parent_id === category.id).sort(byName),
+        }));
+}
+
+// "Fixed › Trough" for a sub-type (with its parent loaded), "Plant" for a category.
+export const typeLabel = (type) => (type?.parent ? `${type.parent.name} › ${type.name}` : type?.name ?? '');
+
+// The asset type picker: each category, then its sub-types under it.
+export function AssetTypeSelect({ assetTypes, value, onChange, className = 'w-full border-gray-300 rounded-lg p-2 text-sm' }) {
+    return (
+        <select value={value ?? ''} onChange={(e) => onChange(e.target.value)} className={className}>
+            <option value="">No type</option>
+            {typeGroups(assetTypes).map(({ category, subTypes }) =>
+                subTypes.length ? (
+                    <optgroup key={category.id} label={category.name}>
+                        <option value={category.id}>{category.name} (general)</option>
+                        {subTypes.map((type) => (
+                            <option key={type.id} value={type.id}>{type.name}</option>
+                        ))}
+                    </optgroup>
+                ) : (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                ),
+            )}
+        </select>
+    );
+}
+
+export const formatLitres =(litres) => `${Math.round(Number(litres)).toLocaleString()} L`;
 
 // An asset's details in a few words: "Electric, 3 wires", "20,000 L", "Shrubs".
 export function describeDetails(kind, details) {

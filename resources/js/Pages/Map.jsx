@@ -276,7 +276,7 @@ export default function Map({
                     return L.marker([location.latitude, location.longitude]).bindPopup(`
                         <div style="min-width:150px">
                             <strong>${asset.name}</strong><br/>
-                            ${asset.asset_type ? `<span>${asset.asset_type.name}</span><br/>` : ''}
+                            ${asset.asset_type ? `<span>${asset.asset_type.parent ? `${asset.asset_type.parent.name} › ` : ''}${asset.asset_type.name}</span><br/>` : ''}
                             <a href="/assets/${asset.id}" style="color:#2563eb">View asset →</a>
                         </div>
                     `);

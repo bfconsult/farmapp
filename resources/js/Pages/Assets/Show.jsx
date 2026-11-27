@@ -3,7 +3,7 @@ import Modal from '@/Components/Modal';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
 import BackLink from '@/Components/BackLink';
-import AssetDetailsFields, { describeDetails, detailValues, formatLitres, kindOfType } from '@/Components/AssetDetailsFields';
+import AssetDetailsFields, { AssetTypeSelect, describeDetails, detailValues, formatLitres, kindOfType, typeLabel } from '@/Components/AssetDetailsFields';
 import { timeAgo } from '@/Utils/sensorFormat';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
@@ -450,16 +450,11 @@ function AssetFields({ values, setValues, assetTypes }) {
                 className="w-full border-gray-300 rounded-lg p-2 text-sm"
                 placeholder="Name"
             />
-            <select
+            <AssetTypeSelect
+                assetTypes={assetTypes}
                 value={values.asset_type_id}
-                onChange={(e) => setValues({ ...values, asset_type_id: e.target.value })}
-                className="w-full border-gray-300 rounded-lg p-2 text-sm"
-            >
-                <option value="">No type</option>
-                {assetTypes.map((type) => (
-                    <option key={type.id} value={type.id}>{type.name}</option>
-                ))}
-            </select>
+                onChange={(id) => setValues({ ...values, asset_type_id: id })}
+            />
             <textarea
                 value={values.description}
                 onChange={(e) => setValues({ ...values, description: e.target.value })}
@@ -798,7 +793,7 @@ export default function Show({ asset, otherLines, assetTypes = [], sensors = [],
                                 <h1 className="text-lg font-semibold text-gray-900">{asset.name}</h1>
                                 {asset.asset_type && (
                                     <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">
-                                        {asset.asset_type.name}
+                                        {typeLabel(asset.asset_type)}
                                     </span>
                                 )}
                             </div>
