@@ -64,26 +64,32 @@ const rotate = ({ x, y }, degrees) => {
  * A farm gate across the fence `direction` (a unit vector in metres),
  * swung open on its hinge when `open`. Grey when its sensor isn't
  * reporting; plain timber when it has none.
+ *
+ * Its real width along the fence, so gates don't overlap; `lift` makes it
+ * taller to match a fence drawn taller than life, and `pixel` (metres per
+ * screen pixel, or 0) keeps its posts and rails a few pixels thick.
  */
-export function drawGate(g, { direction, open, active, monitored = true }) {
+export function drawGate(g, { direction, open, active, monitored = true, lift = 1, pixel = 0 }) {
     const width = 4;
     const hinge = { x: -direction.x * width / 2, y: -direction.y * width / 2 };
     const latch = { x: direction.x * width / 2, y: direction.y * width / 2 };
     const swung = rotate(direction, 70);
     const end = open ? { x: hinge.x + swung.x * width, y: hinge.y + swung.y * width } : latch;
     const color = !monitored ? 0x9a7650 : !active ? 0x9ca3af : open ? 0xd97706 : 0x7c8794;
+    const at = (p, z) => iso(p.x, p.y, z * lift);
+    const thick = (metres, px) => Math.max(metres, px * pixel);
 
     // Posts.
     for (const post of [hinge, latch]) {
-        line(g, iso(post.x, post.y, 0), iso(post.x, post.y, 1.5), 0.18, 0x6b4f35);
+        line(g, at(post, 0), at(post, 1.5), thick(0.18, 3), 0x6b4f35);
     }
     // The gate: rails, ends and a brace.
     for (const z of [0.3, 0.75, 1.2]) {
-        line(g, iso(hinge.x, hinge.y, z), iso(end.x, end.y, z), 0.08, color);
+        line(g, at(hinge, z), at(end, z), thick(0.08, 1.6), color);
     }
-    line(g, iso(hinge.x, hinge.y, 0.3), iso(hinge.x, hinge.y, 1.2), 0.1, color);
-    line(g, iso(end.x, end.y, 0.3), iso(end.x, end.y, 1.2), 0.1, color);
-    line(g, iso(hinge.x, hinge.y, 0.3), iso(end.x, end.y, 1.2), 0.06, color);
+    line(g, at(hinge, 0.3), at(hinge, 1.2), thick(0.1, 2), color);
+    line(g, at(end, 0.3), at(end, 1.2), thick(0.1, 2), color);
+    line(g, at(hinge, 0.3), at(end, 1.2), thick(0.06, 1.2), color);
 }
 
 /**

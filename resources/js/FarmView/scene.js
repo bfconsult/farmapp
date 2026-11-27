@@ -17,7 +17,7 @@
 // The ground has hills when the property's heights have been fetched
 // (terrain.js): this.view puts everything at the ground's height there, and
 // the paddocks are a picture painted onto a mesh of the ground.
-import { Application, Container, Graphics, MeshSimple, Sprite, Text, Texture } from 'pixi.js';
+import { Application, Container, Graphics, MeshSimple, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import { area, bounds, centroid, contains, iso, makeProjection, nearestEdge, randomPointIn, seededRandom } from './geo';
 import { contourInterval, contourLabelSpots, contourSegments, densify, groundHeight, makeTerrain, shading } from './terrain';
 import { TEXTURE_PX_PER_METRE, animalFor, drawGate, drawPump, drawTank, drawTrough, makeAnimalTextures, makeLabel } from './sprites';
@@ -568,21 +568,23 @@ export class FarmScene {
                 let height = 1.5;
                 let wheel = null;
                 let minPx = MIN_PROP_PX;
+                let gate = null;
 
                 if (item.kind === 'gate') {
-                    // On the nearest fence, across it.
+                    // On the nearest fence, across it. Drawn by drawGates,
+                    // as it's redrawn with the fence at each zoom.
                     const edge = nearestEdge(at, this.runs);
                     const onFence = edge && edge.distance <= GATE_SNAP_METRES;
                     if (onFence) at = edge.point;
                     const direction = onFence ? edge.direction : { x: 1, y: 0 };
                     const cos = Math.cos(this.angle);
                     const sin = Math.sin(this.angle);
-                    drawGate(g, {
+                    gate = {
                         direction: { x: direction.x * cos - direction.y * sin, y: direction.x * sin + direction.y * cos },
                         open: item.state?.key === 'open',
                         active,
                         monitored: item.monitored,
-                    });
+                    };
                 } else if (item.kind === 'trough') {
                     drawTrough(g, { ...item.trough, angle: this.angle, percent: item.monitored ? item.percent : 100, low: item.state?.key === 'low' });
                     size = Math.max(1.5, item.trough?.length ?? 1.5);
@@ -607,15 +609,53 @@ export class FarmScene {
                 const label = makeLabel(item.name, detail, propTone(item));
                 this.labels.addChild(label);
 
+                // Its tag shows only while the pointer is on it (or the tag),
+                // so tags don't cover the map.
+                label.visible = false;
+                let hovering = 0;
+                const hover = (change) => {
+                    hovering = Math.max(0, hovering + change);
+                    label.visible = hovering > 0;
+                    if (label.visible) this.placeLabels();
+                };
+
                 const url = item.url;
                 for (const target of [container, label]) {
                     target.eventMode = 'static';
                     target.cursor = 'pointer';
                     target.on('pointertap', (e) => e.button === 0 && !this.dragged && this.onOpen(url));
+                    target.on('pointerover', () => hover(1));
+                    target.on('pointerout', () => hover(-1));
                 }
 
-                return { container, label, at: p, size, height, minPx, wheel, spinning: item.state?.key === 'running' };
+                const prop = { container, g, label, at: p, size, height, minPx, wheel, gate, spinning: item.state?.key === 'running' };
+                if (!gate) this.fitHitArea(prop);
+                return prop;
             });
+        this.drawGates();
+    }
+
+    // Gates at their real width, as tall as the fence they're in - in the
+    // cartoon style that's taller than life, but never wider, so gates
+    // close together don't overlap.
+    drawGates() {
+        const lift = this.fenceScale;
+        const pixel = this.cartoon ? 1 / this.zoom : 0;
+        for (const prop of this.props ?? []) {
+            if (!prop.gate) continue;
+            prop.g.clear();
+            drawGate(prop.g, { ...prop.gate, lift, pixel });
+            prop.height = 1.5 * lift;
+            this.fitHitArea(prop);
+        }
+    }
+
+    // Somewhere comfortable to point at: the prop's drawing, plus a few
+    // pixels round it, as a gate's thin rails are hard to hit.
+    fitHitArea(prop) {
+        const box = prop.g.getLocalBounds();
+        const pad = 6 / (this.zoom * (prop.container.scale.x || 1));
+        prop.container.hitArea = new Rectangle(box.x - pad, box.y - pad, box.width + pad * 2, box.height + pad * 2);
     }
 
     // Each mob in its paddock; a herd keeps its animals where they are when
@@ -747,6 +787,7 @@ export class FarmScene {
     // Tags that would overlap are stacked upwards, nearest the viewer first.
     separateLabels() {
         const tags = [...this.props.map((prop) => prop.label), ...[...this.herds.values()].map((herd) => herd.label)]
+            .filter((tag) => tag.visible)
             .sort((a, b) => b.y - a.y);
         const placed = [];
         for (const tag of tags) {
@@ -778,7 +819,10 @@ export class FarmScene {
             for (const animal of herd.animals) animal.sprite.visible = this.zoom >= SHOW_ANIMALS_AT;
         }
         for (const prop of this.props) {
+            // Gates aren't scaled: drawGates makes them taller instead.
+            if (prop.gate) continue;
             prop.container.scale.set(this.cartoon ? Math.max(1, prop.minPx / (this.zoom * prop.size)) : 1);
+            this.fitHitArea(prop);
         }
         for (const plant of this.plants) {
             const scale = plant.size * plantScale(plant.type, this.zoom, this.cartoon);
@@ -790,6 +834,7 @@ export class FarmScene {
         if (force || !this.lastFenceZoom || Math.abs(this.zoom / this.lastFenceZoom - 1) > 0.08) {
             this.lastFenceZoom = this.zoom;
             this.drawFences();
+            this.drawGates();
             this.drawSkirt();
             this.drawContours();
         }
