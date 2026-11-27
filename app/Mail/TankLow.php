@@ -24,7 +24,7 @@ class TankLow extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "{$this->device->name} is down to ".round($this->level['percent']).'%',
+            subject: "{$this->device->displayName()} is down to ".round($this->level['percent']).'%',
         );
     }
 

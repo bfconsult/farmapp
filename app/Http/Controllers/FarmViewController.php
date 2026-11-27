@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\AssetType;
 use App\Models\Device;
 use App\Models\Livestock;
 use App\Models\Mob;
@@ -17,8 +18,8 @@ use RuntimeException;
 
 /**
  * The cartoon "farm view": the property drawn as an angled 3D scene, with
- * fenced paddocks, its mobs grazing in them and its sensors showing their
- * state. A prototype, for app admins only for now.
+ * fenced paddocks, its mobs grazing in them, its trees, and its gates,
+ * tanks and pumps showing their sensors' state. A prototype, for app admins only for now.
  */
 class FarmViewController extends Controller
 {
@@ -36,8 +37,9 @@ class FarmViewController extends Controller
                 'coordinates' => $zone->coordinates,
             ])->values() ?? [],
             'mobs' => $this->mobs($propertyId),
-            'sensors' => $this->sensors($propertyId),
+            'props' => $this->props($propertyId),
             'fences' => $this->fences($propertyId),
+            'vegetation' => $this->vegetation($propertyId),
             'rotation' => (int) ($property?->farm_view_rotation ?? 0),
             'terrain' => $terrain ? [
                 'north' => $terrain->north,
@@ -145,34 +147,110 @@ class FarmViewController extends Controller
     }
 
     /**
-     * Placed sensors with a kind: {id, name, kind, latitude, longitude,
-     * state, percent (a tank's level)}.
+     * Gates, tanks, pumps and troughs: {key, kind, name, latitude,
+     * longitude, state, percent (a tank's or trough's level), monitored,
+     * trough (its size), url}. Each such asset with a location, showing the
+     * state of a sensor of its kind (a trough's: a level sensor)
+     * fitted to it (if any); then placed sensors with a kind that don't
+     * stand for one of those, where they are.
      */
-    private function sensors(?int $propertyId): array
+    private function props(?int $propertyId): array
     {
-        return Device::where('property_id', $propertyId)
-            ->whereNotNull('kind')
+        $assets = Asset::where('property_id', $propertyId)
+            ->ofKind(...array_keys(AssetType::SENSOR_KINDS))
+            ->with(['assetType', 'currentLocation', 'devices'])
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Asset $asset) => $asset->point() !== null);
+
+        $shown = [];
+        $props = $assets->map(function (Asset $asset) use (&$shown) {
+            $device = $asset->devices->firstWhere('kind', AssetType::SENSOR_KINDS[$asset->kind()]);
+            if ($device) {
+                $shown[] = $device->id;
+            }
+            [$latitude, $longitude] = $asset->point();
+
+            return [
+                'key' => 'asset-'.$asset->id,
+                'kind' => $asset->kind(),
+                'name' => $asset->name,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                ...$this->sensorState($device),
+                // A trough's shape and size, to draw it.
+                'trough' => $asset->kind() === AssetType::TROUGH
+                    ? Asset::TROUGH_SIZES[$asset->details['trough_size'] ?? 'other'] ?? Asset::TROUGH_SIZES['other']
+                    : null,
+                'url' => route('assets.show', $asset),
+            ];
+        });
+
+        $sensors = Device::where('property_id', $propertyId)
+            ->whereIn('kind', ['gate', 'tank', 'pump'])
+            ->whereNotIn('id', $shown)
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
             ->orderBy('name')
             ->get()
-            ->map(function (Device $device) {
-                $percent = null;
-                if ($device->kind === 'tank') {
-                    $reading = $device->readings()->where('metric', 'distance')->latest('recorded_at')->latest('id')->first();
-                    $percent = $reading ? TankActivity::level($device, $reading->value)['percent'] ?? null : null;
-                }
+            ->map(fn (Device $device) => [
+                'key' => 'sensor-'.$device->id,
+                'kind' => $device->kind,
+                'name' => $device->name,
+                'latitude' => (float) $device->latitude,
+                'longitude' => (float) $device->longitude,
+                ...$this->sensorState($device),
+                'trough' => null,
+                'url' => route('manage.sensors.show', $device),
+            ]);
+
+        return $props->concat($sensors)->values()->all();
+    }
+
+    /** What a prop's sensor says: {state, percent, monitored}. */
+    private function sensorState(?Device $device): array
+    {
+        if (! $device) {
+            return ['state' => null, 'percent' => null, 'monitored' => false];
+        }
+
+        $percent = null;
+        if ($device->kind === 'tank') {
+            $reading = $device->readings()->where('metric', 'distance')->latest('recorded_at')->latest('id')->first();
+            $percent = $reading ? TankActivity::level($device, $reading->value)['percent'] ?? null : null;
+        }
+
+        return ['state' => SensorKinds::state($device), 'percent' => $percent, 'monitored' => true];
+    }
+
+    /**
+     * Vegetation assets with a location: {id, name, vegetation_type, point
+     * ([lat, lng]: one tree or clump), shape (an area of it) or line (a row)}.
+     */
+    private function vegetation(?int $propertyId): array
+    {
+        return Asset::where('property_id', $propertyId)
+            ->ofKind(AssetType::VEGETATION)
+            ->with('currentLocation')
+            ->orderBy('name')
+            ->get()
+            ->map(function (Asset $asset) {
+                $location = $asset->currentLocation;
+                $point = $location && $location->latitude !== null && $location->longitude !== null
+                    ? [(float) $location->latitude, (float) $location->longitude]
+                    : null;
 
                 return [
-                    'id' => $device->id,
-                    'name' => $device->name,
-                    'kind' => $device->kind,
-                    'latitude' => (float) $device->latitude,
-                    'longitude' => (float) $device->longitude,
-                    'state' => SensorKinds::state($device),
-                    'percent' => $percent,
+                    'id' => $asset->id,
+                    'name' => $asset->name,
+                    'vegetation_type' => $asset->details['vegetation_type'] ?? 'tree',
+                    'point' => $point,
+                    'shape' => count($location?->shape ?? []) > 2 ? $location->shape : null,
+                    'line' => count($location?->line ?? []) > 1 ? $location->line : null,
                 ];
             })
+            ->filter(fn ($vegetation) => $vegetation['point'] || $vegetation['shape'] || $vegetation['line'])
+            ->values()
             ->all();
     }
 }

@@ -22,7 +22,7 @@ class PumpRunningLong extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "{$this->device->name} has been running for {$this->minutes} minutes",
+            subject: "{$this->device->displayName()} has been running for {$this->minutes} minutes",
         );
     }
 

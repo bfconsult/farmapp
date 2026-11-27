@@ -3,7 +3,8 @@ import Modal from '@/Components/Modal';
 import NoteRow from '@/Components/NoteRow';
 import AddNoteForm from '@/Components/AddNoteForm';
 import BackLink from '@/Components/BackLink';
-import FenceFields, { describeFence, fenceValues, isFenceType } from '@/Components/FenceFields';
+import AssetDetailsFields, { describeDetails, detailValues, formatLitres, kindOfType } from '@/Components/AssetDetailsFields';
+import { timeAgo } from '@/Utils/sensorFormat';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
@@ -11,6 +12,73 @@ import { formatNumber } from '@/numberFormat';
 import { pillBadgeClass } from '@/Utils/pillColors';
 
 const ASSET_COLOR = '#2563eb';
+
+// The kinds of asset a sensor's state stands for.
+const SENSED_KINDS = ['gate', 'tank', 'pump'];
+
+// "3:04 pm" today, otherwise "26 Nov, 3:04 pm".
+function formatSince(iso) {
+    const at = new Date(iso);
+    const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return at.toDateString() === new Date().toDateString() ? time : `${at.toLocaleDateString([], { day: 'numeric', month: 'short' })}, ${time}`;
+}
+
+// What a fitted sensor says now, in words, and whether it needs attention.
+function sensorReport(sensor) {
+    const { status, state } = sensor;
+    if (!status) return { text: 'No readings yet' };
+    if (state?.key === 'not_reporting') return { text: `Not reporting (last heard ${timeAgo(sensor.last_seen_at)})`, attention: true };
+
+    if (sensor.kind === 'tank') {
+        if (!status.configured) return { text: 'Its full and empty distances are not set yet' };
+        const level = status.litres !== null && sensor.capacity
+            ? `${formatLitres(status.litres)} of ${formatLitres(sensor.capacity)} (${Math.round(status.percent)}%)`
+            : `${Math.round(status.percent)}% full`;
+        return { text: status.low ? `${level} - low` : level, attention: status.low };
+    }
+    if (sensor.kind === 'gate') {
+        return { text: `${status.open ? 'Open' : 'Closed'}${status.since ? ` since ${formatSince(status.since)}` : ''}`, attention: status.open };
+    }
+    if (sensor.kind === 'pump') {
+        return { text: `${status.running ? 'Running' : 'Stopped'}${status.since ? ` since ${formatSince(status.since)}` : ''}` };
+    }
+    return { text: state?.label ?? `Last heard ${timeAgo(sensor.last_seen_at)}` };
+}
+
+function SensorsCard({ kind, sensors, canManage }) {
+    if (sensors.length === 0 && !(canManage && SENSED_KINDS.includes(kind))) return null;
+
+    return (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-4 py-2 border-b border-gray-100">
+                <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{sensors.length === 1 ? 'Sensor' : 'Sensors'}</h2>
+            </div>
+            {sensors.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-gray-500">
+                    No sensor fitted. To fit one, choose this asset under "Fitted to" in the sensor's settings (
+                    <Link href={route('manage.sensors.index')} className="text-green-600">Sensors</Link>).
+                </p>
+            ) : (
+                <ul className="divide-y divide-gray-100">
+                    {sensors.map((sensor) => {
+                        const report = sensorReport(sensor);
+                        return (
+                            <li key={sensor.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className={`text-sm font-medium ${report.attention ? 'text-amber-700' : 'text-gray-900'}`}>{report.text}</p>
+                                    <p className="text-xs text-gray-500">{sensor.name}{sensor.kind_label ? ` · ${sensor.kind_label}` : ''}</p>
+                                </div>
+                                {canManage && (
+                                    <Link href={route('manage.sensors.show', sensor.id)} className="text-sm text-green-600 flex-shrink-0">View</Link>
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+}
 const PROPERTY_BOUNDARY_COLOR = '#9ca3af';
 const OTHER_LINE_COLOR = '#6b7280';
 
@@ -373,7 +441,6 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
 }
 
 function AssetFields({ values, setValues, assetTypes }) {
-    const isFence = isFenceType(assetTypes.find((type) => String(type.id) === String(values.asset_type_id)));
     return (
         <div className="space-y-3">
             <input
@@ -408,7 +475,7 @@ function AssetFields({ values, setValues, assetTypes }) {
                 className="w-full border-gray-300 rounded-lg p-2 text-sm"
                 placeholder="Value ($, optional)"
             />
-            {isFence && <FenceFields values={values} setValues={setValues} />}
+            <AssetDetailsFields kind={kindOfType(assetTypes, values.asset_type_id)} values={values} setValues={setValues} />
         </div>
     );
 }
@@ -653,7 +720,7 @@ function AddMaintenanceItemForm({ asset, onClose }) {
     );
 }
 
-export default function Show({ asset, otherLines, assetTypes = [], recentJobs, jobsCount, usageHours, maintenanceHours, workSessions }) {
+export default function Show({ asset, otherLines, assetTypes = [], sensors = [], recentJobs, jobsCount, usageHours, maintenanceHours, workSessions }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canConvert = canManage || currentUserRole === 'worker';
@@ -665,7 +732,7 @@ export default function Show({ asset, otherLines, assetTypes = [], recentJobs, j
         description: asset.description ?? '',
         asset_type_id: asset.asset_type_id ?? '',
         value: asset.value ?? '',
-        ...fenceValues(asset),
+        ...detailValues(asset),
     });
 
     const [showLocationModal, setShowLocationModal] = useState(false);
@@ -738,9 +805,9 @@ export default function Show({ asset, otherLines, assetTypes = [], recentJobs, j
                             {asset.description && (
                                 <p className="text-sm text-gray-500 mb-2">{asset.description}</p>
                             )}
-                            {isFenceType(asset.asset_type) && (
+                            {(describeDetails(asset.asset_type?.kind, asset.details) || asset.current_location?.line) && (
                                 <p className="text-sm text-gray-700 mb-1">
-                                    {[describeFence(asset.details), asset.current_location?.line && formatLength(lineLength(asset.current_location.line))]
+                                    {[describeDetails(asset.asset_type?.kind, asset.details), asset.current_location?.line && formatLength(lineLength(asset.current_location.line))]
                                         .filter(Boolean)
                                         .join(' · ')}
                                 </p>
@@ -754,6 +821,8 @@ export default function Show({ asset, otherLines, assetTypes = [], recentJobs, j
                         </>
                     )}
                 </div>
+
+                <SensorsCard kind={asset.asset_type?.kind} sensors={sensors} canManage={canManage} />
 
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">

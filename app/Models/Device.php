@@ -15,6 +15,7 @@ class Device extends Model
 {
     protected $fillable = [
         'property_id',
+        'asset_id',
         'name',
         'model',
         'kind',
@@ -36,6 +37,21 @@ class Device extends Model
     public function property()
     {
         return $this->belongsTo(Property::class);
+    }
+
+    /** The asset it's fitted to, e.g. the tank whose level it reads. */
+    public function asset()
+    {
+        return $this->belongsTo(Asset::class);
+    }
+
+    /**
+     * What it's called where it stands for something: its asset's name
+     * once fitted to one ("Top tank is low"), otherwise its own.
+     */
+    public function displayName(): string
+    {
+        return $this->asset?->name ?? $this->name;
     }
 
     public function readings()

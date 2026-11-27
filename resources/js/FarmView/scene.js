@@ -2,7 +2,8 @@
 // PixiJS. The world is in metres (geo.js) and the camera zooms it, so a
 // sheep is a sheep's size - with more detail shown the closer you get:
 //
-//   zoomed out:  paddocks, fence lines, a name tag for each mob and sensor
+//   zoomed out:  paddocks, fence lines, trees, a name tag for each mob,
+//                gate, tank and pump
 //   zoomed in:   fence posts, grass, and each animal wandering its paddock
 //
 // In the cartoon style (the default), props (gates, tanks, pumps) and
@@ -19,7 +20,8 @@
 import { Application, Container, Graphics, MeshSimple, Sprite, Text, Texture } from 'pixi.js';
 import { area, bounds, centroid, contains, iso, makeProjection, nearestEdge, randomPointIn, seededRandom } from './geo';
 import { contourInterval, contourLabelSpots, contourSegments, densify, groundHeight, makeTerrain, shading } from './terrain';
-import { TEXTURE_PX_PER_METRE, animalFor, drawGate, drawPump, drawTank, makeAnimalTextures, makeLabel } from './sprites';
+import { TEXTURE_PX_PER_METRE, animalFor, drawGate, drawPump, drawTank, drawTrough, makeAnimalTextures, makeLabel } from './sprites';
+import { makePlantTextures, plantScale, plantSpots, plantTint } from './vegetation';
 
 // Pixels per metre at which more detail appears.
 const SHOW_POSTS_AT = 3;
@@ -27,6 +29,8 @@ const SHOW_ANIMALS_AT = 2.5;
 const SHOW_GRASS_AT = 2;
 // A prop is drawn at least this many pixels across.
 const MIN_PROP_PX = 34;
+// ...but a trough only this big: it's small beside a tank or shed.
+const MIN_TROUGH_PX = 16;
 // In the cartoon style, a fence is at least this tall on screen, and its
 // posts at least this far apart.
 const MIN_FENCE_PX = 12;
@@ -71,8 +75,9 @@ function* segments(run) {
 
 const css = (color) => `#${color.toString(16).padStart(6, '0')}`;
 
-function sensorTone(sensor) {
-    const key = sensor.state?.key;
+function propTone(prop) {
+    if (!prop.monitored) return 'muted';
+    const key = prop.state?.key;
     if (!key || key === 'not_reporting' || key === 'unknown') return 'muted';
     if (key === 'open' || key === 'low') return 'attention';
     if (key === 'stopped') return 'muted';
@@ -90,6 +95,7 @@ export class FarmScene {
         this.angle = (angle * Math.PI) / 180;
         this.herds = new Map();
         this.props = [];
+        this.plants = [];
         this.zoneLabels = [];
         this.destroyed = false;
         this.dragged = false;
@@ -111,6 +117,7 @@ export class FarmScene {
         this.app = app;
         this.element.appendChild(app.canvas);
         this.textures = makeAnimalTextures(app.renderer);
+        this.plantTextures = makePlantTextures(app.renderer);
 
         this.world = new Container();
         this.skirt = new Graphics();
@@ -222,7 +229,8 @@ export class FarmScene {
                 this.redrawQueued = false;
                 if (this.destroyed) return;
                 this.drawLand();
-                this.buildSensors(this.sensors ?? []);
+                this.buildProps(this.propData ?? []);
+                this.placePlants();
                 this.updateCamera(true);
             });
         }
@@ -243,22 +251,22 @@ export class FarmScene {
         // arrive, as they make it taller.
         const refit = !this.zones || (Boolean(data.terrain) && !this.hadTerrain);
         this.hadTerrain = Boolean(data.terrain);
-        const staticKey = JSON.stringify([data.boundary, data.zones, data.fences, data.terrain?.heights?.length, data.terrain?.north]);
+        const staticKey = JSON.stringify([data.boundary, data.zones, data.fences, data.vegetation, data.terrain?.heights?.length, data.terrain?.north]);
         if (staticKey !== this.staticKey) {
             this.staticKey = staticKey;
             this.buildLand(data);
         }
         if (!this.project) return;
 
-        this.sensors = data.sensors ?? [];
-        this.buildSensors(this.sensors);
+        this.propData = data.props ?? [];
+        this.buildProps(this.propData);
         this.buildHerds(data.mobs ?? []);
         if (refit && this.terrain) this.fit();
         this.updateCamera(true);
     }
 
     // The ground, paddocks, fences and paddock names.
-    buildLand({ boundary, zones, fences, terrain }) {
+    buildLand({ boundary, zones, fences, vegetation, terrain }) {
         const all = [...(boundary ?? []), ...(zones ?? []).flatMap((zone) => zone.coordinates ?? [])];
         if (all.length === 0) {
             this.project = null;
@@ -294,8 +302,17 @@ export class FarmScene {
         this.edgeLines = this.edges.map((polygon) => densify(polygon, step));
         this.edgeRuns = this.land.map((polygon) => densify(polygon, step));
 
+        // Vegetation: areas tinted on the ground, and each plant.
+        this.vegetation = (vegetation ?? []).map((item) => ({
+            type: item.vegetation_type,
+            area: item.shape ? item.shape.map(this.project) : null,
+            // Only on the property - an area drawn past its edge stops there.
+            spots: plantSpots(item, this.project).filter((spot) => this.land.some((polygon) => contains(polygon, spot))),
+        }));
+
         this.buildGround();
         this.buildContours();
+        this.buildPlants();
         this.drawLand();
     }
 
@@ -328,6 +345,15 @@ export class FarmScene {
             trace(zone.polygon);
             ctx.fill();
         });
+        // Under an area of trees, shrubs or undergrowth.
+        for (const item of this.vegetation.filter((v) => v.area)) {
+            ctx.fillStyle = css(plantTint(item.type));
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath();
+            trace(item.area);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
 
         if (t.hilly) {
             // The light, one pixel a grid point, stretched smoothly over it all.
@@ -496,25 +522,54 @@ export class FarmScene {
         this.lastFenceZoom = null;
     }
 
-    // Gates, tanks and pumps where their sensors are, each with a name tag.
-    buildSensors(sensors) {
+    // A sprite for each plant, among the animals and props so they hide
+    // each other properly.
+    buildPlants() {
+        for (const plant of this.plants) plant.sprite.destroy();
+        this.plants = this.vegetation.flatMap((item) => item.spots.map((spot) => {
+            const variants = this.plantTextures[item.type] ?? this.plantTextures.tree;
+            const { texture, anchor } = variants[spot.variant % variants.length];
+            const sprite = new Sprite(texture);
+            sprite.anchor.set(anchor.x, anchor.y);
+            this.objects.addChild(sprite);
+            return { sprite, ...spot, type: item.type };
+        }));
+        this.placePlants();
+    }
+
+    // Where each plant stands at this angle, and its size at this zoom.
+    placePlants() {
+        for (const plant of this.plants) {
+            const p = this.view(plant.x, plant.y);
+            const scale = plant.size * plantScale(plant.type, this.zoom, this.cartoon);
+            plant.sprite.position.set(p.x, p.y);
+            plant.sprite.scale.set(plant.flip ? -scale : scale, scale);
+            plant.sprite.zIndex = p.y;
+        }
+    }
+
+    // Gates, tanks, pumps and troughs - the assets, or sensors on their own
+    // - each with a name tag. A gate with no sensor is plain timber; a
+    // trough with none just has its name.
+    buildProps(props) {
         for (const prop of this.props) {
             prop.container.destroy({ children: true });
             prop.label.destroy({ children: true });
         }
-        this.props = sensors
-            .filter((sensor) => ['gate', 'tank', 'pump'].includes(sensor.kind))
-            .map((sensor) => {
-                let at = this.project([sensor.latitude, sensor.longitude]);
-                const active = sensor.state && !['not_reporting', 'unknown'].includes(sensor.state.key);
+        this.props = props
+            .filter((item) => ['gate', 'tank', 'pump', 'trough'].includes(item.kind))
+            .map((item) => {
+                let at = this.project([item.latitude, item.longitude]);
+                const active = item.monitored && item.state && !['not_reporting', 'unknown'].includes(item.state.key);
                 const container = new Container();
                 const g = new Graphics();
                 container.addChild(g);
                 let size = 4;
                 let height = 1.5;
                 let wheel = null;
+                let minPx = MIN_PROP_PX;
 
-                if (sensor.kind === 'gate') {
+                if (item.kind === 'gate') {
                     // On the nearest fence, across it.
                     const edge = nearestEdge(at, this.runs);
                     const onFence = edge && edge.distance <= GATE_SNAP_METRES;
@@ -524,14 +579,20 @@ export class FarmScene {
                     const sin = Math.sin(this.angle);
                     drawGate(g, {
                         direction: { x: direction.x * cos - direction.y * sin, y: direction.x * sin + direction.y * cos },
-                        open: sensor.state?.key === 'open',
+                        open: item.state?.key === 'open',
                         active,
+                        monitored: item.monitored,
                     });
-                } else if (sensor.kind === 'tank') {
-                    drawTank(g, { percent: sensor.percent, low: sensor.state?.key === 'low', active });
+                } else if (item.kind === 'trough') {
+                    drawTrough(g, { ...item.trough, angle: this.angle, percent: item.monitored ? item.percent : 100, low: item.state?.key === 'low' });
+                    size = Math.max(1.5, item.trough?.length ?? 1.5);
+                    height = 1;
+                    minPx = MIN_TROUGH_PX;
+                } else if (item.kind === 'tank') {
+                    drawTank(g, { percent: item.percent, low: item.state?.key === 'low', active });
                     height = 2.8;
                 } else {
-                    wheel = drawPump(g, { running: sensor.state?.key === 'running', active });
+                    wheel = drawPump(g, { running: item.state?.key === 'running', active });
                     container.addChild(wheel);
                     size = 2;
                     height = 2;
@@ -542,17 +603,18 @@ export class FarmScene {
                 container.zIndex = p.y;
                 this.objects.addChild(container);
 
-                const label = makeLabel(sensor.name, sensor.state?.label ?? 'No readings yet', sensorTone(sensor));
+                const detail = !item.monitored ? (item.kind === 'trough' ? null : 'No sensor') : item.state?.label ?? 'No readings yet';
+                const label = makeLabel(item.name, detail, propTone(item));
                 this.labels.addChild(label);
 
-                const url = route('manage.sensors.show', sensor.id);
+                const url = item.url;
                 for (const target of [container, label]) {
                     target.eventMode = 'static';
                     target.cursor = 'pointer';
                     target.on('pointertap', (e) => e.button === 0 && !this.dragged && this.onOpen(url));
                 }
 
-                return { container, label, at: p, size, height, wheel, spinning: sensor.state?.key === 'running' };
+                return { container, label, at: p, size, height, minPx, wheel, spinning: item.state?.key === 'running' };
             });
     }
 
@@ -716,7 +778,11 @@ export class FarmScene {
             for (const animal of herd.animals) animal.sprite.visible = this.zoom >= SHOW_ANIMALS_AT;
         }
         for (const prop of this.props) {
-            prop.container.scale.set(this.cartoon ? Math.max(1, MIN_PROP_PX / (this.zoom * prop.size)) : 1);
+            prop.container.scale.set(this.cartoon ? Math.max(1, prop.minPx / (this.zoom * prop.size)) : 1);
+        }
+        for (const plant of this.plants) {
+            const scale = plant.size * plantScale(plant.type, this.zoom, this.cartoon);
+            plant.sprite.scale.set(plant.flip ? -scale : scale, scale);
         }
 
         // Fence wire and the diorama's edge, redrawn when the zoom changes

@@ -1,6 +1,6 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackLink from '@/Components/BackLink';
-import FenceFields, { describeFence, fenceValues, isFenceType } from '@/Components/FenceFields';
+import AssetDetailsFields, { describeDetails, detailValues, kindOfType } from '@/Components/AssetDetailsFields';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
@@ -43,9 +43,7 @@ function AssetFields({ values, setValues, assetTypes }) {
                     placeholder="Value ($, optional)"
                 />
             </div>
-            {isFenceType(assetTypes.find((type) => String(type.id) === String(values.asset_type_id))) && (
-                <FenceFields values={values} setValues={setValues} />
-            )}
+            <AssetDetailsFields kind={kindOfType(assetTypes, values.asset_type_id)} values={values} setValues={setValues} />
         </div>
     );
 }
@@ -66,7 +64,7 @@ function AssetRow({ asset, canManage, assetTypes }) {
         description: asset.description ?? '',
         asset_type_id: asset.asset_type_id ?? '',
         value: asset.value ?? '',
-        ...fenceValues(asset),
+        ...detailValues(asset),
     });
 
     const save = () => {
@@ -103,8 +101,8 @@ function AssetRow({ asset, canManage, assetTypes }) {
             <Link href={route('assets.show', asset.id)} className="min-w-0 flex-1">
                 <p className="text-sm text-gray-900">{asset.name}</p>
                 <div className="flex items-center gap-2 mt-1">
-                    {isFenceType(asset.asset_type) && describeFence(asset.details) && (
-                        <span className="text-xs text-gray-500">{describeFence(asset.details)}</span>
+                    {describeDetails(asset.asset_type?.kind, asset.details) && (
+                        <span className="text-xs text-gray-500">{describeDetails(asset.asset_type?.kind, asset.details)}</span>
                     )}
                     {asset.value && <span className="text-xs text-gray-500">${formatNumber(asset.value)}</span>}
                     {asset.maintenance_job_open && (
@@ -136,7 +134,7 @@ function AssetRow({ asset, canManage, assetTypes }) {
 
 export default function Assets({ assets, assetTypes, canManage }) {
     const [adding, setAdding] = useState(false);
-    const blank = { name: '', description: '', asset_type_id: '', value: '', ...fenceValues(null) };
+    const blank = { name: '', description: '', asset_type_id: '', value: '', ...detailValues(null) };
     const [values, setValues] = useState(blank);
 
     const create = () => {

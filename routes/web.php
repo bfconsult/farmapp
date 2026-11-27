@@ -343,23 +343,27 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
             ->get()
             ->each(fn ($note) => $note->is_unread = $note->isUnreadBy($user->id));
 
-        // Placed sensors with a kind, each showing the state it's in.
+        // Placed sensors with a kind, each showing the state it's in. One
+        // fitted to an asset with a location is shown there, by its name.
         $sensors = \App\Models\Device::where('property_id', $currentPropertyId)
             ->whereNotNull('kind')
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
+            ->with('asset.currentLocation')
             ->orderBy('name')
             ->get()
-            ->map(fn ($device) => [
-                'id' => $device->id,
-                'name' => $device->name,
-                'kind' => $device->kind,
-                'kind_label' => \App\Services\Lorawan\SensorKinds::label($device->kind),
-                'latitude' => $device->latitude,
-                'longitude' => $device->longitude,
-                'state' => \App\Services\Lorawan\SensorKinds::state($device),
-                'last_seen_at' => $device->last_seen_at,
-            ]);
+            ->map(fn ($device) => [$device, $device->asset?->point() ?? ($device->latitude !== null && $device->longitude !== null ? [$device->latitude, $device->longitude] : null)])
+            ->filter(fn ($row) => $row[1] !== null)
+            ->map(fn ($row) => [
+                'id' => $row[0]->id,
+                'name' => $row[0]->displayName(),
+                'asset_id' => $row[0]->asset_id,
+                'kind' => $row[0]->kind,
+                'kind_label' => \App\Services\Lorawan\SensorKinds::label($row[0]->kind),
+                'latitude' => $row[1][0],
+                'longitude' => $row[1][1],
+                'state' => \App\Services\Lorawan\SensorKinds::state($row[0]),
+                'last_seen_at' => $row[0]->last_seen_at,
+            ])
+            ->values();
 
         return Inertia::render('Map', [
             'jobs' => $jobs,

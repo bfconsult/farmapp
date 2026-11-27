@@ -16,6 +16,39 @@ class Asset extends Model
         'other' => 'Other',
     ];
 
+    /** Vegetation's details.vegetation_type, with its label. */
+    public const VEGETATION_TYPES = [
+        'tree' => 'Trees',
+        'shrubs' => 'Shrubs',
+        'undergrowth' => 'Undergrowth',
+    ];
+
+    /**
+     * Standard stock trough sizes (details.trough_size): its shape, length
+     * (or diameter) and width in metres, and about how many litres it holds
+     * - the capacity a new one starts with, which can be changed. "other"
+     * has no standard capacity. Matches TROUGH_SIZES in AssetDetailsFields.jsx.
+     */
+    public const TROUGH_SIZES = [
+        'round_1200' => ['label' => 'Round, 1.2 m across', 'shape' => 'round', 'length' => 1.2, 'width' => 1.2, 'litres' => 450],
+        'round_1500' => ['label' => 'Round, 1.5 m across', 'shape' => 'round', 'length' => 1.5, 'width' => 1.5, 'litres' => 700],
+        'round_1800' => ['label' => 'Round, 1.8 m across', 'shape' => 'round', 'length' => 1.8, 'width' => 1.8, 'litres' => 1100],
+        'round_2400' => ['label' => 'Round, 2.4 m across', 'shape' => 'round', 'length' => 2.4, 'width' => 2.4, 'litres' => 2000],
+        'rect_1200' => ['label' => 'Rectangular, 1.2 m long', 'shape' => 'rect', 'length' => 1.2, 'width' => 0.5, 'litres' => 200],
+        'rect_2400' => ['label' => 'Rectangular, 2.4 m long', 'shape' => 'rect', 'length' => 2.4, 'width' => 0.5, 'litres' => 400],
+        'rect_3000' => ['label' => 'Rectangular, 3 m long', 'shape' => 'rect', 'length' => 3.0, 'width' => 0.5, 'litres' => 500],
+        'rect_3600' => ['label' => 'Rectangular, 3.6 m long', 'shape' => 'rect', 'length' => 3.6, 'width' => 0.5, 'litres' => 600],
+        'other' => ['label' => 'Other size', 'shape' => 'round', 'length' => 1.5, 'width' => 1.5, 'litres' => null],
+    ];
+
+    /** The details each kind of asset records (see AssetType kinds). */
+    public const DETAILS = [
+        AssetType::FENCE => ['fence_type', 'wires'],
+        AssetType::TANK => ['capacity'],
+        AssetType::TROUGH => ['trough_size', 'capacity'],
+        AssetType::VEGETATION => ['vegetation_type'],
+    ];
+
     protected $fillable = [
         'property_id',
         'asset_type_id',
@@ -41,10 +74,70 @@ class Asset extends Model
         return $this->belongsTo(AssetType::class);
     }
 
-    /** Fences: assets of the property's fence type, whatever it's called. */
+    /** Assets of the property's type of these kinds, whatever it's called. */
+    public function scopeOfKind($query, string ...$kinds)
+    {
+        return $query->whereHas('assetType', fn ($type) => $type->whereIn('kind', $kinds));
+    }
+
     public function scopeFences($query)
     {
-        return $query->whereHas('assetType', fn ($type) => $type->where('kind', AssetType::FENCE));
+        return $query->ofKind(AssetType::FENCE);
+    }
+
+    /** What the app treats it as (its type's kind), or null. */
+    public function kind(): ?string
+    {
+        return $this->assetType?->kind;
+    }
+
+    /** Sensors fitted to it, e.g. a tank's level sensor. */
+    public function devices()
+    {
+        return $this->hasMany(Device::class)->orderBy('name');
+    }
+
+    /**
+     * Its details as kept for its kind: only that kind's fields, empty ones
+     * left out, numbers as numbers - or null for a kind with none.
+     */
+    public static function detailsFor(?string $kind, ?array $details): ?array
+    {
+        $kept = collect($details ?? [])
+            ->only(self::DETAILS[$kind] ?? [])
+            ->reject(fn ($value) => $value === null || $value === '')
+            ->map(fn ($value, $key) => match ($key) {
+                'wires' => (int) $value,
+                'capacity' => (float) $value == (int) $value ? (int) $value : (float) $value,
+                default => $value,
+            })
+            ->all();
+
+        return $kept ?: null;
+    }
+
+    /**
+     * Its point on the map as [lat, lng]: its location's point, or the
+     * middle of its shape or line - where a gate, tank or pump stands.
+     */
+    public function point(): ?array
+    {
+        $location = $this->currentLocation;
+        if (! $location) {
+            return null;
+        }
+        if ($location->latitude !== null && $location->longitude !== null) {
+            return [(float) $location->latitude, (float) $location->longitude];
+        }
+        $points = $location->shape ?? $location->line;
+        if (! $points) {
+            return null;
+        }
+
+        return [
+            collect($points)->avg(fn ($p) => (float) $p[0]),
+            collect($points)->avg(fn ($p) => (float) $p[1]),
+        ];
     }
 
     public function createdBy()

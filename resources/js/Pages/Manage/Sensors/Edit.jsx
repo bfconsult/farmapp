@@ -94,7 +94,7 @@ function boundaryCenter(coordinates) {
     return { lat, lng };
 }
 
-export default function Edit({ device, models, kinds, prefill, propertyBoundary, zones = [] }) {
+export default function Edit({ device, models, kinds, prefill, propertyBoundary, zones = [], assets = [] }) {
     const isNew = !device;
 
     const kindsFor = (model) => kinds.filter((kind) => kind.models.includes(model));
@@ -105,6 +105,7 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary,
         model: initialModel,
         kind: isNew ? (kindsFor(initialModel)[0]?.value ?? '') : (device.kind ?? ''),
         dev_eui: device?.dev_eui ?? prefill?.dev_eui ?? '',
+        asset_id: device?.asset_id ?? '',
         latitude: device?.latitude ?? null,
         longitude: device?.longitude ?? null,
         settings: device?.settings ?? {},
@@ -121,6 +122,15 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary,
 
     // The chosen kind's settings, e.g. a pump's running threshold.
     const kindSettings = Object.entries(kinds.find((kind) => kind.value === data.kind)?.settings ?? {});
+
+    // The asset it's fitted to. Assets of its own kind (a tank sensor's
+    // tanks and troughs) are offered first.
+    const holdsWater = (asset) => ['tank', 'trough'].includes(asset?.kind);
+    const fittedTo = assets.find((asset) => String(asset.id) === String(data.asset_id)) ?? null;
+    const sameKind = assets.filter((asset) => data.kind && (asset.kind === data.kind || (data.kind === 'tank' && holdsWater(asset))));
+    const otherAssets = assets.filter((asset) => !sameKind.includes(asset));
+    // A tank's (or trough's) capacity belongs to it once it has one.
+    const capacityOnTank = data.kind === 'tank' && holdsWater(fittedTo) && fittedTo.capacity > 0;
 
     const hasPin = data.latitude !== null && data.longitude !== null;
     const [showLocationModal, setShowLocationModal] = useState(false);
@@ -264,7 +274,44 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary,
                                 {errors.kind && <p className="mt-1 text-sm text-red-600">{errors.kind}</p>}
                             </div>
 
-                            {kindSettings.map(([name, setting]) => (
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Fitted to</label>
+                                <select
+                                    value={data.asset_id}
+                                    onChange={(e) => setData('asset_id', e.target.value)}
+                                    className="w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                                >
+                                    <option value="">Nothing (the sensor stands on its own)</option>
+                                    {sameKind.length > 0 && (
+                                        <optgroup label={data.kind === 'tank' ? 'Tanks and troughs' : (sameKind[0].type ?? 'Same kind')}>
+                                            {sameKind.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+                                        </optgroup>
+                                    )}
+                                    {otherAssets.length > 0 && (
+                                        <optgroup label={sameKind.length > 0 ? 'Other assets' : 'Assets'}>
+                                            {otherAssets.map((asset) => (
+                                                <option key={asset.id} value={asset.id}>{asset.name}{asset.type ? ` (${asset.type})` : ''}</option>
+                                            ))}
+                                        </optgroup>
+                                    )}
+                                </select>
+                                <p className="mt-1 text-xs text-gray-500">
+                                    {fittedTo
+                                        ? `Its readings show on ${fittedTo.name}'s page, and alerts use that name.${fittedTo.located ? ` The map and farm view show it where ${fittedTo.name} is.` : ''}`
+                                        : 'The asset it measures, e.g. the tank a level sensor is on. If the sensor is replaced, fit the new one to the same asset.'}
+                                </p>
+                                {errors.asset_id && <p className="mt-1 text-sm text-red-600">{errors.asset_id}</p>}
+                            </div>
+
+                            {kindSettings.map(([name, setting]) => name === 'capacity' && capacityOnTank ? (
+                                <div key={name} className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{setting.label}</label>
+                                    <p className="text-sm text-gray-700">
+                                        {Math.round(fittedTo.capacity).toLocaleString()} L, set on{' '}
+                                        <a href={route('assets.show', fittedTo.id)} className="text-green-600">{fittedTo.name}</a>
+                                    </p>
+                                </div>
+                            ) : (
                                 <div key={name} className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">{setting.label}</label>
                                     <div className="flex items-center gap-2">
@@ -280,7 +327,12 @@ export default function Edit({ device, models, kinds, prefill, propertyBoundary,
                                         />
                                         {setting.unit && <span className="text-sm text-gray-500">{setting.unit}</span>}
                                     </div>
-                                    {setting.help && <p className="mt-1 text-xs text-gray-500">{setting.help}</p>}
+                                    {setting.help && (
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {setting.help}
+                                            {name === 'capacity' && holdsWater(fittedTo) && data.kind === 'tank' ? ` It's saved to ${fittedTo.name} as its capacity.` : ''}
+                                        </p>
+                                    )}
                                     {errors[`settings.${name}`] && <p className="mt-1 text-sm text-red-600">{errors[`settings.${name}`]}</p>}
                                 </div>
                             ))}

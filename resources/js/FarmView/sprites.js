@@ -62,15 +62,16 @@ const rotate = ({ x, y }, degrees) => {
 
 /**
  * A farm gate across the fence `direction` (a unit vector in metres),
- * swung open on its hinge when `open`.
+ * swung open on its hinge when `open`. Grey when its sensor isn't
+ * reporting; plain timber when it has none.
  */
-export function drawGate(g, { direction, open, active }) {
+export function drawGate(g, { direction, open, active, monitored = true }) {
     const width = 4;
     const hinge = { x: -direction.x * width / 2, y: -direction.y * width / 2 };
     const latch = { x: direction.x * width / 2, y: direction.y * width / 2 };
     const swung = rotate(direction, 70);
     const end = open ? { x: hinge.x + swung.x * width, y: hinge.y + swung.y * width } : latch;
-    const color = !active ? 0x9ca3af : open ? 0xd97706 : 0x7c8794;
+    const color = !monitored ? 0x9a7650 : !active ? 0x9ca3af : open ? 0xd97706 : 0x7c8794;
 
     // Posts.
     for (const post of [hinge, latch]) {
@@ -115,6 +116,51 @@ export function drawTank(g, { percent, low, active }) {
         const water = (bottom - top - 0.1) * Math.max(0, Math.min(100, percent)) / 100;
         g.rect(-0.2, bottom - 0.05 - water, 0.4, water).fill(low ? 0xf59e0b : 0x3b82f6);
     }
+}
+
+/**
+ * A stock trough, round or long (its size in metres), turned with the
+ * view's angle, with water to `percent` full.
+ */
+export function drawTrough(g, { shape = 'round', length = 1.5, width = 1.5, angle = 0, percent = 100, low = false }) {
+    const depth = 0.5;
+    const water = low ? 0xf59e0b : 0x4f9bd9;
+    const level = depth * 0.85 * Math.max(0.15, Math.min(100, percent ?? 100) / 100);
+    if (shape === 'round') {
+        // Circles in the angled view are ellipses twice as wide as tall.
+        const rx = (length / 2) * Math.SQRT2;
+        const ry = rx / 2;
+        g.ellipse(0.2, 0.1, rx * 1.15, ry * 1.15).fill({ color: 0x000000, alpha: 0.12 });
+        g.ellipse(0, 0, rx, ry).fill(0x9ca3a5);
+        g.rect(-rx, -depth, rx * 2, depth).fill(0xb8bdbf);
+        g.ellipse(0, -depth, rx, ry).fill(0xcfd3d4);
+        g.ellipse(0, -depth, rx * 0.88, ry * 0.88).fill(0x6b7280);
+        g.ellipse(0, -level, rx * 0.86, ry * 0.86).fill(water);
+        return;
+    }
+
+    // A long trough: a box, its corners turned with the view.
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const corner = (x, y, z) => iso(x * cos - y * sin, x * sin + y * cos, z);
+    const l = length / 2;
+    const w = width / 2;
+    const ring = (inset, z) => [[-l + inset, -w + inset], [l - inset, -w + inset], [l - inset, w - inset], [-l + inset, w - inset]]
+        .map(([x, y]) => corner(x, y, z));
+    const face = (points, color) => g.poly(points.flatMap((p) => [p.x, p.y])).fill(color);
+    // Its shadow: the outline, a little bigger and off to one side.
+    face(ring(-0.15, 0).map((p) => ({ x: p.x + 0.15, y: p.y + 0.08 })), { color: 0x000000, alpha: 0.12 });
+    const bottom = ring(0, 0);
+    const top = ring(0, depth);
+    // The sides, back ones first.
+    const sides = [0, 1, 2, 3].map((i) => ({ i, depth: bottom[i].y + bottom[(i + 1) % 4].y })).sort((a, b) => a.depth - b.depth);
+    for (const { i } of sides) {
+        const j = (i + 1) % 4;
+        face([bottom[i], bottom[j], top[j], top[i]], 0xb8bdbf);
+    }
+    face(top, 0xcfd3d4);
+    face(ring(0.06, depth), 0x6b7280);
+    face(ring(0.07, level), water);
 }
 
 /**

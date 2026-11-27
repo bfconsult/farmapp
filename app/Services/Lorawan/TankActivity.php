@@ -2,6 +2,7 @@
 
 namespace App\Services\Lorawan;
 
+use App\Models\AssetType;
 use App\Models\Device;
 use App\Models\SensorReading;
 use Carbon\Carbon;
@@ -33,7 +34,7 @@ class TankActivity
     {
         $empty = SensorKinds::setting($device, 'empty_distance');
         $full = SensorKinds::setting($device, 'full_distance');
-        $capacity = (float) SensorKinds::setting($device, 'capacity');
+        $capacity = (float) self::capacity($device);
         if ($empty === null || $full === null || $empty <= $full) {
             return null;
         }
@@ -44,6 +45,20 @@ class TankActivity
             'percent' => round($percent, 1),
             'litres' => $capacity > 0 ? (int) round($percent / 100 * $capacity) : null,
         ];
+    }
+
+    /**
+     * Litres when full: the tank's (or trough's) own capacity once the
+     * sensor is fitted to one that has it, otherwise the sensor's setting. (The
+     * distances stay with the sensor - they're about how it's mounted.)
+     */
+    public static function capacity(Device $device): ?float
+    {
+        $asset = $device->asset;
+        $own = in_array($asset?->kind(), AssetType::HOLDS_WATER, true) ? ($asset->details['capacity'] ?? null) : null;
+        $capacity = $own ?? SensorKinds::setting($device, 'capacity');
+
+        return $capacity !== null ? (float) $capacity : null;
     }
 
     /**
@@ -205,7 +220,7 @@ class TankActivity
             'settings' => [
                 'empty_distance' => SensorKinds::setting($this->device, 'empty_distance'),
                 'full_distance' => SensorKinds::setting($this->device, 'full_distance'),
-                'capacity' => SensorKinds::setting($this->device, 'capacity'),
+                'capacity' => self::capacity($this->device),
                 'warn_below_percent' => (float) SensorKinds::setting($this->device, 'warn_below_percent'),
             ],
         ];

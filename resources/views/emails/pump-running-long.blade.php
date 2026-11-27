@@ -1,5 +1,5 @@
 <x-mail::message>
-# {{ $device->name }} is still running
+# {{ $device->displayName() }} is still running
 
 It has been running for {{ $minutes }} minutes, longer than the {{ $limit }} minutes set for it.
 

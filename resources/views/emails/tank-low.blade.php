@@ -1,5 +1,5 @@
 <x-mail::message>
-# {{ $device->name }} is running low
+# {{ $device->displayName() }} is running low
 
 It's down to **{{ $percent }}%**@if ($litres !== null) (about {{ number_format($litres) }} litres)@endif, below the {{ $warnBelow + 0 }}% set for it.
 

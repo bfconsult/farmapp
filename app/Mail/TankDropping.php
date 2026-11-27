@@ -25,7 +25,7 @@ class TankDropping extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "{$this->device->name} has dropped ".round($this->drop['drop']).'% in '.TankActivity::describeMinutes((int) $this->warning['within_minutes']),
+            subject: "{$this->device->displayName()} has dropped ".round($this->drop['drop']).'% in '.TankActivity::describeMinutes((int) $this->warning['within_minutes']),
         );
     }
 

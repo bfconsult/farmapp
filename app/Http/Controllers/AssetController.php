@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\AssetType;
+use App\Models\Device;
 use App\Models\FarmJob;
 use App\Models\Property;
 use App\Models\WorkSession;
+use App\Services\Lorawan\SensorKinds;
+use App\Services\Lorawan\TankActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -182,6 +185,7 @@ class AssetController extends Controller
             'otherLines' => $otherLines,
             // For the edit form's type picker (e.g. to make a Fixed asset a fence).
             'assetTypes' => AssetType::where('property_id', $asset->property_id)->orderBy('name')->get(['id', 'name', 'kind']),
+            'sensors' => $this->fittedSensors($asset),
             'recentJobs' => FarmJob::whereIn('id', $jobIds)->with('jobStatus')->latest()->take(5)->get(),
             'jobsCount' => $jobIds->count(),
             'usageHours' => $usageHours,
@@ -201,6 +205,30 @@ class AssetController extends Controller
         ]);
     }
 
+    /**
+     * The sensors fitted to it, each with what it says now: {id, name,
+     * kind, kind_label, state, status (its kind's status, e.g. a tank's
+     * litres or a gate's open-since), last_seen_at}.
+     */
+    private function fittedSensors(Asset $asset): array
+    {
+        $timezone = Auth::user()->displayTimezone();
+
+        return $asset->devices()
+            ->get()
+            ->map(fn (Device $device) => [
+                'id' => $device->id,
+                'name' => $device->name,
+                'kind' => $device->kind,
+                'kind_label' => SensorKinds::label($device->kind),
+                'state' => SensorKinds::state($device),
+                'status' => SensorKinds::activity($device, $timezone)?->status(),
+                'capacity' => $device->kind === 'tank' ? TankActivity::capacity($device) : null,
+                'last_seen_at' => $device->last_seen_at,
+            ])
+            ->all();
+    }
+
     private function validated(Request $request, ?Asset $asset = null): array
     {
         $validated = $request->validate([
@@ -211,18 +239,18 @@ class AssetController extends Controller
             'details' => 'nullable|array',
             'details.fence_type' => ['nullable', Rule::in(array_keys(Asset::FENCE_TYPES))],
             'details.wires' => 'nullable|integer|min:1|max:20',
+            'details.capacity' => 'nullable|numeric|min:0|max:100000000',
+            'details.vegetation_type' => ['nullable', Rule::in(array_keys(Asset::VEGETATION_TYPES))],
+            'details.trough_size' => ['nullable', Rule::in(array_keys(Asset::TROUGH_SIZES))],
         ]);
 
-        // A fence's details are kept only while it's of the fence type.
+        // Only its kind's details are kept, so they go if its type changes.
         $typeId = array_key_exists('asset_type_id', $validated) ? $validated['asset_type_id'] : $asset?->asset_type_id;
-        $isFence = $typeId && AssetType::whereKey($typeId)->where('kind', AssetType::FENCE)->exists();
-        if (! $isFence) {
-            $validated['details'] = null;
-        } elseif (array_key_exists('details', $validated)) {
-            $validated['details'] = array_filter([
-                'fence_type' => $validated['details']['fence_type'] ?? null,
-                'wires' => isset($validated['details']['wires']) ? (int) $validated['details']['wires'] : null,
-            ], fn ($value) => $value !== null) ?: null;
+        $kind = $typeId ? AssetType::whereKey($typeId)->value('kind') : null;
+        if (array_key_exists('details', $validated)) {
+            $validated['details'] = Asset::detailsFor($kind, $validated['details']);
+        } elseif ($asset) {
+            $validated['details'] = Asset::detailsFor($kind, $asset->details);
         }
 
         return $validated;

@@ -453,6 +453,7 @@ export default function Map({
                     <span>${escapeHtml(sensor.state?.label ?? 'No reading yet')}</span>
                     <span style="color:#6b7280"> · ${escapeHtml(timeAgo(sensor.last_seen_at))}</span><br/>
                     ${isAdminOrManager ? `<a href="${route('manage.sensors.show', sensor.id)}" style="color:#2563eb">View ${escapeHtml(sensor.kind_label.toLowerCase())} →</a>` : ''}
+                    ${sensor.asset_id ? `${isAdminOrManager ? '<br/>' : ''}<a href="${route('assets.show', sensor.asset_id)}" style="color:#2563eb">View asset →</a>` : ''}
                 </div>
             `)),
         );

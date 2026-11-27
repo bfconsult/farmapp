@@ -4,7 +4,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { FarmScene } from '@/FarmView/scene';
 
-// Sensors and mobs are refreshed this often, so gates and tanks keep up.
+// Gates, tanks, pumps and mobs are refreshed this often, so their sensors' states keep up.
 const REFRESH_MS = 60 * 1000;
 
 // Whether this viewer last chose "True to scale" - remembered in the
@@ -38,7 +38,7 @@ function Compass({ degrees }) {
     );
 }
 
-export default function FarmView({ boundary, zones, fences, mobs, sensors, rotation, terrain, terrainStale }) {
+export default function FarmView({ boundary, zones, fences, vegetation, mobs, props, rotation, terrain, terrainStale }) {
     const [degrees, setDegrees] = useState(rotation);
     const [saving, setSaving] = useState(false);
     const [fetching, setFetching] = useState(false);
@@ -65,8 +65,8 @@ export default function FarmView({ boundary, zones, fences, mobs, sensors, rotat
     }, [hasLand]);
 
     useEffect(() => {
-        sceneRef.current?.setData({ boundary, zones, fences, mobs, sensors, terrain });
-    }, [boundary, zones, fences, mobs, sensors, terrain, hasLand]);
+        sceneRef.current?.setData({ boundary, zones, fences, vegetation, mobs, props, terrain });
+    }, [boundary, zones, fences, vegetation, mobs, props, terrain, hasLand]);
 
     useEffect(() => {
         sceneRef.current?.setContours(contours);
@@ -89,7 +89,7 @@ export default function FarmView({ boundary, zones, fences, mobs, sensors, rotat
     });
 
     useEffect(() => {
-        const timer = setInterval(() => router.reload({ only: ['mobs', 'sensors'] }), REFRESH_MS);
+        const timer = setInterval(() => router.reload({ only: ['mobs', 'props'] }), REFRESH_MS);
         return () => clearInterval(timer);
     }, []);
 
@@ -140,7 +140,7 @@ export default function FarmView({ boundary, zones, fences, mobs, sensors, rotat
                             )}
                             <label
                                 className="flex items-center gap-1.5 text-sm text-gray-700 mr-1"
-                                title="Off: fences, gates, tanks and pumps are drawn big enough to see from afar. On: their real size."
+                                title="Off: fences, trees, gates, tanks and pumps are drawn big enough to see from afar. On: their real size."
                             >
                                 <input type="checkbox" className="rounded border-gray-300 text-green-600" checked={trueScale} onChange={(e) => setTrueScale(e.target.checked)} />
                                 True to scale

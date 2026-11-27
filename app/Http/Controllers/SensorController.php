@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Asset;
+use App\Models\AssetType;
 use App\Models\Device;
 use App\Models\Gateway;
 use App\Models\LorawanEvent;
@@ -64,6 +66,7 @@ class SensorController extends Controller
             'kinds' => SensorKinds::options(),
             'propertyBoundary' => Property::find(session('current_property_id'))?->shape?->coordinates,
             'zones' => Zone::where('property_id', session('current_property_id'))->orderBy('name')->get(['id', 'name', 'coordinates']),
+            'assets' => $this->assetOptions(),
             'prefill' => [
                 'dev_eui' => $request->query('dev_eui', ''),
                 'name' => $request->query('name', ''),
@@ -82,6 +85,7 @@ class SensorController extends Controller
             'model' => ['required', Rule::in(array_keys(DeviceModels::MODELS))],
             'kind' => ['nullable', Rule::in(SensorKinds::forModel((string) $request->input('model')))],
             'dev_eui' => ['required', 'regex:/^[0-9a-fA-F]{16}$/'],
+            'asset_id' => $this->assetRule(),
             ...self::LOCATION_RULES,
             'settings' => 'nullable|array',
             ...SensorKinds::settingRules($request->input('kind')),
@@ -103,6 +107,7 @@ class SensorController extends Controller
             'property_id' => session('current_property_id'),
         ]);
 
+        $this->shareCapacity($device);
         $processor->processBacklog($device);
 
         return redirect()->route('manage.sensors.show', $device)->with('success', 'Sensor added.');
@@ -182,6 +187,7 @@ class SensorController extends Controller
             'kinds' => SensorKinds::options(),
             'propertyBoundary' => Property::find(session('current_property_id'))?->shape?->coordinates,
             'zones' => Zone::where('property_id', session('current_property_id'))->orderBy('name')->get(['id', 'name', 'coordinates']),
+            'assets' => $this->assetOptions(),
             'prefill' => null,
         ]);
     }
@@ -197,6 +203,7 @@ class SensorController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'kind' => ['nullable', Rule::in(SensorKinds::forModel($device->model))],
+            'asset_id' => $this->assetRule(),
             ...self::LOCATION_RULES,
             'settings' => 'nullable|array',
             ...SensorKinds::settingRules($request->input('kind')),
@@ -206,6 +213,7 @@ class SensorController extends Controller
         ]);
 
         $device->update($this->withSettings($validated, $device->config));
+        $this->shareCapacity($device);
 
         return redirect()->route('manage.sensors.show', $device)->with('success', 'Sensor updated.');
     }
@@ -236,6 +244,49 @@ class SensorController extends Controller
         $device->delete();
 
         return redirect()->route('manage.sensors.index')->with('success', 'Sensor removed.');
+    }
+
+    /** The asset it's fitted to: one on this property, or none. */
+    private function assetRule(): array
+    {
+        return ['nullable', Rule::exists('assets', 'id')->where('property_id', session('current_property_id'))];
+    }
+
+    /**
+     * The property's assets to fit a sensor to: {id, name, type, kind,
+     * capacity (a tank's), located}.
+     */
+    private function assetOptions(): array
+    {
+        return Asset::where('property_id', session('current_property_id'))
+            ->with(['assetType', 'currentLocation'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Asset $asset) => [
+                'id' => $asset->id,
+                'name' => $asset->name,
+                'type' => $asset->assetType?->name,
+                'kind' => $asset->kind(),
+                'capacity' => $asset->details['capacity'] ?? null,
+                'located' => $asset->point() !== null,
+            ])
+            ->all();
+    }
+
+    /**
+     * A tank's capacity belongs to the tank: when a tank sensor is fitted
+     * to a tank (or trough) asset that doesn't have one yet, the sensor's
+     * goes to it.
+     */
+    private function shareCapacity(Device $device): void
+    {
+        $asset = $device->fresh('asset')->asset;
+        $capacity = $device->config['settings']['capacity'] ?? null;
+        if ($device->kind !== 'tank' || ! in_array($asset?->kind(), AssetType::HOLDS_WATER, true) || ! $capacity || isset($asset->details['capacity'])) {
+            return;
+        }
+
+        $asset->update(['details' => Asset::detailsFor($asset->kind(), [...($asset->details ?? []), 'capacity' => $capacity])]);
     }
 
     private function authorizeDevice(Device $device): void
@@ -276,6 +327,8 @@ class SensorController extends Controller
             'model_label' => DeviceModels::MODELS[$device->model]['label'] ?? $device->model,
             'kind' => $device->kind,
             'kind_label' => SensorKinds::label($device->kind),
+            'asset_id' => $device->asset_id,
+            'asset' => $device->asset ? ['id' => $device->asset->id, 'name' => $device->asset->name] : null,
             'latitude' => $device->latitude,
             'longitude' => $device->longitude,
             'dev_eui' => $device->dev_eui,

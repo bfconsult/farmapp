@@ -53,9 +53,10 @@ test('it has the paddocks, each mob in its paddock with its head count, and the 
         ->has('zones', 1)
         ->where('zones.0.name', 'TCL')
         ->where('mobs', [['id' => $mob->id, 'name' => 'Ewes', 'zone_id' => $paddock->id, 'count' => 2, 'type' => 'Sheep']])
-        ->has('sensors', 1)
-        ->where('sensors.0.name', 'Gate')
-        ->where('sensors.0.kind', 'gate')
+        ->has('props', 1)
+        ->where('props.0.name', 'Gate')
+        ->where('props.0.kind', 'gate')
+        ->where('props.0.monitored', true)
     );
 });
 

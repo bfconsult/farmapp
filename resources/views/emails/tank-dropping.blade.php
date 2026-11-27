@@ -1,5 +1,5 @@
 <x-mail::message>
-# {{ $device->name }} is dropping
+# {{ $device->displayName() }} is dropping
 
 It has gone from **{{ round($drop['from_percent']) }}%** to **{{ round($drop['percent']) }}%** full in the last {{ $within }}, a drop of {{ round($drop['drop']) }}%@if ($drop['litres'] !== null && $drop['from_litres'] !== null) (about {{ number_format($drop['from_litres'] - $drop['litres']) }} litres)@endif. You asked to be warned about a drop of {{ $warningPercent }}% within {{ $within }}.
 
