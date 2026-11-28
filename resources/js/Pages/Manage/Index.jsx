@@ -21,7 +21,7 @@ function HubCard({ href, icon, title, subtitle }) {
     );
 }
 
-export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, assetsJobsOpen, suppliersCount, mobsCount, livestockCount, sensorsCount, canManage, canReviewWorkSessions }) {
+export default function Index({ metricsTracked, metricsDue, checklistTemplatesCount, assetsCount, assetsOverdue, assetsJobsOpen, suppliersCount, mobsCount, livestockCount, sensorsCount, dashboardSensorsCount, canManage, canReviewWorkSessions }) {
     return (
         <AuthenticatedLayout title="Manage">
             <Head title="Manage" />
@@ -93,6 +93,21 @@ export default function Index({ metricsTracked, metricsDue, checklistTemplatesCo
                         </svg>
                     }
                 />
+
+                {dashboardSensorsCount > 0 && (
+                    <HubCard
+                        href={route('manage.sensor-dashboard')}
+                        title="Sensor dashboard"
+                        subtitle={`${dashboardSensorsCount} tank, gate and pump sensor${dashboardSensorsCount === 1 ? '' : 's'}`}
+                        icon={
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                                <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                                <rect x="3" y="14" width="18" height="7" rx="1.5" />
+                            </svg>
+                        }
+                    />
+                )}
 
                 {canManage && (
                     <HubCard

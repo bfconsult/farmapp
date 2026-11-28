@@ -10,6 +10,7 @@ use App\Http\Controllers\GatewayController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\WorkSessionController;
 use App\Http\Controllers\SensorController;
+use App\Http\Controllers\SensorDashboardController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\ShapeController;
@@ -241,6 +242,8 @@ Route::middleware(['auth', 'property.role:admin,manager,worker,approver'])->grou
     Route::get('metrics', [MetricController::class, 'index'])->name('metrics.index');
     Route::get('metrics/{metric}/history', [MetricController::class, 'history'])->name('metrics.history');
     Route::get('manage', [ManageController::class, 'index'])->name('manage.index');
+    Route::get('manage/sensor-dashboard', [SensorDashboardController::class, 'index'])->name('manage.sensor-dashboard');
+    Route::put('manage/sensor-dashboard/layout', [SensorDashboardController::class, 'updateLayout'])->name('manage.sensor-dashboard.layout');
     Route::get('manage/assets', [AssetController::class, 'index'])->name('manage.assets');
     Route::get('assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
     Route::get('assets/{asset}/jobs', [AssetController::class, 'jobHistory'])->name('assets.jobs');

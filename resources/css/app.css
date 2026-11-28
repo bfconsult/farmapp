@@ -32,3 +32,22 @@
 .leaflet-pm-actions-container .leaflet-pm-action.action-cancel::before {
     content: '\2715';
 }
+
+/*
+ * The sensor dashboard's resize handle (react-grid-layout) sits on top of
+ * its tile, which would otherwise cover it - a green corner while editing.
+ */
+.react-grid-item > .react-resizable-handle {
+    z-index: 2;
+    width: 24px;
+    height: 24px;
+    background-image: none;
+}
+.react-grid-item > .react-resizable-handle::after {
+    right: 5px;
+    bottom: 5px;
+    width: 10px;
+    height: 10px;
+    border-right: 3px solid #16a34a;
+    border-bottom: 3px solid #16a34a;
+}

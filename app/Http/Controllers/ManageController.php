@@ -75,6 +75,11 @@ class ManageController extends Controller
             ? Device::where('property_id', $currentPropertyId)->count()
             : 0;
 
+        // Everyone sees the sensor dashboard, of the sensors that have a tile.
+        $dashboardSensorsCount = Device::where('property_id', $currentPropertyId)
+            ->whereIn('kind', \App\Services\Lorawan\SensorTiles::KINDS)
+            ->count();
+
         $mobsCount = Mob::where('property_id', $currentPropertyId)->count();
         $livestockCount = Livestock::where('property_id', $currentPropertyId)->count();
 
@@ -89,6 +94,7 @@ class ManageController extends Controller
             'mobsCount' => $mobsCount,
             'livestockCount' => $livestockCount,
             'sensorsCount' => $sensorsCount,
+            'dashboardSensorsCount' => $dashboardSensorsCount,
             'canManage' => $canManage,
             'canReviewWorkSessions' => $canReviewWorkSessions,
         ]);

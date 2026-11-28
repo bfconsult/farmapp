@@ -6,7 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Role extends Model
 {
-    protected $fillable = ['user_id', 'property_id', 'supplier_id', 'type'];
+    protected $fillable = ['user_id', 'property_id', 'supplier_id', 'type', 'sensor_dashboard'];
+
+    protected $casts = [
+        // Their own sensor dashboard layout on this property: [{i, x, y, w, h}].
+        'sensor_dashboard' => 'array',
+    ];
 
     const TYPES = ['admin', 'manager', 'worker', 'approver'];
 
