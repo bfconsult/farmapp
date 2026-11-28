@@ -18,12 +18,14 @@ class MobController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'zone_id' => ['nullable', Rule::exists('zones', 'id')->where('property_id', session('current_property_id'))],
+            'sprite' => ['nullable', Rule::in(array_keys(Livestock::SPRITES))],
         ]);
 
         $mob = Mob::create([
             'property_id' => session('current_property_id'),
             'created_by' => $request->user()->id,
             'name' => $validated['name'],
+            'sprite' => $validated['sprite'] ?? null,
         ]);
 
         if (filled($validated['zone_id'] ?? null)) {

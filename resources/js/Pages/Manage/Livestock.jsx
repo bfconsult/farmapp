@@ -2,6 +2,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import BackLink from '@/Components/BackLink';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
+import MobSpriteField from '@/Components/MobSpriteField';
 
 const STATUS_BADGE = {
     active: 'bg-green-100 text-green-700',
@@ -12,13 +13,16 @@ const STATUS_BADGE = {
 
 function MobFields({ values, setValues }) {
     return (
-        <input
-            type="text"
-            value={values.name}
-            onChange={(e) => setValues({ ...values, name: e.target.value })}
-            className="w-full border-gray-300 rounded-lg p-2 text-sm"
-            placeholder="Mob name (e.g. Breeding Mob)"
-        />
+        <div className="space-y-3">
+            <input
+                type="text"
+                value={values.name}
+                onChange={(e) => setValues({ ...values, name: e.target.value })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                placeholder="Mob name (e.g. Breeding Mob)"
+            />
+            <MobSpriteField values={values} setValues={setValues} />
+        </div>
     );
 }
 
@@ -146,7 +150,7 @@ function BulkAnimalFields({ values, setValues, livestockTypes, errors }) {
 
 function MobRow({ mob, canManage, livestockTypes }) {
     const [editing, setEditing] = useState(false);
-    const [values, setValues] = useState({ name: mob.name });
+    const [values, setValues] = useState({ name: mob.name, sprite: mob.sprite ?? '' });
 
     const [addingBulk, setAddingBulk] = useState(false);
     const emptyBulkValues = {

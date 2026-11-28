@@ -149,3 +149,11 @@ test("each mob says how many of its animals are drawn as each sprite: the animal
     $this->actingAs($this->user)->withSession(['current_property_id' => $this->property->id])
         ->patch(route('mobs.update', $mob), ['name' => 'Steers', 'sprite' => 'unicorn'])->assertSessionHasErrors('sprite');
 });
+
+test('a mob can be given its sprite when it\'s added', function () {
+    $this->actingAs($this->user)->withSession(['current_property_id' => $this->property->id])
+        ->post(route('mobs.store'), ['name' => 'Angus', 'sprite' => 'cow_black'])
+        ->assertSessionHasNoErrors();
+
+    expect(Mob::where('name', 'Angus')->sole()->sprite)->toBe('cow_black');
+});
