@@ -37,6 +37,12 @@ const MIN_FENCE_PX = 12;
 const MIN_POST_GAP_PX = 16;
 // The most animals drawn for one mob; its tag still says how many.
 const MAX_ANIMALS = 80;
+// In the cartoon style, an animal is at least this many pixels long - but
+// no more than this many times its real size, so a mob far off is a clump
+// of small animals rather than a few giant ones - and the mob spreads out
+// a little to make room (the square root of how much bigger it's drawn).
+const MIN_ANIMAL_PX = 18;
+const MAX_ANIMAL_SCALE = 8;
 const GATE_SNAP_METRES = 40;
 
 const GRASS = [0x9ccc74, 0x8cc06a, 0xa8d17f, 0x95c56f, 0xa2c977, 0x91bd66];
@@ -694,9 +700,8 @@ export class FarmScene {
             const at = randomPointIn(zone.polygon, random, centre, spread);
             const sprite = new Sprite(texture);
             sprite.anchor.set(anchor.x, anchor.y);
-            sprite.scale.set((random() < 0.5 ? -1 : 1) / TEXTURE_PX_PER_METRE, 1 / TEXTURE_PX_PER_METRE);
             this.objects.addChild(sprite);
-            return { sprite, x: at.x, y: at.y, target: null, pause: random() * 8, speed: 0.35 + random() * 0.3 };
+            return { sprite, x: at.x, y: at.y, facing: random() < 0.5 ? -1 : 1, target: null, pause: random() * 8, speed: 0.35 + random() * 0.3 };
         });
 
         const noun = kind === 'cattle' ? 'cattle' : 'sheep';
@@ -706,7 +711,44 @@ export class FarmScene {
         label.on('pointertap', (e) => e.button === 0 && !this.dragged && this.onOpen(route('mobs.show', mob.id)));
         this.labels.addChild(label);
 
-        return { mob, zone, kind, animals, centre, wanderTo: null, nextWander: 20 + random() * 40, spread, random, label };
+        const herd = {
+            mob, zone, kind, animals, centre, wanderTo: null, nextWander: 20 + random() * 40, spread, random, label,
+            // Its animals' real size in metres, from the texture.
+            length: texture.width / TEXTURE_PX_PER_METRE,
+            height: texture.height / TEXTURE_PX_PER_METRE,
+        };
+        this.sizeHerd(herd);
+        return herd;
+    }
+
+    // How big a mob's animals are drawn at this zoom, and whether they're
+    // shown: always in the cartoon style, only close up when true to scale.
+    sizeHerd(herd) {
+        herd.scale = this.cartoon
+            ? Math.min(MAX_ANIMAL_SCALE, Math.max(1, MIN_ANIMAL_PX / (this.zoom * herd.length)))
+            : 1;
+        herd.visible = this.cartoon || this.zoom >= SHOW_ANIMALS_AT;
+        for (const animal of herd.animals) {
+            animal.sprite.visible = herd.visible;
+            animal.sprite.scale.set((animal.facing * herd.scale) / TEXTURE_PX_PER_METRE, herd.scale / TEXTURE_PX_PER_METRE);
+        }
+        this.placeAnimals(herd);
+    }
+
+    // Each animal where it is - pushed out from the mob's middle as much as
+    // it's drawn bigger, unless that would put it outside its paddock.
+    placeAnimals(herd) {
+        const spread = Math.sqrt(herd.scale);
+        for (const animal of herd.animals) {
+            let at = { x: animal.x, y: animal.y };
+            if (spread > 1) {
+                const out = { x: herd.centre.x + (animal.x - herd.centre.x) * spread, y: herd.centre.y + (animal.y - herd.centre.y) * spread };
+                if (contains(herd.zone.polygon, out)) at = out;
+            }
+            const p = this.view(at.x, at.y);
+            animal.sprite.position.set(p.x, p.y);
+            animal.sprite.zIndex = p.y;
+        }
     }
 
     tick(seconds) {
@@ -745,13 +787,12 @@ export class FarmScene {
                         // Face the way it's walking on screen.
                         const ahead = this.view(animal.target.x, animal.target.y);
                         const here = this.view(animal.x, animal.y);
-                        animal.sprite.scale.x = (Math.sign(ahead.x - here.x) || 1) / TEXTURE_PX_PER_METRE;
+                        animal.facing = Math.sign(ahead.x - here.x) || 1;
+                        animal.sprite.scale.x = (animal.facing * herd.scale) / TEXTURE_PX_PER_METRE;
                     }
                 }
-                const p = this.view(animal.x, animal.y);
-                animal.sprite.position.set(p.x, p.y);
-                animal.sprite.zIndex = p.y;
             }
+            this.placeAnimals(herd);
         }
 
         for (const prop of this.props) {
@@ -771,9 +812,9 @@ export class FarmScene {
         }
         for (const herd of this.herds.values()) {
             const p = this.view(herd.centre.x, herd.centre.y);
-            const close = this.zoom >= SHOW_ANIMALS_AT;
+            // Above its animals, when they're shown.
             herd.label.scale.set(scale);
-            herd.label.position.set(p.x, p.y - (close ? herd.spread * 0.6 + 2 : 0));
+            herd.label.position.set(p.x, p.y - (herd.visible ? herd.spread * Math.sqrt(herd.scale) * 0.6 + herd.height * herd.scale + 1 : 0));
         }
         for (const label of this.zoneLabels) {
             label.scale.set(scale);
@@ -815,9 +856,7 @@ export class FarmScene {
 
         this.posts.visible = this.cartoon || this.zoom >= SHOW_POSTS_AT;
         this.grass.visible = this.zoom >= SHOW_GRASS_AT;
-        for (const herd of this.herds.values()) {
-            for (const animal of herd.animals) animal.sprite.visible = this.zoom >= SHOW_ANIMALS_AT;
-        }
+        for (const herd of this.herds.values()) this.sizeHerd(herd);
         for (const prop of this.props) {
             // Gates aren't scaled: drawGates makes them taller instead.
             if (prop.gate) continue;
