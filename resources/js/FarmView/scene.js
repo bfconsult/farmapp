@@ -32,6 +32,8 @@ const SHOW_GRASS_AT = 2;
 const MIN_PROP_PX = 34;
 // ...but a trough only this big: it's small beside a tank or shed.
 const MIN_TROUGH_PX = 16;
+// ...and a pump - a pump body and motor two metres long - smaller still.
+const MIN_PUMP_PX = 26;
 // In the cartoon style, a fence is at least this tall on screen, and its
 // posts at least this far apart.
 const MIN_FENCE_PX = 12;
@@ -603,8 +605,9 @@ export class FarmScene {
                 } else {
                     wheel = drawPump(g, { running: item.state?.key === 'running', active });
                     container.addChild(wheel);
-                    size = 2;
-                    height = 2;
+                    size = 1.9;
+                    height = 1;
+                    minPx = MIN_PUMP_PX;
                 }
 
                 const p = this.view(at.x, at.y);

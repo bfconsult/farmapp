@@ -168,33 +168,71 @@ export function drawTrough(g, { shape = 'round', length = 1.5, width = 1.5, angl
 }
 
 /**
- * A pump shed; returns the wheel on its roof, which turns while it runs.
+ * A pump: a red horizontal cylinder (the pump body) lying on the ground
+ * with its motor, a cube, at one end - about two metres long. Deeper red when
+ * its sensor isn't reporting (or it has none). Returns the fan on the
+ * motor's top, which turns while it runs.
  */
 export function drawPump(g, { running, active }) {
-    const s = 0.8;
-    const h = 1.1;
-    const corner = (x, y, z) => iso(x, y, z);
-    const face = (points, color) => g.poly(points.flatMap((p) => [p.x, p.y])).fill(color).stroke({ width: 0.04, color: 0x475569 });
+    const r = 0.34;              // the body's radius
+    const x0 = -0.9;             // the body's far end
+    const x1 = 0.3;              // where it meets the motor
+    const c = 0.64;              // the motor's size
+    const steps = 20;
+    const body = active ? 0xd12a1f : 0xa8322a;
+    const motor = active ? 0x2f3640 : 0x6b7280;
+    const shade = (color, amount) => {
+        const k = 1 + amount;
+        const ch = (v) => Math.max(0, Math.min(255, Math.round(v * k)));
+        return (ch((color >> 16) & 255) << 16) | (ch((color >> 8) & 255) << 8) | ch(color & 255);
+    };
+    const poly = (points, color) => g.poly(points.flatMap((p) => [p.x, p.y])).fill(color);
+    // A point on the body's surface at angle t round its axis, at x.
+    const rim = (x, t) => iso(x, r * Math.cos(t), r + r * Math.sin(t));
 
-    g.ellipse(0.4, 0.4, 1.6, 0.8).fill({ color: 0x000000, alpha: 0.12 });
-    face([corner(s, -s, 0), corner(s, s, 0), corner(s, s, h), corner(s, -s, h)], active ? 0x6f8399 : 0x8b9096);
-    face([corner(-s, s, 0), corner(s, s, 0), corner(s, s, h), corner(-s, s, h)], active ? 0x82a0bb : 0x9ca3a9);
-    face([corner(-s, -s, h), corner(s, -s, h), corner(s, s, h), corner(-s, s, h)], active ? 0x9fb3c8 : 0xb3b8bd);
+    g.ellipse(0.1, 0.24, 1.5, 0.64).fill({ color: 0x000000, alpha: 0.14 });
 
-    // Status light on the front.
-    const light = corner(0, s, h * 0.6);
-    g.circle(light.x, light.y, 0.14).fill(!active ? 0x9ca3af : running ? 0x22c55e : 0x64748b);
-
-    const wheel = new Graphics();
-    wheel.circle(0, 0, 0.38).stroke({ width: 0.07, color: 0x334155 });
-    for (let i = 0; i < 4; i++) {
-        const a = (i * Math.PI) / 4;
-        wheel.moveTo(-Math.cos(a) * 0.38, -Math.sin(a) * 0.38).lineTo(Math.cos(a) * 0.38, Math.sin(a) * 0.38).stroke({ width: 0.05, color: 0x334155 });
+    // The body: strips round it, those facing away first, lit from above.
+    const strips = [];
+    for (let i = 0; i < steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        const b = ((i + 1) / steps) * Math.PI * 2;
+        const mid = (a + b) / 2;
+        // Facing the viewer (who looks from +y and above) or away.
+        const facing = Math.cos(mid) * 0.7 + Math.sin(mid) * 0.7;
+        strips.push({ a, b, facing, light: Math.sin(mid) * 0.25 + Math.cos(mid) * 0.08 });
     }
-    const top = corner(0, 0, h);
-    wheel.position.set(top.x, top.y - 0.5);
-    wheel.scale.y = 0.6;
-    return wheel;
+    strips.sort((p, q) => p.facing - q.facing);
+    // The far end's flange, behind everything.
+    poly(Array.from({ length: steps }, (_, i) => rim(x0 - 0.04, (i / steps) * Math.PI * 2)), shade(body, -0.35));
+    for (const { a, b, light } of strips) {
+        poly([rim(x0, a), rim(x1, a), rim(x1, b), rim(x0, b)], shade(body, light));
+    }
+
+    // The motor: its three visible faces.
+    const corner = (x, y, z) => iso(x, y, z);
+    const h = -c / 2;
+    const k = c / 2;
+    poly([corner(x1, h, c), corner(x1 + c, h, c), corner(x1 + c, k, c), corner(x1, k, c)], shade(motor, 0.35));
+    poly([corner(x1 + c, h, 0), corner(x1 + c, k, 0), corner(x1 + c, k, c), corner(x1 + c, h, c)], shade(motor, -0.1));
+    poly([corner(x1, k, 0), corner(x1 + c, k, 0), corner(x1 + c, k, c), corner(x1, k, c)], motor);
+
+    // Status light on the motor's side.
+    const light = corner(x1 + c * 0.5, k, c * 0.7);
+    g.circle(light.x, light.y, 0.09).fill(!active ? 0x9ca3af : running ? 0x22c55e : 0x94a3b8);
+
+    // The cooling fan on top, which turns while it runs.
+    const fan = new Graphics();
+    const fr = 0.2;
+    fan.circle(0, 0, fr).stroke({ width: 0.05, color: 0xe2e8f0 });
+    for (let i = 0; i < 3; i++) {
+        const a = (i * Math.PI * 2) / 3;
+        fan.moveTo(0, 0).lineTo(Math.cos(a) * fr, Math.sin(a) * fr).stroke({ width: 0.05, color: 0xe2e8f0 });
+    }
+    const top = corner(x1 + c / 2, 0, c);
+    fan.position.set(top.x, top.y);
+    fan.scale.y = 0.5;
+    return fan;
 }
 
 const TONES = {
