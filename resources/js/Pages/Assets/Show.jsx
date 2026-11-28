@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 import { pillBadgeClass } from '@/Utils/pillColors';
-import { formatLength, showDrawLengths } from '@/Utils/drawLength';
+import { closeLinesAtStart, formatLength, showDrawLengths } from '@/Utils/drawLength';
 
 const ASSET_COLOR = '#2563eb';
 
@@ -327,6 +327,7 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
                     removalMode: false,
                 });
                 showDrawLengths(L, map);
+                closeLinesAtStart(map);
 
                 // Drawing a new pin/shape no longer saves immediately - it
                 // becomes an adjustable draft (draggable marker, or an
@@ -776,7 +777,7 @@ function AssetPage({ asset, otherLines, assetTypes = [], sensors = [], recentJob
 
             <div className="max-w-lg mx-auto mt-2 space-y-4">
                 <div className="flex items-center justify-between">
-                    <BackLink href={route('manage.index')}>Manage</BackLink>
+                    <BackLink href={route('manage.assets')}>Assets</BackLink>
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-4">

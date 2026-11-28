@@ -10,6 +10,51 @@ export function formatLength(metres) {
     return metres >= 1000 ? `${(metres / 1000).toFixed(2)} km` : `${Math.round(metres)} m`;
 }
 
+/**
+ * Lets a line be closed: once it has two segments, the pointer snaps to its
+ * first point when close to it (within the map's snap distance), and
+ * clicking there (or on that first point) adds the closing point and
+ * finishes - a fenced paddock drawn with the line tool rather than the
+ * polygon tool. Geoman on its own finishes there without adding it.
+ *
+ * Call once, after the draw controls are added and before drawing starts.
+ */
+export function closeLinesAtStart(map) {
+    const draw = map.pm.Draw.Line;
+    if (!draw || draw._closesAtStart) return;
+    draw._closesAtStart = true;
+
+    const nearStart = (latlng) => {
+        const points = draw._layer?.getLatLngs?.() ?? [];
+        if (points.length < 3 || !latlng) return false;
+        const distance = map.latLngToContainerPoint(latlng).distanceTo(map.latLngToContainerPoint(points[0]));
+        return distance <= (draw.options.snapDistance ?? map.pm.getGlobalOptions().snapDistance ?? 20);
+    };
+
+    // Snap the pointer (and so the rubber band) onto the first point.
+    const snap = () => {
+        const hint = draw._hintMarker;
+        const first = draw._layer?.getLatLngs?.()[0];
+        if (!hint || !first || !nearStart(hint.getLatLng()) || hint.getLatLng().equals(first)) return;
+        hint._snapped = true;
+        hint.setLatLng(first);
+    };
+    map.on('pm:drawstart', (e) => {
+        if (e.shape === 'Line') draw._hintMarker?.on('move', snap);
+    });
+
+    // Finishing with the pointer on the first point closes the line first.
+    const finish = draw._finishShape;
+    draw._finishShape = function (...args) {
+        const points = this._layer?.getLatLngs?.() ?? [];
+        const first = points[0];
+        if (first && points.length >= 3 && nearStart(this._hintMarker?.getLatLng()) && !points[points.length - 1].equals(first)) {
+            this._layer.addLatLng(first);
+        }
+        return finish.apply(this, args);
+    };
+}
+
 /** Shows segment lengths while drawing on `map`; returns a function that stops it. */
 export function showDrawLengths(L, map) {
     let tooltip = null;

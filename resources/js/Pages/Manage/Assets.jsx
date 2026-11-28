@@ -237,12 +237,15 @@ export default function Assets({ assets, assetTypes, canManage }) {
                                     </p>
                                 </div>
                                 {group.subGroups.map((subGroup) => (
-                                    <div key={subGroup.label ?? ''} className="border-t border-gray-100 first:border-t-0">
-                                        {/* Sub-headings only once the category has a sub-type in use. */}
+                                    <div key={subGroup.label ?? ''} className="border-t border-gray-200 first:border-t-0">
+                                        {/* Sub-headings only once the category has a sub-type in use -
+                                            a tinted band with a green edge, so each sub-type's
+                                            section stands out from the asset names under it. */}
                                         {group.subGroups.some((other) => other.label !== null) && (
-                                            <p className="px-4 pt-3 pb-1 text-xs font-medium text-gray-400">
-                                                {subGroup.label ?? 'General'}
-                                            </p>
+                                            <div className="flex items-center justify-between px-4 py-2 bg-green-50 border-l-4 border-green-600 border-b border-b-gray-100">
+                                                <p className="text-sm font-semibold text-gray-800">{subGroup.label ?? 'General'}</p>
+                                                <span className="text-xs text-gray-500">{subGroup.assets.length}</span>
+                                            </div>
                                         )}
                                         <div className="divide-y divide-gray-100">
                                             {subGroup.assets.map((asset) => (

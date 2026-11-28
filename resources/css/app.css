@@ -1,3 +1,34 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Geoman's draw/edit fly-out (Finish | Remove Last Vertex | Cancel) as
+ * icons, so it covers less of the map - the words stay as the hover title.
+ */
+.leaflet-pm-actions-container .leaflet-pm-action.action-finish,
+.leaflet-pm-actions-container .leaflet-pm-action.action-finishMode,
+.leaflet-pm-actions-container .leaflet-pm-action.action-removeLastVertex,
+.leaflet-pm-actions-container .leaflet-pm-action.action-cancel {
+    font-size: 0;
+    padding: 0 10px;
+    min-width: 34px;
+    text-align: center;
+}
+.leaflet-pm-actions-container .leaflet-pm-action.action-finish::before,
+.leaflet-pm-actions-container .leaflet-pm-action.action-finishMode::before,
+.leaflet-pm-actions-container .leaflet-pm-action.action-removeLastVertex::before,
+.leaflet-pm-actions-container .leaflet-pm-action.action-cancel::before {
+    font-size: 16px;
+    font-weight: 700;
+}
+.leaflet-pm-actions-container .leaflet-pm-action.action-finish::before,
+.leaflet-pm-actions-container .leaflet-pm-action.action-finishMode::before {
+    content: '\2713';
+}
+.leaflet-pm-actions-container .leaflet-pm-action.action-removeLastVertex::before {
+    content: '\21B6';
+}
+.leaflet-pm-actions-container .leaflet-pm-action.action-cancel::before {
+    content: '\2715';
+}
