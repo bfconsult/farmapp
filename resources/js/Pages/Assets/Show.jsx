@@ -98,6 +98,11 @@ function lineLength(line) {
 
 const ZONE_COLOR = '#7c3aed';
 
+// For the map's background shapes (paddocks, the boundary, other fences):
+// Geoman leaves them out of edit mode - only the asset's own location gets
+// handles - but new and moved points still snap to them.
+const SNAP_ONLY = { pmIgnore: true, snapIgnore: false };
+
 /** Standard ray-casting point-in-polygon test - `coordinates` is a plain
  * array of [lat, lng] pairs, the same shape Zone/Asset shapes already use
  * everywhere else in this app (not GeoJSON). */
@@ -259,6 +264,7 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
                         fillColor: ZONE_COLOR,
                         fillOpacity: 0.15,
                         interactive: false,
+                        ...SNAP_ONLY,
                     }).bindTooltip(zone.name, { permanent: true, direction: 'center' }),
                 ),
             );
@@ -271,6 +277,7 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
                     weight: 1,
                     fillOpacity: 0.05,
                     interactive: false,
+                    ...SNAP_ONLY,
                 }).addTo(map);
                 boundaryBounds = boundary.getBounds();
             }
@@ -279,7 +286,7 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
             // line's points snap onto them, and onto paddock and boundary
             // corners and edges.
             (otherLines ?? []).forEach((other) => {
-                L.polyline(other.line, { color: OTHER_LINE_COLOR, weight: 2, dashArray: '4 4' })
+                L.polyline(other.line, { color: OTHER_LINE_COLOR, weight: 2, dashArray: '4 4', ...SNAP_ONLY })
                     .bindTooltip(other.name, { sticky: true })
                     .addTo(map);
             });
