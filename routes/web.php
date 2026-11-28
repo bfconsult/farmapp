@@ -195,6 +195,7 @@ Route::middleware(['auth', 'property.role:admin,manager'])->group(function () {
     Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
     Route::patch('assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+    Route::post('assets/{asset}/duplicate', [AssetController::class, 'duplicate'])->name('assets.duplicate');
     Route::put('assets/{asset}/location', [AssetController::class, 'updateLocation'])->name('assets.update-location');
     Route::post('assets/{asset}/maintenance-items', [MaintenanceItemController::class, 'store'])->name('maintenance-items.store');
     Route::patch('maintenance-items/{maintenanceItem}', [MaintenanceItemController::class, 'update'])->name('maintenance-items.update');

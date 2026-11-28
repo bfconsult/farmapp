@@ -125,6 +125,24 @@ class AssetController extends Controller
         return back()->with('success', 'Location updated.');
     }
 
+    /**
+     * A new asset like this one - its type, details, description and value,
+     * named "... (copy)" - with no location, maintenance items or notes.
+     * Opens on the copy's edit form, to rename it.
+     */
+    public function duplicate(Request $request, Asset $asset)
+    {
+        abort_unless($asset->property_id === (int) session('current_property_id'), 404);
+
+        $copy = Asset::create([
+            ...$asset->only(['property_id', 'asset_type_id', 'details', 'description', 'value']),
+            'name' => "{$asset->name} (copy)",
+            'created_by' => $request->user()->id,
+        ]);
+
+        return redirect()->to(route('assets.show', $copy).'?edit=1')->with('success', 'Asset duplicated.');
+    }
+
     public function destroy(Asset $asset)
     {
         $asset->delete();

@@ -714,7 +714,7 @@ function AddMaintenanceItemForm({ asset, onClose }) {
     );
 }
 
-export default function Show({ asset, otherLines, assetTypes = [], sensors = [], recentJobs, jobsCount, usageHours, maintenanceHours, workSessions }) {
+function AssetPage({ asset, otherLines, assetTypes = [], sensors = [], recentJobs, jobsCount, usageHours, maintenanceHours, workSessions }) {
     const { currentUserRole } = usePage().props;
     const canManage = currentUserRole === 'admin' || currentUserRole === 'manager';
     const canConvert = canManage || currentUserRole === 'worker';
@@ -812,7 +812,10 @@ export default function Show({ asset, otherLines, assetTypes = [], sensors = [],
                                 <p className="text-sm text-gray-900">${formatNumber(asset.value)}</p>
                             )}
                             {canManage && (
-                                <button onClick={() => setEditing(true)} className="text-xs text-green-600 mt-2">Edit</button>
+                                <div className="flex gap-3 mt-2 text-xs">
+                                    <button onClick={() => setEditing(true)} className="text-green-600">Edit</button>
+                                    <button onClick={() => router.post(route('assets.duplicate', asset.id))} className="text-green-600">Duplicate</button>
+                                </div>
                             )}
                         </>
                     )}
@@ -1033,4 +1036,11 @@ export default function Show({ asset, otherLines, assetTypes = [], sensors = [],
             </Modal>
         </AuthenticatedLayout>
     );
+}
+
+// Keyed by the asset, so going straight from one asset's page to another's
+// (e.g. to a copy just made with Duplicate) starts afresh - its form values
+// and edit state are the new asset's, not left over from the last one.
+export default function Show(props) {
+    return <AssetPage key={props.asset.id} {...props} />;
 }

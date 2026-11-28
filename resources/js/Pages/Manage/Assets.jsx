@@ -124,6 +124,7 @@ function AssetRow({ asset, canManage, assetTypes }) {
                 {canManage && (
                     <div className="flex gap-3 mt-1 text-xs">
                         <button type="button" onClick={(e) => { e.preventDefault(); setEditing(true); }} className="text-green-600">Quick edit</button>
+                        <button type="button" onClick={(e) => { e.preventDefault(); router.post(route('assets.duplicate', asset.id)); }} className="text-green-600">Duplicate</button>
                         <button type="button" onClick={(e) => { e.preventDefault(); destroy(); }} className="text-red-500">Delete</button>
                     </div>
                 )}

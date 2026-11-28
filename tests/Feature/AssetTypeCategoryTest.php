@@ -85,3 +85,27 @@ test('the asset pages get each type\'s category', function () {
     ($this->as)()->get(route('assets.show', $asset))->assertInertia(fn ($page) => $page
         ->where('asset.asset_type.parent.name', 'Fixed'));
 });
+
+test('an asset can be duplicated, as "(copy)" with no location', function () {
+    $trough = AssetType::where('property_id', $this->property->id)->where('kind', 'trough')->sole();
+    $asset = Asset::create([
+        'property_id' => $this->property->id, 'created_by' => $this->user->id, 'name' => 'Trough 1',
+        'asset_type_id' => $trough->id, 'details' => ['trough_size' => 'round_1800', 'capacity' => 1100],
+        'description' => 'By the gate', 'value' => 450,
+    ]);
+    \App\Models\AssetLocation::create(['asset_id' => $asset->id, 'latitude' => -38.41, 'longitude' => 145.02]);
+
+    $response = ($this->as)()->post(route('assets.duplicate', $asset));
+
+    $copy = Asset::where('name', 'Trough 1 (copy)')->sole();
+    $response->assertRedirect(route('assets.show', $copy).'?edit=1');
+    expect($copy->asset_type_id)->toBe($trough->id)
+        ->and($copy->details)->toEqual(['trough_size' => 'round_1800', 'capacity' => 1100])
+        ->and($copy->description)->toBe('By the gate')
+        ->and((float) $copy->value)->toBe(450.0)
+        ->and($copy->currentLocation)->toBeNull();
+
+    $other = Property::create(['name' => 'Next door', 'address' => '2 Test Rd']);
+    $theirs = Asset::create(['property_id' => $other->id, 'created_by' => $this->user->id, 'name' => 'Theirs']);
+    ($this->as)()->post(route('assets.duplicate', $theirs))->assertNotFound();
+});
