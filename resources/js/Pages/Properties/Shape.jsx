@@ -3,6 +3,7 @@ import HelpTip from '@/Components/HelpTip';
 import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { showDrawLengths } from '@/Utils/drawLength';
 
 const ZONE_COLOR = '#7c3aed';
 const NOTE_COLOR = 'blue';
@@ -282,6 +283,7 @@ export default function Shape({ property, shape, zones, notes, fences }) {
                 cutPolygon: false,
                 removalMode: false,
             });
+            showDrawLengths(L, map);
 
             map.on('pm:create', (e) => {
                 // On the Zones tab, any drawn polygon is a new named zone,

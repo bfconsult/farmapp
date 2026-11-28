@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatDate } from '@/dateInput';
 import { formatNumber } from '@/numberFormat';
 import { pillBadgeClass } from '@/Utils/pillColors';
+import { formatLength, showDrawLengths } from '@/Utils/drawLength';
 
 const ASSET_COLOR = '#2563eb';
 
@@ -95,9 +96,6 @@ function lineLength(line) {
     return metres;
 }
 
-function formatLength(metres) {
-    return metres >= 1000 ? `${(metres / 1000).toFixed(2)} km` : `${Math.round(metres)} m`;
-}
 const ZONE_COLOR = '#7c3aed';
 
 /** Standard ray-casting point-in-polygon test - `coordinates` is a plain
@@ -328,6 +326,7 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
                     cutPolygon: false,
                     removalMode: false,
                 });
+                showDrawLengths(L, map);
 
                 // Drawing a new pin/shape no longer saves immediately - it
                 // becomes an adjustable draft (draggable marker, or an
