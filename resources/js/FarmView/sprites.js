@@ -31,24 +31,22 @@ export function makeAnimalTextures(renderer) {
         g.ellipse(17, -30, 3.5, 1.8).fill(0x3b3632);
     });
 
-    const cattle = animalTexture(renderer, (g) => {
+    // A black (Angus-style, polled) cow, with a grey muzzle so its head
+    // reads against its body.
+    const blackCow = animalTexture(renderer, (g) => {
         g.ellipse(0, 0, 30, 6).fill({ color: 0x000000, alpha: 0.15 });
         for (const x of [-25, -16, 16, 25]) {
-            g.rect(x - 2.5, -20, 5, 20).fill(0x4a2e1a);
+            g.rect(x - 2.5, -20, 5, 20).fill(0x141414);
         }
-        g.roundRect(-30, -44, 60, 26, 10).fill(0x7a4a2a).stroke({ width: 1.5, color: 0x4a2e1a });
-        g.ellipse(-8, -33, 9, 6).fill(0xf1e9dc);
-        g.roundRect(26, -52, 14, 17, 5).fill(0x6b3f22).stroke({ width: 1.5, color: 0x4a2e1a });
-        g.rect(28, -56, 2, 5).fill(0xe8e0d0);
-        g.rect(36, -56, 2, 5).fill(0xe8e0d0);
+        g.roundRect(-30, -44, 60, 26, 10).fill(0x262626).stroke({ width: 1.5, color: 0x0a0a0a });
+        g.ellipse(-6, -38, 16, 4).fill({ color: 0xffffff, alpha: 0.12 });
+        g.roundRect(26, -52, 14, 17, 5).fill(0x1f1f1f).stroke({ width: 1.5, color: 0x0a0a0a });
+        g.roundRect(32, -41, 9, 7, 3).fill(0x6b6b6b);
+        g.ellipse(27, -50, 3, 2).fill(0x1f1f1f);
     });
 
-    return { sheep, cattle };
-}
-
-// Which animal a mob's livestock type looks like.
-export function animalFor(type) {
-    return /cattle|cow|steer|heifer|bull|calf|calves|ox/i.test(type ?? '') ? 'cattle' : 'sheep';
+    // Keyed as LIVESTOCK_SPRITES (Utils/livestockSprites.js).
+    return { sheep_white: sheep, cow_black: blackCow };
 }
 
 function line(g, from, to, width, color) {

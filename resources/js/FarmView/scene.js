@@ -20,7 +20,8 @@
 import { Application, Container, Graphics, MeshSimple, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import { area, bounds, centroid, contains, iso, makeProjection, nearestEdge, randomPointIn, seededRandom } from './geo';
 import { contourInterval, contourLabelSpots, contourSegments, densify, groundHeight, makeTerrain, shading } from './terrain';
-import { TEXTURE_PX_PER_METRE, animalFor, drawGate, drawPump, drawTank, drawTrough, makeAnimalTextures, makeLabel } from './sprites';
+import { isCattleSprite, spriteForType } from '@/Utils/livestockSprites';
+import { TEXTURE_PX_PER_METRE, drawGate, drawPump, drawTank, drawTrough, makeAnimalTextures, makeLabel } from './sprites';
 import { makePlantTextures, plantScale, plantSpots, plantTint } from './vegetation';
 
 // Pixels per metre at which more detail appears.
@@ -671,7 +672,7 @@ export class FarmScene {
         for (const mob of mobs) {
             const zone = this.zones.find((z) => z.id === mob.zone_id);
             if (!zone) continue;
-            const kind = animalFor(mob.type);
+            const kind = JSON.stringify(mob.sprites ?? []);
             const key = `${mob.id}:${zone.id}:${mob.count}:${kind}`;
             seen.add(key);
             if (this.herds.has(key)) {
@@ -692,19 +693,25 @@ export class FarmScene {
     makeHerd(mob, zone, kind) {
         const random = seededRandom(mob.id * 104729 + zone.id);
         const count = Math.min(mob.count, MAX_ANIMALS);
-        const spread = Math.max(6, Math.sqrt(count) * (kind === 'cattle' ? 3.5 : 2.4));
+        // Each animal's sprite, in proportion when there are more than are
+        // drawn; the mob's main one sets how much room it needs.
+        const sprites = this.spritesFor(mob, count);
+        const main = sprites[0] ?? spriteForType(mob.type);
+        const cattle = isCattleSprite(main);
+        const spread = Math.max(6, Math.sqrt(count) * (cattle ? 3.5 : 2.4));
         const centre = randomPointIn(zone.polygon, random, centroid(zone.polygon), spread * 2);
-        const { texture, anchor } = this.textures[kind];
+        const { texture } = this.textures[main] ?? this.textures.sheep_white;
 
-        const animals = Array.from({ length: count }, () => {
+        const animals = sprites.map((name) => {
             const at = randomPointIn(zone.polygon, random, centre, spread);
+            const { texture, anchor } = this.textures[name] ?? this.textures.sheep_white;
             const sprite = new Sprite(texture);
             sprite.anchor.set(anchor.x, anchor.y);
             this.objects.addChild(sprite);
             return { sprite, x: at.x, y: at.y, facing: random() < 0.5 ? -1 : 1, target: null, pause: random() * 8, speed: 0.35 + random() * 0.3 };
         });
 
-        const noun = kind === 'cattle' ? 'cattle' : 'sheep';
+        const noun = cattle ? 'cattle' : 'sheep';
         const label = makeLabel(mob.name, `${mob.count} ${mob.type ? mob.type.toLowerCase() : noun}`, 'active');
         label.eventMode = 'static';
         label.cursor = 'pointer';
@@ -719,6 +726,20 @@ export class FarmScene {
         };
         this.sizeHerd(herd);
         return herd;
+    }
+
+    // The sprite of each of a mob's `count` drawn animals, from how many
+    // are drawn as each (mob.sprites), shared out in proportion.
+    spritesFor(mob, count) {
+        const groups = (mob.sprites?.length ? mob.sprites : [{ sprite: spriteForType(mob.type), count: mob.count }])
+            .filter((group) => group.count > 0);
+        const total = groups.reduce((sum, group) => sum + group.count, 0) || 1;
+        const sprites = [];
+        groups.forEach((group, i) => {
+            const share = i === groups.length - 1 ? count - sprites.length : Math.max(1, Math.round((group.count / total) * count));
+            for (let n = 0; n < share && sprites.length < count; n++) sprites.push(group.sprite);
+        });
+        return sprites;
     }
 
     // How big a mob's animals are drawn at this zoom, and whether they're

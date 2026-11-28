@@ -93,8 +93,10 @@ class FarmViewController extends Controller
     }
 
     /**
-     * Mobs in a paddock: {id, name, zone_id, count, type} - the count is
-     * its animals still on the property, the type their most common one.
+     * Mobs in a paddock: {id, name, zone_id, count, type, sprites} - the
+     * count is its animals still on the property, the type their most
+     * common one, and sprites how many are drawn as each (an animal's own
+     * sprite, else the mob's, else one picked by its type), most first.
      */
     private function mobs(?int $propertyId): array
     {
@@ -107,17 +109,22 @@ class FarmViewController extends Controller
                 $animals = Livestock::where('livestock.mob_id', $mob->id)
                     ->where(fn ($query) => $query->whereNull('livestock.status')->orWhere('livestock.status', 'active'))
                     ->leftJoin('livestock_types', 'livestock_types.id', '=', 'livestock.livestock_type_id')
-                    ->selectRaw('livestock_types.name as type, count(*) as count')
-                    ->groupBy('livestock_types.name')
-                    ->orderByDesc('count')
+                    ->selectRaw('livestock_types.name as type, livestock.sprite, count(*) as count')
+                    ->groupBy('livestock_types.name', 'livestock.sprite')
                     ->get();
+                $types = $animals->groupBy('type')->map->sum('count')->sortDesc();
+                $sprites = $animals
+                    ->groupBy(fn ($row) => $row->sprite ?? $mob->sprite ?? Livestock::spriteForType($row->type))
+                    ->map->sum('count')
+                    ->sortDesc();
 
                 return [
                     'id' => $mob->id,
                     'name' => $mob->name,
                     'zone_id' => $mob->currentZone->zone_id,
                     'count' => (int) $animals->sum('count'),
-                    'type' => $animals->first()?->type,
+                    'type' => $types->keys()->first() ?: null,
+                    'sprites' => $sprites->map(fn ($count, $sprite) => ['sprite' => $sprite, 'count' => (int) $count])->values()->all(),
                 ];
             })
             ->values()

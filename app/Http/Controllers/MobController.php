@@ -42,6 +42,8 @@ class MobController extends Controller
 
         $mob->update($request->validate([
             'name' => 'required|string|max:255',
+            // How its animals are drawn in the farm view; null picks by type.
+            'sprite' => ['nullable', Rule::in(array_keys(Livestock::SPRITES))],
         ]));
 
         return back()->with('success', 'Mob updated.');

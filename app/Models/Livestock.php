@@ -10,10 +10,27 @@ class Livestock extends Model
     // convention would otherwise guess "livestocks" for the table name.
     protected $table = 'livestock';
 
+    /**
+     * How an animal's drawn in the farm view - set on its mob, or on the
+     * animal where it differs. Matches LIVESTOCK_SPRITES in
+     * resources/js/Utils/livestockSprites.js and the farm view's textures.
+     */
+    public const SPRITES = [
+        'sheep_white' => 'White sheep',
+        'cow_black' => 'Black cow',
+    ];
+
+    /** The sprite for a livestock type's name, when none has been picked. */
+    public static function spriteForType(?string $type): string
+    {
+        return preg_match('/cattle|cow|steer|heifer|bull|calf|calves|ox/i', $type ?? '') ? 'cow_black' : 'sheep_white';
+    }
+
     protected $fillable = [
         'property_id',
         'livestock_type_id',
         'mob_id',
+        'sprite',
         'created_by',
         'tag_number',
         'name',

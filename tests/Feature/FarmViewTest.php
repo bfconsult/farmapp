@@ -52,7 +52,7 @@ test('it has the paddocks, each mob in its paddock with its head count, and the 
         ->component('FarmView')
         ->has('zones', 1)
         ->where('zones.0.name', 'TCL')
-        ->where('mobs', [['id' => $mob->id, 'name' => 'Ewes', 'zone_id' => $paddock->id, 'count' => 2, 'type' => 'Sheep']])
+        ->where('mobs', [['id' => $mob->id, 'name' => 'Ewes', 'zone_id' => $paddock->id, 'count' => 2, 'type' => 'Sheep', 'sprites' => [['sprite' => 'sheep_white', 'count' => 2]]]])
         ->has('props', 1)
         ->where('props.0.name', 'Gate')
         ->where('props.0.kind', 'gate')
@@ -120,4 +120,32 @@ test('a failed fetch of the heights says so', function () {
         ->assertSessionHas('error');
 
     expect(PropertyTerrain::count())->toBe(0);
+});
+
+test("each mob says how many of its animals are drawn as each sprite: the animal's own, else the mob's, else by type", function () {
+    $paddock = Zone::create(['property_id' => $this->property->id, 'name' => 'TCL', 'coordinates' => [[-38.41, 145.02], [-38.41, 145.03], [-38.42, 145.03]]]);
+    $cattle = LivestockType::create(['property_id' => $this->property->id, 'name' => 'Cattle']);
+    $mob = Mob::create(['property_id' => $this->property->id, 'created_by' => $this->user->id, 'name' => 'Steers']);
+    MobZoneHistory::create(['mob_id' => $mob->id, 'zone_id' => $paddock->id, 'created_by' => $this->user->id]);
+    foreach (range(1, 3) as $i) {
+        Livestock::create(['property_id' => $this->property->id, 'mob_id' => $mob->id, 'livestock_type_id' => $cattle->id, 'created_by' => $this->user->id, 'tag_number' => "C{$i}"]);
+    }
+    $odd = Livestock::where('tag_number', 'C3')->sole();
+
+    // Picked by type: cattle are black cows.
+    farmView($this)->assertInertia(fn ($page) => $page->where('mobs.0.sprites', [['sprite' => 'cow_black', 'count' => 3]]));
+
+    // Set on the mob, then one animal changed on its own.
+    $this->actingAs($this->user)->withSession(['current_property_id' => $this->property->id])
+        ->patch(route('mobs.update', $mob), ['name' => 'Steers', 'sprite' => 'sheep_white'])->assertSessionHasNoErrors();
+    $this->actingAs($this->user)->withSession(['current_property_id' => $this->property->id])
+        ->patch(route('livestock.update', $odd), ['tag_number' => 'C3', 'mob_id' => $mob->id, 'sprite' => 'cow_black'])->assertSessionHasNoErrors();
+
+    farmView($this)->assertInertia(fn ($page) => $page->where('mobs.0.sprites', [
+        ['sprite' => 'sheep_white', 'count' => 2],
+        ['sprite' => 'cow_black', 'count' => 1],
+    ]));
+
+    $this->actingAs($this->user)->withSession(['current_property_id' => $this->property->id])
+        ->patch(route('mobs.update', $mob), ['name' => 'Steers', 'sprite' => 'unicorn'])->assertSessionHasErrors('sprite');
 });

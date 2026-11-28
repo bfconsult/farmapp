@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Mob extends Model
 {
-    protected $fillable = ['property_id', 'created_by', 'name'];
+    protected $fillable = ['property_id', 'created_by', 'name', 'sprite'];
 
     public function property()
     {

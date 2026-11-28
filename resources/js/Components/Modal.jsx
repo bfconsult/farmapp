@@ -24,6 +24,9 @@ export default function Modal({
         lg: 'max-w-lg',
         xl: 'max-w-xl',
         '2xl': 'max-w-2xl',
+        // A normal (lg) dialog on phones and tablets; on a laptop or wider,
+        // the whole screen less a margin - for a map to work in.
+        screen: 'sm:max-w-lg lg:max-w-none lg:mx-6 lg:mb-0 lg:h-[calc(100dvh-3rem)] lg:flex lg:flex-col',
     }[maxWidth];
 
     return (

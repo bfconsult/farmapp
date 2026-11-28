@@ -365,7 +365,14 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
             }
         });
 
+        // The map fills its dialog, which is full screen on a laptop and
+        // settles into size as it opens - Leaflet needs telling when its
+        // box changes size, or it leaves tiles missing.
+        const resize = new ResizeObserver(() => mapInstance.current?.invalidateSize());
+        resize.observe(mapRef.current);
+
         return () => {
+            resize.disconnect();
             if (mapInstance.current) {
                 mapInstance.current.remove();
                 mapInstance.current = null;
@@ -398,7 +405,7 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
     };
 
     return (
-        <div>
+        <div className="lg:flex lg:flex-col lg:flex-1 lg:min-h-0">
             {zones && zones.length > 0 && (
                 <div className="flex items-center justify-between mb-2 px-2 py-1.5 rounded-lg bg-gray-50 border border-gray-200">
                     <span className="flex items-center gap-1.5 text-xs font-medium text-gray-600">
@@ -429,7 +436,8 @@ function LocationEditorMap({ asset, propertyBoundary, zones, otherLines, canMana
                     For a fence, pipe or track, draw a line: click along it and click the last point again to finish. Points snap to paddock corners and other fences.
                 </p>
             )}
-            <div ref={mapRef} style={{ height: '350px' }} />
+            {/* 350px in the small dialog on a phone; the rest of the screen on a laptop. */}
+            <div ref={mapRef} className="h-[350px] lg:h-auto lg:flex-1 lg:min-h-0" />
             {pendingPayload && (
                 <div className="flex gap-2 mt-3">
                     <button onClick={saveDraft} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium">Done</button>
@@ -874,8 +882,8 @@ function AssetPage({ asset, otherLines, assetTypes = [], sensors = [], recentJob
                     </div>
                 )}
 
-                <Modal show={showLocationModal} onClose={() => setShowLocationModal(false)} maxWidth="lg">
-                    <div className="p-4">
+                <Modal show={showLocationModal} onClose={() => setShowLocationModal(false)} maxWidth="screen">
+                    <div className="p-4 lg:flex lg:flex-col lg:flex-1 lg:min-h-0">
                         <div className="flex items-center justify-between mb-3">
                             <h3 className="text-sm font-medium text-gray-700">Location</h3>
                             <button onClick={() => setShowLocationModal(false)} className="text-sm text-gray-500">Close</button>

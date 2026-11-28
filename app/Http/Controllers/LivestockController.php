@@ -94,7 +94,7 @@ class LivestockController extends Controller
             'livestock' => $livestock,
             'offspring' => $livestock->offspring()->orderBy('tag_number')->get(),
             'potentialParents' => $potentialParents,
-            'mobs' => Mob::where('property_id', $currentPropertyId)->orderBy('name')->get(['id', 'name']),
+            'mobs' => Mob::where('property_id', $currentPropertyId)->orderBy('name')->get(['id', 'name', 'sprite']),
             // Lets the back link return to whichever Livestock tab the user
             // actually came from, instead of always landing on Mobs.
             'backTab' => $request->query('tab') === 'animals' ? 'animals' : null,
@@ -124,6 +124,8 @@ class LivestockController extends Controller
             'status' => 'nullable|in:active,sold,deceased,culled',
             'livestock_type_id' => ['nullable', Rule::exists('livestock_types', 'id')->where('property_id', $currentPropertyId)],
             'mob_id' => ['nullable', Rule::exists('mobs', 'id')->where('property_id', $currentPropertyId)],
+            // Null draws it as its mob's animals are.
+            'sprite' => ['nullable', Rule::in(array_keys(Livestock::SPRITES))],
             'sire_id' => [
                 'nullable',
                 Rule::exists('livestock', 'id')->where('property_id', $currentPropertyId),

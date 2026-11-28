@@ -8,6 +8,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import { compressImageFiles } from '@/imageCompression';
 import { formatDate } from '@/dateInput';
+import { LIVESTOCK_SPRITES } from '@/Utils/livestockSprites';
 
 const STATUS_BADGE = {
     active: 'bg-green-100 text-green-700',
@@ -135,6 +136,22 @@ function AnimalFields({ values, setValues, mobs, errors }) {
                     <option key={mob.id} value={mob.id}>{mob.name}</option>
                 ))}
             </select>
+            <div>
+                <label className="block text-xs text-gray-500 mb-1">Shown in the farm view as</label>
+                <select
+                    value={values.sprite ?? ''}
+                    onChange={(e) => setValues({ ...values, sprite: e.target.value })}
+                    className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                >
+                    {(() => {
+                        const mob = mobs.find((m) => String(m.id) === String(values.mob_id));
+                        return <option value="">Same as its mob{mob?.sprite ? ` (${LIVESTOCK_SPRITES[mob.sprite] ?? mob.sprite})` : ''}</option>;
+                    })()}
+                    {Object.entries(LIVESTOCK_SPRITES).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                    ))}
+                </select>
+            </div>
         </div>
     );
 }
@@ -162,6 +179,7 @@ export default function Show({ livestock, offspring, potentialParents, mobs, bac
         purchase_price_type: livestock.purchase_price_type ?? '',
         purchase_price: livestock.purchase_price ?? '',
         mob_id: livestock.mob_id ?? '',
+        sprite: livestock.sprite ?? '',
     });
 
     const [status, setStatus] = useState(livestock.status);

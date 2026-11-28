@@ -5,16 +5,33 @@ import AddNoteForm from '@/Components/AddNoteForm';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { formatDate } from '@/dateInput';
+import { LIVESTOCK_SPRITES } from '@/Utils/livestockSprites';
 
 function MobFields({ values, setValues }) {
     return (
-        <input
-            type="text"
-            value={values.name}
-            onChange={(e) => setValues({ ...values, name: e.target.value })}
-            className="w-full border-gray-300 rounded-lg p-2 text-sm"
-            placeholder="Mob name"
-        />
+        <div className="space-y-3">
+            <input
+                type="text"
+                value={values.name}
+                onChange={(e) => setValues({ ...values, name: e.target.value })}
+                className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                placeholder="Mob name"
+            />
+            <div>
+                <label className="block text-xs text-gray-500 mb-1">Shown in the farm view as</label>
+                <select
+                    value={values.sprite ?? ''}
+                    onChange={(e) => setValues({ ...values, sprite: e.target.value })}
+                    className="w-full border-gray-300 rounded-lg p-2 text-sm"
+                >
+                    <option value="">Picked by livestock type</option>
+                    {Object.entries(LIVESTOCK_SPRITES).map(([key, label]) => (
+                        <option key={key} value={key}>{label}</option>
+                    ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">Each animal can be changed on its own page.</p>
+            </div>
+        </div>
     );
 }
 
@@ -24,7 +41,7 @@ export default function Show({ mob }) {
     const canCreateNote = canManage || currentUserRole === 'worker';
 
     const [editing, setEditing] = useState(false);
-    const [values, setValues] = useState({ name: mob.name });
+    const [values, setValues] = useState({ name: mob.name, sprite: mob.sprite ?? '' });
 
     const today = new Date().toISOString().slice(0, 10);
 
