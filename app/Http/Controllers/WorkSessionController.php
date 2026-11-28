@@ -98,6 +98,9 @@ class WorkSessionController extends Controller
             'assets' => Asset::where('property_id', $currentPropertyId)->orderBy('name')->get(),
             'jobEquipment' => $this->equipmentByJob($plannedJobs),
             'billingBlockMinutes' => Auth::user()->billing_block_minutes,
+            // Where a session started now would begin - after the end of
+            // one just stopped, if that's later than now rounded down.
+            'startsAt' => Auth::user()->startOfNewSession()->toIso8601String(),
         ]);
     }
 
@@ -136,7 +139,7 @@ class WorkSessionController extends Controller
         $validated['user_id'] = Auth::id();
         $validated['property_id'] = session('current_property_id');
         $validated['started_at'] = $validated['started_at']
-            ?? Auth::user()->floorToBillingBlock(now());
+            ?? Auth::user()->startOfNewSession();
         $validated['status'] = WorkSession::DRAFT;
 
         $session = WorkSession::create($validated);
@@ -360,7 +363,15 @@ class WorkSessionController extends Controller
             404
         );
 
-        $workSession->update(['ended_at' => now()]);
+        // Ends at now rounded up to the worker's billing block - what its
+        // duration's billed to anyway - so the saved end time matches, and
+        // a session started next begins there (see startOfNewSession()).
+        $user = $workSession->user ?? Auth::user();
+        $endedAt = $user->ceilToBillingBlock(now());
+        if ($endedAt->lte($workSession->started_at)) {
+            $endedAt = $workSession->started_at->clone()->addMinutes($user->billing_block_minutes ?: 1);
+        }
+        $workSession->update(['ended_at' => $endedAt]);
 
         // Only ever posted from the session's own Show page, so the browser's
         // Referer (which back() reads) is always that same page - including

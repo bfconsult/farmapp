@@ -204,8 +204,39 @@ class User extends Authenticatable
             return $time;
         }
 
-        $flooredMinute = intdiv($time->minute, $this->billing_block_minutes) * $this->billing_block_minutes;
+        // Blocks line up with the hour in the user's own timezone (offsets
+        // like Adelaide's +10:30 aren't whole hours), whatever the time's in.
+        $local = $time->clone()->setTimezone($this->displayTimezone());
+        $flooredMinute = intdiv($local->minute, $this->billing_block_minutes) * $this->billing_block_minutes;
 
-        return $time->clone()->setTime($time->hour, $flooredMinute, 0);
+        return $local->setTime($local->hour, $flooredMinute, 0)->setTimezone($time->getTimezone());
+    }
+
+    /**
+     * Round the given time up to this user's billing block boundary (2:07
+     * becomes 2:15) - where a session stopped now ends, matching how its
+     * duration is billed. A time already on a boundary stays put.
+     */
+    public function ceilToBillingBlock(\Illuminate\Support\Carbon $time): \Illuminate\Support\Carbon
+    {
+        $floored = $this->floorToBillingBlock($time);
+
+        return $floored->lt($time) ? $floored->addMinutes($this->billing_block_minutes) : $floored;
+    }
+
+    /**
+     * When a session started now begins: now, rounded down to the billing
+     * block - but not before the end of a session this user has just
+     * stopped (whose end was rounded up), so the two don't overlap.
+     */
+    public function startOfNewSession(): \Illuminate\Support\Carbon
+    {
+        $start = $this->floorToBillingBlock(now());
+        $lastEnd = WorkSession::where('user_id', $this->id)
+            ->where('started_at', '<=', now())
+            ->where('ended_at', '>', $start)
+            ->max('ended_at');
+
+        return $lastEnd ? \Illuminate\Support\Carbon::parse($lastEnd) : $start;
     }
 }

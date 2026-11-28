@@ -12,7 +12,15 @@ import {
     floorToBillingBlock,
 } from '@/dateInput';
 
-export default function Create({ plannedJobs, assets, jobEquipment, billingBlockMinutes }) {
+export default function Create({ plannedJobs, assets, jobEquipment, billingBlockMinutes, startsAt }) {
+    // Now rounded down to the billing block, but not before the end of a
+    // session just stopped (its end was rounded up) - matches the start
+    // store() gives a session started now.
+    const startFor = (date) => {
+        const floored = floorToBillingBlock(date, billingBlockMinutes);
+        const earliest = startsAt ? new Date(startsAt) : null;
+        return earliest && earliest > floored ? earliest : floored;
+    };
     const { data, setData, post, processing, errors, transform } = useForm({
         description: '',
         farm_job_id: '',
@@ -53,7 +61,7 @@ export default function Create({ plannedJobs, assets, jobEquipment, billingBlock
         // Seed the start with "now" (same value the 'now' mode was already
         // showing) so the common case - adjusting just the date or nudging
         // the time slightly - only needs a small tweak, not a fresh entry.
-        const floored = splitLocalValue(toLocalInputValue(floorToBillingBlock(new Date(), billingBlockMinutes).toISOString()));
+        const floored = splitLocalValue(toLocalInputValue(startFor(new Date()).toISOString()));
         setData((prev) => ({ ...prev, started_date: floored.date, started_time: floored.time }));
     };
 
@@ -68,7 +76,7 @@ export default function Create({ plannedJobs, assets, jobEquipment, billingBlock
         return () => clearInterval(interval);
     }, [mode]);
 
-    const displayedStartTime = floorToBillingBlock(now, billingBlockMinutes);
+    const displayedStartTime = startFor(now);
 
     useEffect(() => {
         if (navigator.geolocation) {
