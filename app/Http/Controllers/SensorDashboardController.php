@@ -47,8 +47,9 @@ class SensorDashboardController extends Controller
                 'i' => $item['i'],
                 'x' => (int) $item['x'],
                 'y' => (int) $item['y'],
-                // Snapped to a size a tile is designed for.
-                ...$this->snap((int) $item['w'], (int) $item['h']),
+                // 1 or 2 each way (validated): small, tall, wide or large.
+                'w' => (int) $item['w'],
+                'h' => (int) $item['h'],
             ])
             ->values()
             ->all();
@@ -56,12 +57,6 @@ class SensorDashboardController extends Controller
         $this->role($request)?->update(['sensor_dashboard' => $layout]);
 
         return back();
-    }
-
-    /** The nearest tile size: one column wide is always small. */
-    private function snap(int $w, int $h): array
-    {
-        return $w === 1 ? ['w' => 1, 'h' => 1] : ['w' => 2, 'h' => $h];
     }
 
     private function role(Request $request): ?Role

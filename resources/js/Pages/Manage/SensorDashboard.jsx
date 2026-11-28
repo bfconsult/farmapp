@@ -11,8 +11,10 @@ import 'react-resizable/css/styles.css';
 // The sensor dashboard: a tile per tank, gate and pump sensor (built by
 // App\Services\Lorawan\SensorTiles), which each person drags and resizes
 // for themselves on a wide screen. Their layout is kept for four columns;
-// narrower screens flow the tiles in the same order. Tiles come in three
-// sizes, each designed for: small (1x1), medium (2x1) and large (2x2).
+// narrower screens flow the tiles in the same order. Tiles come in four
+// sizes, each designed for: small (1x1), tall (1x2 - small with a calendar
+// of the last five weeks under it), wide (2x1 - small with the calendar
+// beside it) and large (2x2).
 
 const ROW_HEIGHT = 150;
 const MARGIN = [12, 12];
@@ -24,11 +26,16 @@ function columnsFor(width) {
     return 1;
 }
 
-// 'S', 'M' or 'L' from a layout item's size.
-const sizeOf = (item) => (!item || item.w === 1 ? 'S' : item.h === 2 ? 'L' : 'M');
+// 'S', 'T', 'M' or 'L' from a layout item's size.
+const sizeOf = (item) => {
+    if (!item) return 'S';
+    if (item.w === 1) return item.h === 2 ? 'T' : 'S';
+    return item.h === 2 ? 'L' : 'M';
+};
 
-// One column wide is always small; two wide is medium or large.
-const snap = (item) => (item.w <= 1 ? { ...item, w: 1, h: 1 } : { ...item, w: 2, h: Math.min(2, Math.max(1, item.h)) });
+// One or two columns wide, one or two rows high.
+const clamp = (n) => Math.min(2, Math.max(1, n));
+const snap = (item) => ({ ...item, w: clamp(item.w), h: clamp(item.h) });
 
 // The saved four-column layout for the tiles there are now: saved ones as
 // they were, new ones added small at the end.
@@ -130,7 +137,7 @@ export default function SensorDashboard({ tiles, layout: savedLayout, canManage 
                 </div>
                 {editing && (
                     <p className="text-xs text-gray-500 mb-2">
-                        Drag a tile to move it; drag its corner to make it small, wide or large. Done saves the layout - it's just yours.
+                        Drag a tile to move it; drag its corner to make it small, tall (with a calendar), wide or large. Done saves the layout - it's just yours.
                     </p>
                 )}
                 {!editing && tiles.length > 0 && cols < 4 && (
@@ -182,10 +189,26 @@ function Tile({ tile, size, editing, canManage }) {
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">Not reporting</span>
                 )}
             </div>
-            <div className="flex-1 min-h-0 mt-2">
-                {Body ? <Body tile={tile} size={size} /> : null}
+            <div className="flex-1 min-h-0 mt-2 flex flex-col">
+                {size === 'T' ? (
+                    <>
+                        <div className="h-[92px] flex-none">{Body ? <Body tile={tile} size="S" /> : null}</div>
+                        <div className="flex-1 min-h-0 border-t border-gray-100 pt-2">
+                            <ActivityCalendar tile={tile} />
+                        </div>
+                    </>
+                ) : size === 'M' ? (
+                    <div className="h-full grid grid-cols-2 gap-3">
+                        <div className="min-w-0">{Body ? <Body tile={tile} size="S" /> : null}</div>
+                        <div className="min-w-0 border-l border-gray-100 pl-3">
+                            <ActivityCalendar tile={tile} compact />
+                        </div>
+                    </div>
+                ) : (
+                    Body ? <Body tile={tile} size={size} /> : null
+                )}
             </div>
-            {size !== 'S' && (
+            {size === 'L' && (
                 <p className="text-[11px] text-gray-400 mt-1">
                     Last reading {timeAgo(tile.last_reading_at)}
                     {tile.battery !== null && tile.battery !== undefined && ` · Battery ${tile.battery} V`}
@@ -366,6 +389,76 @@ function DayBars({ days, colour, format }) {
                     </span>
                 </div>
             ))}
+        </div>
+    );
+}
+
+// The last five weeks, a square per day (weeks from Monday), shaded by the
+// day's activity: a gate's openings, a pump's hours running, a tank's
+// lowest level (amber below its warning level).
+// `compact` (beside a wide tile's figures, in one row's height) leaves out
+// the day numbers, which don't fit.
+function ActivityCalendar({ tile, compact = false }) {
+    const days = tile.calendar ?? [];
+    if (!days.length) return null;
+    const today = days[days.length - 1].date;
+    const most = Math.max(1, ...days.map((day) => day.value ?? 0));
+    const weeks = [];
+    days.forEach((day, i) => {
+        if (i % 7 === 0) weeks.push([]);
+        weeks[weeks.length - 1].push(day);
+    });
+    while (weeks[weeks.length - 1].length < 7) weeks[weeks.length - 1].push(null);
+
+    const describe = {
+        gate: (v) => `${v} opening${v === 1 ? '' : 's'}`,
+        pump: (v) => `${(v / 3600).toFixed(1)} h running`,
+        tank: (v) => `lowest ${Math.round(v)}%`,
+    }[tile.kind] ?? ((v) => `${v}`);
+    const caption = { gate: 'Openings a day', pump: 'Hours run a day', tank: 'Lowest level each day' }[tile.kind];
+
+    const shade = (value) => {
+        if (value === null || value === undefined) return { backgroundColor: '#f3f4f6' };
+        if (tile.kind === 'tank') {
+            const low = tile.warn_below && value < tile.warn_below;
+            return { backgroundColor: low ? '#f59e0b' : `rgba(2, 132, 199, ${0.15 + 0.85 * (value / 100)})` };
+        }
+        if (!value) return { backgroundColor: '#e5e7eb' };
+        const strength = 0.25 + 0.75 * (value / most);
+        return { backgroundColor: tile.kind === 'gate' ? `rgba(245, 158, 11, ${strength})` : `rgba(37, 99, 235, ${strength})` };
+    };
+    const month = (date) => new Date(`${date}T12:00:00`).toLocaleDateString([], { month: 'short' });
+    const months = month(days[0].date) === month(today) ? month(today) : `${month(days[0].date)} - ${month(today)}`;
+
+    return (
+        <div className="h-full flex flex-col">
+            <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+                <span>{caption}</span>
+                <span>{months}</span>
+            </div>
+            <div className="grid grid-cols-7 gap-[3px] text-[9px] text-gray-400 text-center mb-[3px]">
+                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i}>{d}</span>)}
+            </div>
+            <div className="flex-1 min-h-0 grid gap-[3px]" style={{ gridTemplateRows: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
+                {weeks.map((week, w) => (
+                    <div key={w} className="grid grid-cols-7 gap-[3px]">
+                        {week.map((day, d) => day ? (
+                            <div
+                                key={d}
+                                className={`rounded-sm flex items-center justify-center text-[9px] ${day.date === today ? 'ring-2 ring-gray-700' : ''}`}
+                                style={shade(day.value)}
+                                title={`${new Date(`${day.date}T12:00:00`).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}: ${day.value === null ? 'no readings' : describe(day.value)}`}
+                            >
+                                {!compact && (
+                                    <span className={day.value && (tile.kind !== 'tank' || day.value > 55) ? 'text-white/90' : 'text-gray-500'}>
+                                        {Number(day.date.slice(8))}
+                                    </span>
+                                )}
+                            </div>
+                        ) : <div key={d} />)}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

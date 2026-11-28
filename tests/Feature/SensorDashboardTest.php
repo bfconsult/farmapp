@@ -57,16 +57,16 @@ test('gate and pump tiles have their state and a week by day', function () {
         }));
 });
 
-test('each person\'s layout is their own, snapped to the tile sizes', function () {
+test('each person\'s layout is their own, in the tile sizes', function () {
     ($this->as)()->put(route('manage.sensor-dashboard.layout'), ['layout' => [
         ['i' => (string) $this->tank->id, 'x' => 0, 'y' => 0, 'w' => 2, 'h' => 2],
-        // One column wide is always small.
+        // Tall: small with a calendar under it.
         ['i' => (string) $this->gate->id, 'x' => 2, 'y' => 0, 'w' => 1, 'h' => 2],
     ]])->assertSessionHasNoErrors();
 
     expect($this->role->fresh()->sensor_dashboard)->toEqual([
         ['i' => (string) $this->tank->id, 'x' => 0, 'y' => 0, 'w' => 2, 'h' => 2],
-        ['i' => (string) $this->gate->id, 'x' => 2, 'y' => 0, 'w' => 1, 'h' => 1],
+        ['i' => (string) $this->gate->id, 'x' => 2, 'y' => 0, 'w' => 1, 'h' => 2],
     ]);
 
     $manager = User::factory()->create(['claimed_at' => now()]);
@@ -82,4 +82,22 @@ test('each person\'s layout is their own, snapped to the tile sizes', function (
 
 test('the Manage page links to it for everyone when there are sensors with tiles', function () {
     ($this->as)()->get(route('manage.index'))->assertInertia(fn ($page) => $page->where('dashboardSensorsCount', 3));
+});
+
+test('each tile has a calendar from the Monday four weeks back to today, with the day\'s activity', function () {
+    ($this->as)()->get(route('manage.sensor-dashboard'))->assertInertia(fn ($page) => $page
+        ->where('tiles', function ($tiles) {
+            $today = now($this->worker->displayTimezone())->toDateString();
+            foreach ($tiles as $tile) {
+                $first = \Illuminate\Support\Carbon::parse($tile['calendar'][0]['date']);
+                if (! $first->isMonday() || end($tile['calendar'])['date'] !== $today || count($tile['calendar']) < 29) {
+                    return false;
+                }
+            }
+            $tank = collect($tiles)->firstWhere('kind', 'tank');
+            $gate = collect($tiles)->firstWhere('kind', 'gate');
+
+            // The tank's lowest level today; the gate's one opening.
+            return end($tank['calendar'])['value'] == 50 && end($gate['calendar'])['value'] == 1;
+        }));
 });

@@ -11,19 +11,26 @@ use Illuminate\Support\Collection;
  * tile picks what fits (Manage/SensorDashboard.jsx). Built from the same
  * activity classes as each kind's own page, so the two always agree.
  *
- * Every tile: {id, kind, name, state, reporting, last_reading_at, battery}
- * plus its kind's own:
- *   tank: {percent, litres, capacity, low, configured, change_per_hour, levels}
+ * Every tile: {id, kind, name, state, reporting, last_reading_at, battery,
+ * calendar} plus its kind's own:
+ *   tank: {percent, litres, capacity, low, configured, warn_below, change_per_hour, levels}
  *   gate: {open, since, openings_today, open_periods_today, openings_by_day}
  *   pump: {running, since, current, seconds_today, runs_today, seconds_by_day}
+ *
+ * `calendar` is a value per day, [{date, value}], from the Monday four
+ * weeks before this week's to today - for a tall tile's calendar: a tank's
+ * lowest level that day (%), a gate's openings, a pump's seconds running.
  */
 class SensorTiles
 {
     /** The kinds that have a tile, for now. */
     public const KINDS = ['tank', 'gate', 'pump'];
 
-    /** Days of history a large tile shows. */
+    /** Days of history a large tile's chart shows. */
     private const DAYS = 7;
+
+    /** Weeks before this one a tall tile's calendar shows. */
+    private const CALENDAR_WEEKS = 4;
 
     public function __construct(private string $timezone) {}
 
@@ -46,16 +53,23 @@ class SensorTiles
         $status = $activity?->status();
         $battery = $device->readings()->where('metric', 'battery')->latest('recorded_at')->latest('id')->first();
 
+        $history = $this->history($activity);
+        // A tank's day is its lowest level; the others' are a count or a total.
+        $days = $device->kind === 'tank'
+            ? array_map(fn ($day) => $day['min'], $history['levels'] ?? [])
+            : ($history['days'] ?? []);
+
         return [
             'id' => $device->id,
             'kind' => $device->kind,
             'name' => $device->displayName(),
             'state' => SensorKinds::state($device),
             'battery' => $battery ? round($battery->value, 2) : null,
+            'calendar' => $this->calendar($days),
             ...match ($device->kind) {
                 'tank' => $this->tank($device, $status),
-                'gate' => $this->gate($device, $activity, $status),
-                'pump' => $this->pump($activity, $status),
+                'gate' => $this->gate($device, $history, $status),
+                'pump' => $this->pump($history, $status),
                 default => [],
             },
         ];
@@ -94,6 +108,7 @@ class SensorTiles
             'capacity' => TankActivity::capacity($device),
             'low' => $status['low'] ?? false,
             'configured' => $status['configured'] ?? false,
+            'warn_below' => (float) SensorKinds::setting($device, 'warn_below_percent') ?: null,
             'reporting' => $status['reporting'] ?? false,
             'last_reading_at' => $status['at'] ?? null,
             'change_per_hour' => $change,
@@ -101,9 +116,8 @@ class SensorTiles
         ];
     }
 
-    private function gate(Device $device, ?object $activity, ?array $status): array
+    private function gate(Device $device, array $week, ?array $status): array
     {
-        $week = $this->lastWeek($activity);
         $today = Carbon::now($this->timezone)->toDateString();
         $openings = collect($week['openings'] ?? []);
         $latest = $device->readings()->where('metric', 'door_open')->latest('recorded_at')->value('recorded_at');
@@ -125,9 +139,8 @@ class SensorTiles
         ];
     }
 
-    private function pump(?object $activity, ?array $status): array
+    private function pump(array $week, ?array $status): array
     {
-        $week = $this->lastWeek($activity);
         $today = Carbon::now($this->timezone)->toDateString();
 
         return [
@@ -146,28 +159,47 @@ class SensorTiles
         ];
     }
 
+    /** The first day a tall tile's calendar shows: a Monday. */
+    private function calendarStart(): Carbon
+    {
+        return Carbon::now($this->timezone)->startOfWeek(Carbon::MONDAY)->subWeeks(self::CALENDAR_WEEKS);
+    }
+
     /**
-     * The activity's month() for this month, with last month's merged in
-     * while the last week reaches back into it.
+     * The activity's month() for each month back to the calendar's start,
+     * merged: days (and a tank's levels) by date, openings and runs in order.
      */
-    private function lastWeek(?object $activity): array
+    private function history(?object $activity): array
     {
         if (! $activity) {
             return [];
         }
+        $merged = ['days' => [], 'levels' => [], 'openings' => [], 'runs' => []];
+        $month = $this->calendarStart()->startOfMonth();
         $now = Carbon::now($this->timezone);
-        $month = $activity->month($now->copy()->startOfMonth());
-        if ($now->copy()->subDays(self::DAYS - 1)->month !== $now->month) {
-            $previous = $activity->month($now->copy()->startOfMonth()->subMonth());
-            foreach (['openings', 'runs'] as $list) {
-                if (isset($month[$list])) {
-                    $month[$list] = [...($previous[$list] ?? []), ...$month[$list]];
-                }
-            }
-            $month['days'] = ($previous['days'] ?? []) + ($month['days'] ?? []);
+        while ($month->lte($now)) {
+            $data = $activity->month($month->copy());
+            $merged['days'] = ($data['days'] ?? []) + $merged['days'];
+            $merged['levels'] = ($data['levels'] ?? []) + $merged['levels'];
+            $merged['openings'] = [...$merged['openings'], ...($data['openings'] ?? [])];
+            $merged['runs'] = [...$merged['runs'], ...($data['runs'] ?? [])];
+            $month->addMonth();
         }
 
-        return $month;
+        return $merged;
+    }
+
+    /** Each day from the calendar's start to today, as [{date, value}] - null for a day with none. */
+    private function calendar(array $days): array
+    {
+        $today = Carbon::now($this->timezone)->toDateString();
+        $dates = [];
+        for ($day = $this->calendarStart(); $day->toDateString() <= $today; $day->addDay()) {
+            $date = $day->toDateString();
+            $dates[] = ['date' => $date, 'value' => isset($days[$date]) ? round((float) $days[$date], 1) : null];
+        }
+
+        return $dates;
     }
 
     /** The last week's days, oldest first, as [{date, value}] - 0 for a day with none. */
